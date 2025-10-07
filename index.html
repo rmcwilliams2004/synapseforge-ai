@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SynapseForge AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              'brand-cyan': '#06b6d4',
+              'brand-dark': '#0f172a',
+              'brand-light': '#e2e8f0',
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .animate-fade-in {
+        animation: fadeIn 0.5s ease-out forwards;
+      }
+      
+      @keyframes slideInUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .animate-slide-in-up {
+        animation: slideInUp 0.5s ease-out forwards;
+      }
+      
+      @keyframes scaleIn {
+        from { opacity: 0; transform: scale(0.95); }
+        to { opacity: 1; transform: scale(1); }
+      }
+      .animate-scale-in {
+        animation: scaleIn 0.3s ease-out forwards;
+      }
+
+      /* Tour Styles */
+      .tour-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.7);
+        z-index: 999;
+        pointer-events: none;
+      }
+      
+      .tour-popover {
+        position: absolute;
+        background-color: #1f2937; /* gray-800 */
+        color: #e2e8f0; /* brand-light */
+        border: 2px solid #06b6d4; /* brand-cyan */
+        border-radius: 8px;
+        padding: 16px;
+        max-width: 350px;
+        z-index: 1001;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+        transition: top 0.3s ease, left 0.3s ease;
+      }
+      
+      .tour-popover-arrow {
+        position: absolute;
+        width: 0;
+        height: 0;
+        border-style: solid;
+      }
+      
+      .tour-popover-arrow.top {
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        border-width: 0 10px 10px 10px;
+        border-color: transparent transparent #06b6d4 transparent;
+      }
+      
+      .tour-popover-arrow.bottom {
+        top: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        border-width: 10px 10px 0 10px;
+        border-color: #06b6d4 transparent transparent transparent;
+      }
+      
+      .tour-highlight {
+        position: relative;
+        z-index: 1000;
+        border-radius: 6px;
+        /* The magic sauce for the spotlight effect */
+        box-shadow: 0 0 0 9999px rgba(0,0,0,0.7);
+      }
+    </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+  <script type="importmap">
+{
+  "imports": {
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.22.0",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/"
+  }
+}
+</script>
+</head>
+  <body class="bg-brand-dark">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
