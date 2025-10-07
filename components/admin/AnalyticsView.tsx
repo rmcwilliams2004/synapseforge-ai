@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react';
-import { LogEntry, Project } from '../../types';
+// FIX: Changed Project to ProjectIndexEntry to match props from AdminDashboard.
+import { LogEntry, ProjectIndexEntry } from '../../types';
 
-const BarChart = ({ data, title }: { data: { label: string; value: number, color: string }[], title: string }) => {
+const BarChart = ({ data, title }: { data: { label: string; value: number, color: string }[], title:string }) => {
     const maxValue = Math.max(...data.map(d => d.value), 1);
     return (
         <div className="bg-gray-800 border border-gray-700 p-6 rounded-lg">
@@ -37,7 +38,8 @@ const LogLevelPill = ({ level }: { level: LogEntry['level'] }) => {
 
 interface AnalyticsViewProps {
     logs: LogEntry[];
-    projects: Project[];
+    // FIX: Changed projects prop type to ProjectIndexEntry. The prop is unused but this aligns types.
+    projects: ProjectIndexEntry[];
 }
 
 export const AnalyticsView = ({ logs, projects }: AnalyticsViewProps) => {

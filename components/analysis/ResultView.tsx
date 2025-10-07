@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo } from 'react';
 import { AnalysisResult, Faction, MaterialSuggestion, ManufacturingProcess, ComparativeAnalysis, Risk, BillOfMaterialsItem, AssemblyInstructionStep, SystemSuggestion, Project, User, GeneratedDrawing } from '../../types';
 import { exportFullReportPDF, exportCostEstimatePDF, exportRiskAssessmentPDF, exportDrawingSpecPDF } from '../../services/pdfService';
@@ -47,6 +48,9 @@ interface ResultViewProps {
   onLaunchDeVinci: () => void;
   activeProject: Project | null;
   authenticatedUser: User;
+  onGenerateSummary: (result: AnalysisResult) => Promise<string | null>;
+  isSummaryLoading: boolean;
+  summaryError: string | null;
 }
 
 export const ResultView = ({
@@ -65,7 +69,10 @@ export const ResultView = ({
   onIncorporateSuggestions,
   onLaunchDeVinci,
   activeProject,
-  authenticatedUser
+  authenticatedUser,
+  onGenerateSummary,
+  isSummaryLoading,
+  summaryError
 }: ResultViewProps) => {
   const Icon = selectedFaction?.icon;
   const [showVideoModal, setShowVideoModal] = useState(false);
@@ -73,6 +80,10 @@ export const ResultView = ({
   const [drawingPrompt, setDrawingPrompt] = useState('');
   const isViewer = authenticatedUser.role === 'Viewer';
   const isDrawingInProgress = useMemo(() => (drawings || []).some(d => d.isLoading), [drawings]);
+
+  const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
+  const [summaryText, setSummaryText] = useState('');
+  const [copyButtonText, setCopyButtonText] = useState('Copy to Clipboard');
 
   const materialSuggestionTexts = useMemo(() => 
     (result.material_suggestions || []).map(mat => `Material Suggestion: ${mat.name}. Rationale: ${mat.rationale}`),
@@ -128,6 +139,20 @@ export const ResultView = ({
     }
   };
 
+  const handleGenerateSummary = async () => {
+    const summary = await onGenerateSummary(result);
+    if (summary) {
+      setSummaryText(summary);
+      setIsSummaryModalOpen(true);
+    }
+  };
+  
+  const handleCopySummary = () => {
+      navigator.clipboard.writeText(summaryText);
+      setCopyButtonText('Copied!');
+      setTimeout(() => setCopyButtonText('Copy to Clipboard'), 2000);
+  }
+
   const handleExportBOM = () => {
     const bom = result.drawingSpecification?.bill_of_materials || [];
     const jsonString = JSON.stringify(bom, null, 2);
@@ -153,7 +178,19 @@ export const ResultView = ({
             <span>Analysis via: <span className="font-semibold text-brand-cyan">{selectedFaction?.name}</span></span>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+             <button 
+              onClick={handleGenerateSummary} 
+              disabled={isSummaryLoading || isViewer}
+              className="py-2 px-4 bg-gray-700 text-white font-semibold rounded-lg border border-gray-600 hover:bg-gray-600 transition active:scale-95 text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSummaryLoading ? (
+                <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
+              )}
+              Generate Summary
+            </button>
             <button onClick={handleExportFullReport} className="py-2 px-4 bg-gray-700 text-white font-semibold rounded-lg border border-gray-600 hover:bg-gray-600 transition active:scale-95 text-sm flex items-center gap-2">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
                 Export Full Report
@@ -398,6 +435,23 @@ export const ResultView = ({
       <Modal isOpen={showVideoModal} onClose={() => setShowVideoModal(false)} onConfirm={() => { onGenerateVideo(); setShowVideoModal(false); }} title="Confirm Video Generation" confirmText="Generate">
         <p>Video generation is a computationally intensive process and may take several minutes.</p>
         <p className="mt-2 text-sm text-gray-400">In a production environment, this could be a premium feature that consumes significant resources.</p>
+      </Modal>
+
+      <Modal 
+        isOpen={isSummaryModalOpen} 
+        onClose={() => setIsSummaryModalOpen(false)} 
+        onConfirm={() => setIsSummaryModalOpen(false)}
+        title="Generated Report Summary" 
+        confirmText="Close"
+        cancelText={null}
+      >
+        <p className="text-gray-300 whitespace-pre-wrap mb-4 bg-gray-900/50 p-3 rounded-md border border-gray-600">{summaryText}</p>
+        <button 
+            onClick={handleCopySummary}
+            className="w-full py-2 px-4 bg-gray-600 text-white font-semibold rounded-lg hover:bg-gray-500 transition active:scale-95"
+        >
+            {copyButtonText}
+        </button>
       </Modal>
     </div>
   );

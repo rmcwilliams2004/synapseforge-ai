@@ -248,6 +248,32 @@ export const generateAnalysis = async (prompt: string, faction: Faction, files: 
     }
 };
 
+export const generateSummary = async (result: AnalysisResult): Promise<string> => {
+    // Select key information to avoid sending an overly large payload
+    const contextPrompt = `
+        Based on the following detailed analysis report, generate a concise executive summary (around 3-4 sentences) highlighting the most critical findings and actionable recommendations. The tone should be professional and direct. Focus on the key takeaways for a busy stakeholder, not the granular details.
+
+        Report Context:
+        - Product Name: ${result.product_name}
+        - Original Executive Summary: ${result.executive_summary}
+        - Top Material Suggestion: ${result.material_suggestions[0] ? `${result.material_suggestions[0].name} - Rationale: ${result.material_suggestions[0].rationale}` : 'N/A'}
+        - Top System Suggestion: ${result.suggested_systems[0] ? `${result.suggested_systems[0].name} - Rationale: ${result.suggested_systems[0].rationale}` : 'N/A'}
+        - Core Faction Rationale: ${result.faction_rationale.summary}
+    `;
+
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: contextPrompt,
+        config: {
+            temperature: 0.3, // Lower temperature for more factual summary
+            topP: 0.9,
+        }
+    });
+
+    return response.text.trim();
+};
+
+
 export const generateTechnicalDrawingImage = async (baseProductName: string, specificPrompt: string): Promise<string> => {
     const fullPrompt = `Generate a clean, professional, black and white technical engineering drawing for a "${baseProductName}". The drawing should specifically detail: "${specificPrompt}". The style must be a precise CAD blueprint on a white background. Include multiple orthographic views (front, top, side) and an isometric view where appropriate. Include clear annotation labels and key dimensions. Maintain a consistent, professional engineering style.`;
 

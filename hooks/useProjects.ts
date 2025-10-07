@@ -1,14 +1,16 @@
 
+
 import { useState, useEffect, useCallback } from 'react';
 // Fix: Import FactionId to resolve type error.
-import { Project, ProjectVersion, AnalysisResult, FactionId } from '../types';
+// FIX: Import ProjectIndexEntry from central types file.
+import { Project, ProjectVersion, AnalysisResult, FactionId, ProjectIndexEntry } from '../types';
 
 // Use new keys to prevent conflicts with old, oversized data structure.
 const INDEX_KEY = 'synapseforge-project-index-v4';
 const PROJECT_KEY_PREFIX = 'synapseforge-project-v4-';
 
 // Type for the flattened project metadata stored in the index
-type ProjectIndexEntry = Omit<Project, 'history'> & { searchKeywords: string };
+// FIX: Removed local type definition in favor of imported ProjectIndexEntry.
 
 /**
  * Generates a concatenated string of all searchable keywords from a project's history.
@@ -105,7 +107,7 @@ export const useProjects = () => {
             const initialProject = createNewProject({ name: 'My First Project', description: 'An example project to get you started.', tags: ["example"] });
             const { history, ...indexEntry } = initialProject;
             const keywords = getProjectKeywords(history);
-            const newIndexEntry = { ...indexEntry, searchKeywords: keywords };
+            const newIndexEntry: ProjectIndexEntry = { ...indexEntry, searchKeywords: keywords };
             
             initialIndex = [newIndexEntry];
             setProjects(initialIndex);

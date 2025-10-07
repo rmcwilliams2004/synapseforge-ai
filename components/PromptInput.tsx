@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { User } from '../types';
 
 interface PromptInputProps {
@@ -6,6 +6,10 @@ interface PromptInputProps {
   onProjectNameChange: (name: string) => void;
   prompt: string;
   onPromptChange: (prompt: string) => void;
+  onUndo: () => void;
+  onRedo: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
   files: File[];
   onFilesChange: (files: File[]) => void;
   onEngage: () => void;
@@ -22,6 +26,10 @@ export const PromptInput = ({
   onProjectNameChange, 
   prompt, 
   onPromptChange, 
+  onUndo,
+  onRedo,
+  canUndo,
+  canRedo,
   files, 
   onFilesChange, 
   onEngage, 
@@ -33,6 +41,27 @@ export const PromptInput = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const isViewer = authenticatedUser.role === 'Viewer';
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const isUndo = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z';
+      const isRedo = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'y';
+      const isMacRedo = event.metaKey && event.shiftKey && event.key.toLowerCase() === 'z';
+
+      if (isUndo && !event.shiftKey) { // Exclude Shift+Ctrl+Z
+        event.preventDefault();
+        if (canUndo) onUndo();
+      } else if (isRedo || isMacRedo) {
+        event.preventDefault();
+        if (canRedo) onRedo();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [canUndo, canRedo, onUndo, onRedo]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -71,7 +100,17 @@ export const PromptInput = ({
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-xl font-semibold text-brand-light mb-3">2. Project Name & Concept</h2>
+        <div className="flex justify-between items-center mb-3">
+          <h2 className="text-xl font-semibold text-brand-light">2. Project Name & Concept</h2>
+          <div className="flex items-center gap-1">
+            <button onClick={onUndo} disabled={!canUndo || isLoading || isViewer} className="p-2 text-gray-400 rounded-md hover:bg-gray-700 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition" title="Undo (Ctrl+Z)">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" /></svg>
+            </button>
+            <button onClick={onRedo} disabled={!canRedo || isLoading || isViewer} className="p-2 text-gray-400 rounded-md hover:bg-gray-700 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition" title="Redo (Ctrl+Y)">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="m15 15 6-6m0 0-6-6m6 6H9a6 6 0 0 0 0 12h3" /></svg>
+            </button>
+          </div>
+        </div>
          <input
           type="text"
           value={projectName}

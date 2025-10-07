@@ -178,6 +178,10 @@ export interface Project {
   updatedAt: string; // Date of the latest version
 }
 
+// FIX: Add ProjectIndexEntry type for use across the application.
+// This type is used for project listings to avoid loading the full 'history' for every project.
+export type ProjectIndexEntry = Omit<Project, 'history'> & { searchKeywords?: string };
+
 // --- DEVINCI CONVERSATIONAL AI ---
 export type DeVinciState = 'idle' | 'connecting' | 'listening' | 'speaking' | 'thinking' | 'error';
 

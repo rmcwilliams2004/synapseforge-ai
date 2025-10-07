@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { User, Project, LogEntry } from '../../types';
+// FIX: Changed Project to ProjectIndexEntry to match the data passed from App.tsx.
+import { User, ProjectIndexEntry, LogEntry } from '../../types';
 import { Sidebar } from './Sidebar';
 import { DashboardView } from './DashboardView';
 import { UserManagementView } from './UserManagementView';
@@ -9,7 +10,8 @@ import { AnalyticsView } from './AnalyticsView';
 interface AdminDashboardProps {
     authenticatedUser: User;
     users: User[];
-    projects: Project[];
+    // FIX: Changed projects prop to use ProjectIndexEntry to resolve type mismatch from App.tsx.
+    projects: ProjectIndexEntry[];
     logs: LogEntry[];
     onUpdateUser: (user: User) => void;
     onDeleteUser: (userId: string) => void;

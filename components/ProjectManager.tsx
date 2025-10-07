@@ -1,10 +1,12 @@
 
+
 import React, { useState, useMemo } from 'react';
-import { Project, ProjectVersion, AnalysisResult, User, Role } from '../types';
+// FIX: Import ProjectIndexEntry from central types file.
+import { Project, User, Role, ProjectIndexEntry } from '../types';
 import { Modal } from './Modal';
 
 // This is a simplified version of the Project type used for the list/index.
-type ProjectIndexEntry = Omit<Project, 'history'> & { searchKeywords?: string };
+// FIX: Removed local type definition in favor of imported ProjectIndexEntry.
 
 interface ProjectManagerProps {
     projects: ProjectIndexEntry[];

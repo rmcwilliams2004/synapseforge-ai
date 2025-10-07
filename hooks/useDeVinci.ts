@@ -158,7 +158,10 @@ export const useDeVinci = () => {
                         }
                     } else if (message.serverContent?.outputTranscription) {
                         const { text, isFinal } = message.serverContent.outputTranscription;
-                         if (state !== 'speaking') setState('speaking');
+                         // FIX: Removed condition `if (state !== 'speaking')` to fix a stale closure bug.
+                         // The `state` variable was not up-to-date inside this callback, causing the condition to be unreliable.
+                         // Setting state unconditionally correctly transitions to 'speaking' when the model starts talking.
+                        setState('speaking');
                         setTranscript(prev => {
                             const last = prev[prev.length - 1];
                             if (last?.source === 'devinci' && !last.isFinal) {

@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { User, Project, LogEntry } from '../../types';
+// FIX: Changed Project to ProjectIndexEntry to avoid needing the full 'history' object.
+import { User, ProjectIndexEntry, LogEntry } from '../../types';
 
 interface StatCardProps {
     title: string;
@@ -51,15 +52,18 @@ const Icons = {
 
 interface DashboardViewProps {
     users: User[];
-    projects: Project[];
+    // FIX: Changed projects prop to use ProjectIndexEntry.
+    projects: ProjectIndexEntry[];
     logs: LogEntry[];
 }
 
 export const DashboardView = ({ users, projects, logs }: DashboardViewProps) => {
 
+    // FIX: Changed totalAnalyses calculation to be based on user.analysesRun.
+    // This is more accurate to the metric "Analyses Run" and removes the dependency on the full project.history object.
     const totalAnalyses = useMemo(() => {
-        return projects.reduce((sum, project) => sum + project.history.length, 0);
-    }, [projects]);
+        return users.reduce((sum, user) => sum + user.analysesRun, 0);
+    }, [users]);
 
     const modelUsageData = useMemo(() => {
         const coreAnalysisCount = logs.filter(log => log.message.includes('Core Analysis Failed') || log.message.includes('completed successfully')).length;

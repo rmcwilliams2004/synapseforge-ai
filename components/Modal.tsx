@@ -9,6 +9,8 @@ interface ModalProps {
   confirmText?: string;
   cancelText?: string | null;
   onConfirm: () => void;
+  // FIX: Added 'children' to ModalProps to allow the component to accept child elements for its content.
+  children: React.ReactNode;
 }
 
 export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, confirmText = 'Confirm', cancelText, onConfirm }) => {

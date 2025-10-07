@@ -20,12 +20,19 @@ import { ProjectModal } from './components/ProjectModal';
 import { CommitModal } from './components/CommitModal';
 import { AuthPage } from './components/AuthPage';
 import { ProfileModal } from './components/ProfileModal';
+import { useUndoRedo } from './hooks/useUndoRedo';
+import { useSummaryGenerator } from './hooks/useSummaryGenerator';
 
 type VersionDataToSave = {
     prompt: string;
     result: AnalysisResult;
     newFileUrls: string[];
 } | null;
+
+interface EditorState {
+  prompt: string;
+  selectedFaction: Faction | null;
+}
 
 
 const fileToDataUrl = (file: File): Promise<string> => {
@@ -52,10 +59,19 @@ function App() {
   
   // State for the "editor" or current working area
   const [projectName, setProjectName] = useState('');
-  const [prompt, setPrompt] = useState('');
   const [files, setFiles] = useState<File[]>([]);
-  const [selectedFaction, setSelectedFaction] = useState<Faction | null>(null);
   const [activeVersionIndex, setActiveVersionIndex] = useState(0);
+
+  const {
+    state: editorState,
+    setState: setEditorState,
+    undo: undoEditorState,
+    redo: redoEditorState,
+    canUndo: canUndoEditorState,
+    canRedo: canRedoEditorState,
+    resetState: resetEditorState,
+  } = useUndoRedo<EditorState>({ prompt: '', selectedFaction: null });
+  const { prompt, selectedFaction } = editorState;
   
   // --- Auth, Admin & User State ---
   const [authenticatedUser, setAuthenticatedUser] = useState<User | null>(null);
@@ -88,6 +104,7 @@ function App() {
 
   const { videoUrl, isVideoLoading, videoError, generateVideo, clearVideo } = useVideoGenerator(displayedResult?.product_name || null, addLog);
   const { drawings, requestDrawing, removeDrawing, setDrawings, clearAllDrawings } = useDrawingGenerator(displayedResult?.product_name || null, addLog);
+  const { summary, isSummaryLoading, summaryError, generateSummary, clearSummary } = useSummaryGenerator(addLog);
   
   const [isTourOpen, setIsTourOpen] = useState(false);
   const [tourStep, setTourStep] = useState(0);
@@ -188,9 +205,8 @@ function App() {
         setProjectName(activeProject.name);
         const versionToLoad = activeProject.history[activeVersionIndex] || activeProject.history[0];
         if (versionToLoad) {
-            setPrompt(versionToLoad.prompt);
             const faction = ENGINEERING_PHILOSOPHIES.find(f => f.id === versionToLoad.factionId) || null;
-            setSelectedFaction(faction);
+            resetEditorState({ prompt: versionToLoad.prompt, selectedFaction: faction });
             setFiles([]); // Clear staged files when loading a version
             setDrawings(versionToLoad.drawings || []); // Load drawings
             setResult(versionToLoad.result);
@@ -199,14 +215,13 @@ function App() {
     } else {
         // Reset editor if no project is active
         setProjectName('');
-        setPrompt('');
-        setSelectedFaction(ENGINEERING_PHILOSOPHIES[0]);
+        resetEditorState({ prompt: '', selectedFaction: ENGINEERING_PHILOSOPHIES[0] });
         setFiles([]);
         clearAllDrawings();
         clearAnalysis();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeProject, activeVersionIndex]);
+  }, [activeProject, activeVersionIndex, resetEditorState]);
 
   const prepareToSaveVersion = (analysisResult: AnalysisResult, newPrompt: string, newFileUrls: string[]) => {
       setVersionDataToSave({ result: analysisResult, prompt: newPrompt, newFileUrls });
@@ -266,7 +281,7 @@ function App() {
 
     const suggestionsFormatted = suggestionTexts.map(s => `- ${s}`).join('\n');
     const newPrompt = `${activeVersion.prompt}\n\n---\n[User Action] Incorporate the following AI suggestions into the design:\n${suggestionsFormatted}`;
-    setPrompt(newPrompt); // Update UI for user to see
+    setEditorState({ ...editorState, prompt: newPrompt }); // Update UI for user to see
     
     addLog('INFO', `Incorporating ${suggestionTexts.length} suggestions into project "${activeProject.name}".`);
     
@@ -319,10 +334,12 @@ function App() {
     clearVideo();
     clearAllDrawings();
     clearInProgressAnalysis();
+    clearSummary();
   };
 
   const handleLoadVersion = (index: number) => {
     clearInProgressAnalysis();
+    clearSummary();
     setActiveVersionIndex(index);
   };
   
@@ -334,6 +351,7 @@ function App() {
 
   const handleSelectProject = (projectId: string) => {
     clearInProgressAnalysis();
+    clearSummary();
     onSelectProject(projectId);
     setActiveVersionIndex(0); 
   };
@@ -347,13 +365,15 @@ function App() {
   const handleResumeSession = useCallback(() => {
     if (savedSessionData) {
         setProjectName(savedSessionData.projectName);
-        setPrompt(savedSessionData.prompt);
-        setSelectedFaction(ENGINEERING_PHILOSOPHIES.find(f => f.id === savedSessionData.factionId) || null);
+        resetEditorState({
+          prompt: savedSessionData.prompt,
+          selectedFaction: ENGINEERING_PHILOSOPHIES.find(f => f.id === savedSessionData.factionId) || null,
+        });
         setResult(savedSessionData.result);
         setSavedSessionData(null); // Hide banner
         addLog('INFO', `Resumed previous session for project "${savedSessionData.projectName}".`);
     }
-  }, [savedSessionData, setResult, addLog]);
+  }, [savedSessionData, setResult, addLog, resetEditorState]);
 
   const handleDismissResume = useCallback(() => {
     clearInProgressAnalysis();
@@ -365,7 +385,7 @@ function App() {
     return <AuthPage onLogin={handleLogin} onSignUp={handleSignUp} />;
   }
   
-  const isBusy = isLoading || isVideoLoading || drawings.some(d => d.isLoading);
+  const isBusy = isLoading || isVideoLoading || drawings.some(d => d.isLoading) || isSummaryLoading;
 
   return (
     <div className="bg-gray-900 min-h-screen text-gray-200 font-sans">
@@ -410,7 +430,7 @@ function App() {
                 />
                 <FactionSelector
                   selectedFaction={selectedFaction}
-                  onSelectFaction={setSelectedFaction}
+                  onSelectFaction={(faction) => setEditorState({ ...editorState, selectedFaction: faction })}
                   disabled={isBusy}
                   authenticatedUser={authenticatedUser}
                 />
@@ -418,7 +438,11 @@ function App() {
                   projectName={projectName}
                   onProjectNameChange={handleProjectNameChange}
                   prompt={prompt}
-                  onPromptChange={setPrompt}
+                  onPromptChange={(newPrompt) => setEditorState({ ...editorState, prompt: newPrompt })}
+                  onUndo={undoEditorState}
+                  onRedo={redoEditorState}
+                  canUndo={canUndoEditorState}
+                  canRedo={canRedoEditorState}
                   files={files}
                   onFilesChange={setFiles}
                   onEngage={handleStartAnalysis}
@@ -448,6 +472,9 @@ function App() {
                   onLaunchDeVinci={() => setIsDeVinciOpen(true)}
                   activeProject={activeProject}
                   authenticatedUser={authenticatedUser}
+                  onGenerateSummary={generateSummary}
+                  isSummaryLoading={isSummaryLoading}
+                  summaryError={summaryError}
                 />
               </div>
             </div>

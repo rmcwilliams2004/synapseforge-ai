@@ -23,6 +23,9 @@ interface AnalysisDisplayProps {
   onLaunchDeVinci: () => void;
   activeProject: Project | null;
   authenticatedUser: User;
+  onGenerateSummary: (result: AnalysisResult) => Promise<string | null>;
+  isSummaryLoading: boolean;
+  summaryError: string | null;
 }
 
 export const AnalysisDisplay = (props: AnalysisDisplayProps) => {
@@ -53,6 +56,9 @@ export const AnalysisDisplay = (props: AnalysisDisplayProps) => {
         onLaunchDeVinci={props.onLaunchDeVinci}
         activeProject={props.activeProject}
         authenticatedUser={props.authenticatedUser}
+        onGenerateSummary={props.onGenerateSummary}
+        isSummaryLoading={props.isSummaryLoading}
+        summaryError={props.summaryError}
       />
     );
   }
