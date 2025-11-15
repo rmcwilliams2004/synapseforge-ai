@@ -45,6 +45,8 @@ interface AnalyticsViewProps {
 export const AnalyticsView = ({ logs, projects }: AnalyticsViewProps) => {
     const [logFilter, setLogFilter] = useState<LogEntry['level'] | 'ALL'>('ALL');
     const [logSearchTerm, setLogSearchTerm] = useState('');
+    const [userFilter, setUserFilter] = useState<string>('ALL');
+    const [projectFilter, setProjectFilter] = useState<string>('ALL');
 
     const analysisSuccessRate = useMemo(() => {
         const success = logs.filter(l => l.message.includes('completed successfully')).length;
@@ -54,13 +56,40 @@ export const AnalyticsView = ({ logs, projects }: AnalyticsViewProps) => {
             { label: 'Failure', value: failure, color: 'bg-red-600' },
         ];
     }, [logs]);
+    
+    const { uniqueUsers, uniqueProjects } = useMemo(() => {
+        const users = new Set<string>();
+        const projects = new Set<string>();
+        logs.forEach(log => {
+            if (log.user) users.add(log.user);
+            if (log.context) projects.add(log.context);
+        });
+        return { 
+            uniqueUsers: Array.from(users).sort(), 
+            uniqueProjects: Array.from(projects).sort() 
+        };
+    }, [logs]);
 
     const filteredLogs = useMemo(() => {
+        const lowercasedSearch = logSearchTerm.toLowerCase();
         return logs
             .filter(log => logFilter === 'ALL' || log.level === logFilter)
-            .filter(log => log.message.toLowerCase().includes(logSearchTerm.toLowerCase()))
+            .filter(log => userFilter === 'ALL' || log.user === userFilter)
+            .filter(log => projectFilter === 'ALL' || log.context === projectFilter)
+            .filter(log => 
+                log.message.toLowerCase().includes(lowercasedSearch) ||
+                (log.user && log.user.toLowerCase().includes(lowercasedSearch)) ||
+                (log.context && log.context.toLowerCase().includes(lowercasedSearch))
+            )
             .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-    }, [logs, logFilter, logSearchTerm]);
+    }, [logs, logFilter, logSearchTerm, userFilter, projectFilter]);
+
+    const rowClasses: Record<LogEntry['level'], string> = {
+        'INFO': 'hover:bg-gray-700/50',
+        'WARN': 'bg-yellow-900/10 hover:bg-yellow-900/30',
+        'ERROR': 'bg-red-900/10 hover:bg-red-900/30',
+    };
+
 
     return (
         <div className="space-y-6 animate-fade-in">
@@ -70,13 +99,13 @@ export const AnalyticsView = ({ logs, projects }: AnalyticsViewProps) => {
 
             <div>
                 <h3 className="text-lg font-semibold text-brand-light mb-4">System Event Logs</h3>
-                <div className="flex gap-4 mb-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                      <input
                         type="text"
                         placeholder="Search logs..."
                         value={logSearchTerm}
                         onChange={(e) => setLogSearchTerm(e.target.value)}
-                        className="w-full bg-gray-800 border-2 border-gray-700 rounded-lg px-4 py-2 text-gray-300 focus:ring-brand-cyan focus:border-brand-cyan"
+                        className="w-full bg-gray-800 border-2 border-gray-700 rounded-lg px-4 py-2 text-gray-300 focus:ring-brand-cyan focus:border-brand-cyan lg:col-span-2"
                     />
                      <select
                         value={logFilter}
@@ -88,22 +117,42 @@ export const AnalyticsView = ({ logs, projects }: AnalyticsViewProps) => {
                         <option value="WARN">Warning</option>
                         <option value="ERROR">Error</option>
                     </select>
+                     <select
+                        value={userFilter}
+                        onChange={(e) => setUserFilter(e.target.value)}
+                        className="bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-purple-500 focus:border-purple-500 p-2"
+                    >
+                        <option value="ALL">All Users</option>
+                        {uniqueUsers.map(user => <option key={user} value={user}>{user}</option>)}
+                    </select>
+                     <select
+                        value={projectFilter}
+                        onChange={(e) => setProjectFilter(e.target.value)}
+                        className="bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-purple-500 focus:border-purple-500 p-2 lg:col-start-4"
+                    >
+                        <option value="ALL">All Projects</option>
+                        {uniqueProjects.map(proj => <option key={proj} value={proj}>{proj}</option>)}
+                    </select>
                 </div>
                  <div className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden max-h-[50vh] overflow-y-auto">
-                    <table className="w-full text-left">
+                    <table className="w-full text-left table-fixed">
                         <thead className="bg-gray-900 text-sm text-gray-300 uppercase sticky top-0">
                             <tr>
-                                <th className="px-6 py-3 w-1/5">Timestamp</th>
-                                <th className="px-6 py-3 w-24">Level</th>
-                                <th className="px-6 py-3">Message</th>
+                                <th className="px-6 py-3 w-[20%]">Timestamp</th>
+                                <th className="px-6 py-3 w-[15%]">User</th>
+                                <th className="px-6 py-3 w-[10%]">Level</th>
+                                <th className="px-6 py-3 w-[35%]">Message</th>
+                                <th className="px-6 py-3 w-[20%]">Context</th>
                             </tr>
                         </thead>
                         <tbody className="text-gray-200 text-sm font-mono">
                             {filteredLogs.map(log => (
-                                <tr key={log.id} className="border-b border-gray-700 hover:bg-gray-700/50">
-                                    <td className="px-6 py-3 text-gray-400">{new Date(log.timestamp).toLocaleString()}</td>
+                                <tr key={log.id} className={`border-b border-gray-700 transition-colors ${rowClasses[log.level]}`}>
+                                    <td className="px-6 py-3 text-gray-400 truncate">{new Date(log.timestamp).toLocaleString()}</td>
+                                    <td className="px-6 py-3 text-cyan-300 truncate" title={log.user}>{log.user}</td>
                                     <td className="px-6 py-3"><LogLevelPill level={log.level} /></td>
-                                    <td className="px-6 py-3">{log.message}</td>
+                                    <td className="px-6 py-3 truncate" title={log.message}>{log.message}</td>
+                                    <td className="px-6 py-3 text-purple-300 truncate" title={log.context}>{log.context}</td>
                                 </tr>
                             ))}
                         </tbody>

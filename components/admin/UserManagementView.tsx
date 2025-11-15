@@ -16,6 +16,7 @@ const formatDate = (isoString: string) => {
 const RolePill = ({ role }: { role: Role }) => {
     const roleColors: Record<Role, string> = {
         [Role.Admin]: 'bg-purple-600 text-purple-100',
+        [Role.Manager]: 'bg-teal-600 text-teal-100',
         [Role.Editor]: 'bg-blue-600 text-blue-100',
         [Role.Viewer]: 'bg-gray-600 text-gray-100',
     };
@@ -55,7 +56,7 @@ export const UserManagementView = ({ authenticatedUser, users, onUpdateUser, onD
                     </thead>
                     <tbody className="text-gray-200">
                         {users.map(user => (
-                            <tr key={user.id} className="border-b border-gray-700 hover:bg-gray-700/50">
+                            <tr key={user.id} className="border-b border-gray-700 hover:bg-gray-700/50 transition-colors duration-150">
                                 <td className="px-6 py-4 font-semibold">{user.name}</td>
                                 <td className="px-6 py-4">
                                     {authenticatedUser.id === user.id ? (

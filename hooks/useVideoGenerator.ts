@@ -1,16 +1,21 @@
 import { useState } from 'react';
-import { generateExplodedViewVideo, parseApiError } from '../services/geminiService';
+import { generateVideo as performVideoGeneration, parseApiError } from '../services/geminiService';
 import { LogEntry } from '../types';
 
-export const useVideoGenerator = (prompt: string | null, addLog: (level: LogEntry['level'], message: string) => void) => {
+export const useVideoGenerator = (addLog: (level: LogEntry['level'], message: string) => void) => {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [isVideoLoading, setIsVideoLoading] = useState<boolean>(false);
   const [videoError, setVideoError] = useState<string | null>(null);
 
-  const generateVideo = async () => {
+  const generateVideo = async (prompt: string, imageFile?: File, aspectRatio?: '16:9' | '9:16') => {
     if (!prompt) {
-      setVideoError("Cannot generate video without a successful prior analysis.");
+      setVideoError("Cannot generate video without a prompt.");
       return;
+    }
+
+    // Per Veo guidelines, check for API key selection
+    if (typeof (window as any).aistudio !== 'undefined' && !(await (window as any).aistudio.hasSelectedApiKey())) {
+        await (window as any).aistudio.openSelectKey();
     }
 
     setIsVideoLoading(true);
@@ -19,13 +24,19 @@ export const useVideoGenerator = (prompt: string | null, addLog: (level: LogEntr
     addLog('INFO', `Starting video generation for "${prompt}".`);
 
     try {
-      const url = await generateExplodedViewVideo(prompt);
+      const url = await performVideoGeneration(prompt, imageFile, aspectRatio);
       setVideoUrl(url);
       addLog('INFO', `Video generation for "${prompt}" succeeded.`);
     } catch (e) {
       const errorMessage = parseApiError(e);
       setVideoError(errorMessage);
       addLog('ERROR', `Video generation for "${prompt}" failed: ${errorMessage}`);
+      // Per guidelines, if the error indicates a missing entity, re-prompt for API key.
+      if (errorMessage.includes('Requested entity was not found.')) {
+           if (typeof (window as any).aistudio !== 'undefined') {
+               await (window as any).aistudio.openSelectKey();
+           }
+       }
     } finally {
       setIsVideoLoading(false);
     }

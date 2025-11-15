@@ -1,4 +1,5 @@
 import React from 'react';
+import { User, Role } from '../../types';
 
 type AdminView = 'dashboard' | 'users' | 'analytics';
 
@@ -6,6 +7,7 @@ interface SidebarProps {
     activeView: AdminView;
     setActiveView: (view: AdminView) => void;
     onOpenTechDoc: () => void;
+    authenticatedUser: User;
 }
 
 const NavItem = ({ label, icon, isActive, onClick }: { label: string, icon: React.ReactNode, isActive: boolean, onClick: () => void }) => (
@@ -29,13 +31,19 @@ const Icons = {
     TechDoc: () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.25 6.75 22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3-4.5 16.5" /></svg>,
 };
 
-export const Sidebar = ({ activeView, setActiveView, onOpenTechDoc }: SidebarProps) => {
+export const Sidebar = ({ activeView, setActiveView, onOpenTechDoc, authenticatedUser }: SidebarProps) => {
     return (
         <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 h-full">
             <nav className="space-y-2">
-                <NavItem label="Dashboard" icon={<Icons.Dashboard />} isActive={activeView === 'dashboard'} onClick={() => setActiveView('dashboard')} />
-                <NavItem label="User Management" icon={<Icons.Users />} isActive={activeView === 'users'} onClick={() => setActiveView('users')} />
-                <NavItem label="Analytics" icon={<Icons.Analytics />} isActive={activeView === 'analytics'} onClick={() => setActiveView('analytics')} />
+                {authenticatedUser.role === Role.Admin && (
+                    <>
+                        <NavItem label="Dashboard" icon={<Icons.Dashboard />} isActive={activeView === 'dashboard'} onClick={() => setActiveView('dashboard')} />
+                        <NavItem label="User Management" icon={<Icons.Users />} isActive={activeView === 'users'} onClick={() => setActiveView('users')} />
+                    </>
+                )}
+                {[Role.Admin, Role.Manager].includes(authenticatedUser.role) && (
+                     <NavItem label="Analytics" icon={<Icons.Analytics />} isActive={activeView === 'analytics'} onClick={() => setActiveView('analytics')} />
+                )}
                 <div className="pt-2 mt-2 border-t border-gray-700">
                     <NavItem label="Technical Doc" icon={<Icons.TechDoc />} isActive={false} onClick={onOpenTechDoc} />
                 </div>

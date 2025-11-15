@@ -11,6 +11,7 @@ interface ProfileModalProps {
 const RolePill = ({ role }: { role: string }) => {
     const roleColors: { [key: string]: string } = {
         'Admin': 'bg-purple-600 text-purple-100',
+        'Manager': 'bg-teal-600 text-teal-100',
         'Editor': 'bg-blue-600 text-blue-100',
         'Viewer': 'bg-gray-600 text-gray-100',
     };
@@ -44,10 +45,19 @@ export const ProfileModal = ({ isOpen, onClose, user, onSave }: ProfileModalProp
                     <h2 className="text-2xl font-bold text-brand-light">Your Profile</h2>
                     <button onClick={onClose} className="text-gray-400 hover:text-white transition text-3xl font-bold">&times;</button>
                 </div>
+                
+                <div className="flex items-center gap-4 mb-6">
+                    <img src={user.picture} alt={user.name} className="w-20 h-20 rounded-full border-4 border-gray-600" />
+                    <div>
+                        <h3 className="text-xl font-bold text-white">{name}</h3>
+                        <p className="text-sm text-gray-400">{user.email}</p>
+                    </div>
+                </div>
+
 
                 <div className="space-y-4">
                     <div>
-                        <label htmlFor="profileName" className="block text-sm font-medium text-gray-400 mb-1">Name</label>
+                        <label htmlFor="profileName" className="block text-sm font-medium text-gray-400 mb-1">Display Name</label>
                         <input
                             id="profileName"
                             type="text"

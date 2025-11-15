@@ -41,33 +41,39 @@ interface FileSource {
     fileUrls?: string[];
 }
 
+export const runFullAnalysis = async (projectName: string, prompt: string, faction: Faction, source: FileSource): Promise<AnalysisResult> => {
+    const fileParts = [];
+    // Prioritize newly uploaded files over saved project files
+    if (source.files.length > 0) {
+      for(const file of source.files) {
+          if (!file.type.startsWith('image/') && !file.type.endsWith('pdf')) {
+              throw new Error('Only image and PDF files are supported for analysis.');
+          }
+          fileParts.push(await fileToGenerativePart(file));
+      }
+    } else if (source.fileUrls && source.fileUrls.length > 0) {
+      for(const url of source.fileUrls) {
+          fileParts.push(dataUrlToGenerativePart(url));
+      }
+    }
+    
+    const analysisResult = await performAnalysis(projectName, prompt, faction, fileParts.length > 0 ? fileParts : null);
+    return analysisResult;
+};
+
+
 export const useAnalysis = (addLog: (level: LogEntry['level'], message: string) => void) => {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  const generateAnalysis = async (prompt: string, faction: Faction, source: FileSource): Promise<AnalysisResult | null> => {
+  const generateAnalysis = async (projectName: string, prompt: string, faction: Faction, source: FileSource): Promise<AnalysisResult | null> => {
     setIsLoading(true);
     setError(null);
     setResult(null);
 
     try {
-      const fileParts = [];
-      // Prioritize newly uploaded files over saved project files
-      if (source.files.length > 0) {
-        for(const file of source.files) {
-            if (!file.type.startsWith('image/') && !file.type.endsWith('pdf')) {
-                throw new Error('Only image and PDF files are supported for analysis.');
-            }
-            fileParts.push(await fileToGenerativePart(file));
-        }
-      } else if (source.fileUrls && source.fileUrls.length > 0) {
-        for(const url of source.fileUrls) {
-            fileParts.push(dataUrlToGenerativePart(url));
-        }
-      }
-      
-      const analysisResult = await performAnalysis(prompt, faction, fileParts.length > 0 ? fileParts : null);
+      const analysisResult = await runFullAnalysis(projectName, prompt, faction, source);
       setResult(analysisResult);
       return analysisResult;
     } catch (e) {

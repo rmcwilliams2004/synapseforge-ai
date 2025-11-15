@@ -1,4 +1,5 @@
-import { Faction, FactionId, User, Role } from './types';
+import React from 'react';
+import { Faction, FactionId, User, Role, Comment } from './types';
 import { AetheriumIcon } from './components/icons/AetheriumIcon';
 import { TerraFirmaIcon } from './components/icons/TerraFirmaIcon';
 import { SyntheticaIcon } from './components/icons/SyntheticaIcon';
@@ -44,10 +45,41 @@ export const ENGINEERING_PHILOSOPHIES: Faction[] = [
 
 const now = new Date();
 export const MOCK_USERS: User[] = [
-    { id: 'user-1', name: 'Alex (Admin)', password: 'password123', role: Role.Admin, analysesRun: 12, lastActive: now.toISOString() },
-    { id: 'user-2', name: 'Blake (Demo User)', password: 'password123', role: Role.Editor, analysesRun: 25, lastActive: new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString() },
-    { id: 'user-3', name: 'Casey (Viewer)', password: 'password123', role: Role.Viewer, analysesRun: 3, lastActive: new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString() },
-    { id: 'user-4', name: 'Dana (Editor)', password: 'password123', role: Role.Editor, analysesRun: 8, lastActive: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString() },
+    { id: 'user-1', name: 'Alex (Admin)', email: 'alex@example.com', picture: `https://i.pravatar.cc/150?u=alex@example.com`, role: Role.Admin, analysesRun: 12, lastActive: now.toISOString() },
+    { id: 'user-5', name: 'Devin (Manager)', email: 'devin@example.com', picture: `https://i.pravatar.cc/150?u=devin@example.com`, role: Role.Manager, analysesRun: 18, lastActive: new Date(now.getTime() - 1 * 60 * 60 * 1000).toISOString() },
+    { id: 'user-2', name: 'Blake (Demo User)', email: 'blake@example.com', picture: `https://i.pravatar.cc/150?u=blake@example.com`, role: Role.Editor, analysesRun: 25, lastActive: new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString() },
+    { id: 'user-4', name: 'Dana (Editor)', email: 'dana@example.com', picture: `https://i.pravatar.cc/150?u=dana@example.com`, role: Role.Editor, analysesRun: 8, lastActive: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString() },
+    { id: 'user-3', name: 'Casey (Viewer)', email: 'casey@example.com', picture: `https://i.pravatar.cc/150?u=casey@example.com`, role: Role.Viewer, analysesRun: 3, lastActive: new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString() },
+];
+
+export const MOCK_COMMENTS: Comment[] = [
+    {
+        id: 'c1',
+        userId: 'user-4',
+        userName: 'Dana (Editor)',
+        userPicture: MOCK_USERS.find(u => u.id === 'user-4')?.picture || '',
+        text: 'This looks promising, but have we considered the fatigue life of this material under cyclic loading?',
+        createdAt: new Date(now.getTime() - 10 * 60 * 1000).toISOString(),
+        sectionId: 'ai_suggestions',
+    },
+    {
+        id: 'c2',
+        userId: 'user-2',
+        userName: 'Blake (Demo User)',
+        userPicture: MOCK_USERS.find(u => u.id === 'user-2')?.picture || '',
+        text: 'Good point Dana. We should probably run an FEA simulation on the main housing to check stress concentrations.',
+        createdAt: new Date(now.getTime() - 5 * 60 * 1000).toISOString(),
+        sectionId: 'ai_suggestions',
+    },
+     {
+        id: 'c3',
+        userId: 'user-5',
+        userName: 'Devin (Manager)',
+        userPicture: MOCK_USERS.find(u => u.id === 'user-5')?.picture || '',
+        text: 'Agreed. Let\'s prioritize that simulation. Also, what is the estimated cost impact of this material choice?',
+        createdAt: new Date(now.getTime() - 2 * 60 * 1000).toISOString(),
+        sectionId: 'ai_suggestions',
+    }
 ];
 
 

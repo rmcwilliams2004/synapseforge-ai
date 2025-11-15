@@ -1,7 +1,7 @@
 
 
 import React from 'react';
-import { Faction, User } from '../types';
+import { Faction, User, FactionId } from '../types';
 import { ENGINEERING_PHILOSOPHIES } from '../constants';
 
 interface FactionSelectorProps {
@@ -21,17 +21,39 @@ interface FactionCardProps {
 
 const FactionCard: React.FC<FactionCardProps> = ({ faction, isSelected, onSelect, disabled }) => {
   const Icon = faction.icon;
+
+  // Color schemes for each faction
+  const factionColors: Record<FactionId, { selected: string; hover: string; icon: string }> = {
+    [FactionId.ADVANCED_MATERIALS]: {
+      selected: 'border-brand-cyan bg-cyan-900/40 shadow-lg shadow-cyan-900/50',
+      hover: 'hover:border-brand-cyan',
+      icon: 'text-brand-cyan',
+    },
+    [FactionId.PRAGMATIC_PRODUCTION]: {
+      selected: 'border-amber-500 bg-amber-900/40 shadow-lg shadow-amber-900/50',
+      hover: 'hover:border-amber-500',
+      icon: 'text-amber-500',
+    },
+    [FactionId.SYSTEMS_AUTOMATION]: {
+      selected: 'border-purple-500 bg-purple-900/40 shadow-lg shadow-purple-900/50',
+      hover: 'hover:border-purple-500',
+      icon: 'text-purple-500',
+    },
+  };
+
+  const colors = factionColors[faction.id];
+
   return (
     <div
       onClick={() => !disabled && onSelect()}
       className={`p-4 border-2 rounded-lg transition-all duration-300 ${
         isSelected
-          ? 'border-brand-cyan bg-cyan-900/40 shadow-lg shadow-cyan-900/50'
-          : 'border-gray-700 bg-gray-800 hover:border-gray-500'
+          ? colors.selected
+          : `border-gray-700 bg-gray-800 ${colors.hover}`
       } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:-translate-y-1'}`}
     >
       <div className="flex items-center mb-2">
-        <Icon className="w-8 h-8 mr-3 text-brand-cyan" />
+        <Icon className={`w-8 h-8 mr-3 ${colors.icon}`} />
         <h3 className="text-lg font-bold text-brand-light">{faction.name}</h3>
       </div>
       <p className="text-sm text-gray-400 font-mono mb-2">

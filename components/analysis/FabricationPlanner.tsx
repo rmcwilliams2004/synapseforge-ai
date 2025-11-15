@@ -1,0 +1,132 @@
+import React, { useState } from 'react';
+import { FabricationPlan, ManufacturingProcessType, AnalysisResult, User } from '../../types';
+import { useFabricationPlanner } from '../../hooks/useFabricationPlanner';
+import { useGCodeVisualizer } from '../../hooks/useGCodeVisualizer';
+
+interface FabricationPlannerProps {
+    fabricationPlanner: ReturnType<typeof useFabricationPlanner>;
+    analysisResult: AnalysisResult;
+    isViewer: boolean;
+    gcodeVisualizer: ReturnType<typeof useGCodeVisualizer>;
+}
+
+const processOptions: ManufacturingProcessType[] = ['CNC Machining', '3D Printing', 'Sheet Metal'];
+
+export const FabricationPlanner: React.FC<FabricationPlannerProps> = ({ fabricationPlanner, analysisResult, isViewer, gcodeVisualizer }) => {
+    const [selectedProcess, setSelectedProcess] = useState<ManufacturingProcessType>('CNC Machining');
+    const [selectedMaterial, setSelectedMaterial] = useState<string>(analysisResult.material_suggestions[0]?.name || 'Aluminum 6061');
+
+    const handleRunPlanner = () => {
+        const productContext = `
+        Product: ${analysisResult.product_name}.
+        Summary: ${analysisResult.executive_summary}.
+        BOM: ${analysisResult.billOfMaterials.map(item => item.name).join(', ')}.
+        Key Components: ${analysisResult.designDocument.component_designs.map(c => `${c.component_name}: ${c.design_details}`).join('; ')}.
+        `;
+        fabricationPlanner.runPlanner(selectedProcess, selectedMaterial, productContext);
+    };
+
+    const { plan, isLoading, error } = fabricationPlanner;
+
+    return (
+        <div className="mb-6 animate-fade-in" style={{ animationDelay: '150ms' }}>
+            <div className="flex justify-between items-center mb-3 pb-2 border-b-2 border-cyan-800/50">
+                <h3 className="text-xl font-bold text-brand-cyan">⚙️ Forge Fabrication Planner</h3>
+            </div>
+            <div className="pl-8 space-y-6">
+                <div className="bg-gray-800/50 p-6 rounded-lg border border-gray-700 space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">1. Select Manufacturing Process</label>
+                            <select
+                                value={selectedProcess}
+                                onChange={(e) => setSelectedProcess(e.target.value as ManufacturingProcessType)}
+                                className="w-full p-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 focus:ring-2 focus:ring-purple-500"
+                                disabled={isLoading || isViewer}
+                            >
+                                {processOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">2. Confirm Material</label>
+                            <select
+                                value={selectedMaterial}
+                                onChange={(e) => setSelectedMaterial(e.target.value)}
+                                className="w-full p-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 focus:ring-2 focus:ring-purple-500"
+                                disabled={isLoading || isViewer}
+                            >
+                                {analysisResult.material_suggestions.map(mat => <option key={mat.name} value={mat.name}>{mat.name}</option>)}
+                                <option value="Custom">-- Enter Custom --</option>
+                            </select>
+                        </div>
+                    </div>
+                    {!isViewer && (
+                        <button
+                            onClick={handleRunPlanner}
+                            disabled={isLoading}
+                            className="w-full py-2 px-5 bg-purple-600 text-white font-bold rounded-lg border border-purple-500 hover:bg-purple-500 transition active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+                        >
+                            {isLoading ? 'Generating Plan...' : 'Generate Fabrication Plan'}
+                        </button>
+                    )}
+                </div>
+
+                {isLoading && (
+                    <div className="text-center p-4">
+                        <svg className="animate-spin h-8 w-8 text-purple-400 mx-auto mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                        <p className="text-purple-300">AI is analyzing manufacturability...</p>
+                    </div>
+                )}
+                {error && <p className="text-red-400">{error}</p>}
+
+                {plan && (
+                    <div className="bg-gray-800/50 p-6 rounded-lg border border-gray-700 space-y-4 animate-fade-in">
+                        <h4 className="text-lg font-semibold text-brand-light">Fabrication Plan Results</h4>
+                        <div>
+                            <h5 className="font-semibold text-gray-300 mb-2">Design for Manufacturability (DFM) Checks</h5>
+                            <table className="w-full text-sm text-left text-gray-400">
+                                <thead className="text-xs text-gray-300 uppercase bg-gray-700/50">
+                                    <tr>
+                                        <th className="px-4 py-2">Component</th>
+                                        <th className="px-4 py-2">Issue</th>
+                                        <th className="px-4 py-2">Recommendation</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {plan.dfmChecks.map((check, i) => (
+                                        <tr key={i} className="border-b border-gray-700">
+                                            <td className="px-4 py-2 font-medium text-gray-200">{check.component}</td>
+                                            <td className="px-4 py-2 text-yellow-300">{check.issue}</td>
+                                            <td className="px-4 py-2">{check.recommendation}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div>
+                            <h5 className="font-semibold text-gray-300 mb-2">Tolerancing Notes</h5>
+                            <ul className="list-disc pl-5 space-y-1 text-sm text-gray-400">
+                                {plan.tolerancingNotes.map((note, i) => <li key={i}>{note}</li>)}
+                            </ul>
+                        </div>
+                        <div>
+                            <h5 className="font-semibold text-gray-300 mb-2">{plan.processSpecificOutput.title}</h5>
+                            <pre className="bg-gray-900/50 p-4 rounded-md text-cyan-300 text-xs overflow-x-auto font-mono">
+                                <code>{plan.processSpecificOutput.data}</code>
+                            </pre>
+                            {selectedProcess === 'CNC Machining' && plan.processSpecificOutput.data && (
+                                <button
+                                    onClick={() => gcodeVisualizer.openModal(plan.processSpecificOutput.data)}
+                                    className="mt-3 py-2 px-4 bg-cyan-600 text-white font-semibold rounded-lg border border-cyan-500 hover:bg-cyan-500 transition active:scale-95 text-sm flex items-center gap-2"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0 1 3.75 9.375v-4.5ZM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 0 1-1.125-1.125v-4.5ZM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0 1 13.5 9.375v-4.5Z" /><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 6.75h.75v.75h-.75v-.75ZM6.75 16.5h.75v.75h-.75v-.75ZM16.5 6.75h.75v.75h-.75v-.75ZM13.5 13.5v4.5m0-.75h4.5" /></svg>
+                                    Visualize Toolpath & Summary
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};

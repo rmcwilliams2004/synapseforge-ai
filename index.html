@@ -28,6 +28,12 @@
         animation: fadeIn 0.5s ease-out forwards;
       }
       
+      /* Add new class for staggered list items */
+      .animate-stagger-in {
+        opacity: 0;
+        animation: fadeIn 0.5s ease-out forwards;
+      }
+      
       @keyframes slideInUp {
         from { opacity: 0; transform: translateY(20px); }
         to { opacity: 1; transform: translateY(0); }
@@ -99,16 +105,37 @@
         /* The magic sauce for the spotlight effect */
         box-shadow: 0 0 0 9999px rgba(0,0,0,0.7);
       }
+      
+      /* Voice Commander Pulse */
+      @keyframes pulse-mic {
+        0%, 100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 0.8;
+          transform: scale(1.1);
+        }
+      }
+      .animate-pulse-mic {
+        animation: pulse-mic 1.5s ease-in-out infinite;
+      }
     </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.25.1/full/pyodide.js"></script>
   <script type="importmap">
 {
   "imports": {
     "@google/genai": "https://aistudiocdn.com/@google/genai@^1.22.0",
     "react/": "https://aistudiocdn.com/react@^19.2.0/",
     "react": "https://aistudiocdn.com/react@^19.2.0",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/"
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "three": "https://cdn.jsdelivr.net/npm/three@0.166.1/build/three.module.js",
+    "three/examples/jsm/controls/OrbitControls.js": "https://cdn.jsdelivr.net/npm/three@0.166.1/examples/jsm/controls/OrbitControls.js",
+    "three/": "https://aistudiocdn.com/three@^0.180.0/"
   }
 }
 </script>

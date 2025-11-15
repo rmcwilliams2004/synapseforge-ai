@@ -17,7 +17,7 @@ const StatCard = ({ title, value, icon }: StatCardProps) => (
     </div>
 );
 
-const BarChart = ({ data, title }: { data: { label: string; value: number }[], title: string }) => {
+const BarChart = ({ data, title }: { data: { label: string; value: number, color?: string }[], title: string }) => {
     const maxValue = Math.max(...data.map(d => d.value), 1);
     return (
         <div className="bg-gray-800 border border-gray-700 p-6 rounded-lg">
@@ -28,7 +28,7 @@ const BarChart = ({ data, title }: { data: { label: string; value: number }[], t
                         <span className="text-sm text-gray-400 col-span-1 truncate">{item.label}</span>
                         <div className="col-span-3 bg-gray-700 rounded-full h-6">
                             <div
-                                className="bg-purple-600 h-6 rounded-full flex items-center justify-end px-2"
+                                className={`${item.color || 'bg-purple-600'} h-6 rounded-full flex items-center justify-end px-2`}
                                 style={{ width: `${(item.value / maxValue) * 100}%` }}
                             >
                                 <span className="text-xs font-bold text-white">{item.value}</span>
@@ -83,7 +83,28 @@ export const DashboardView = ({ users, projects, logs }: DashboardViewProps) => 
         return logs
             .filter(log => log.level !== 'ERROR')
             .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-            .slice(0, 10);
+            .slice(0, 5);
+    }, [logs]);
+
+    const topUsersData = useMemo(() => {
+        return [...users]
+            .sort((a, b) => b.analysesRun - a.analysesRun)
+            .slice(0, 5)
+            .map(user => ({ label: user.name, value: user.analysesRun, color: 'bg-cyan-600' }));
+    }, [users]);
+    
+    const factionUsageData = useMemo(() => {
+        const counts: Record<string, number> = {};
+        const factionRegex = /with faction "([^"]+)"/;
+        logs.forEach(log => {
+            const match = log.message.match(factionRegex);
+            if (match && match[1]) {
+                counts[match[1]] = (counts[match[1]] || 0) + 1;
+            }
+        });
+        return Object.entries(counts)
+            .map(([label, value]) => ({ label, value, color: 'bg-teal-600' }))
+            .sort((a, b) => b.value - a.value);
     }, [logs]);
 
     return (
@@ -97,6 +118,10 @@ export const DashboardView = ({ users, projects, logs }: DashboardViewProps) => 
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                  <BarChart data={modelUsageData} title="AI Model Usage" />
+                 <BarChart data={topUsersData} title="Top Active Users (by Analyses)" />
+            </div>
+             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                 <BarChart data={factionUsageData} title="Faction Usage Distribution" />
 
                  <div className="bg-gray-800 border border-gray-700 p-6 rounded-lg">
                     <h3 className="text-lg font-semibold text-brand-light mb-4">Recent Activity</h3>

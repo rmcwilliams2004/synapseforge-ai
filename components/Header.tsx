@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Role, User } from '../types';
+import { MOCK_USERS } from '../constants';
 
 interface HeaderProps {
     onStartTour: () => void;
@@ -25,6 +26,8 @@ export const Header = ({ onStartTour, onOpenUserManual, authenticatedUser, onLog
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
+    if (!authenticatedUser) return null;
+
     return (
       <header className="py-4 px-6 bg-gray-900/80 backdrop-blur-sm border-b border-gray-700 sticky top-0 z-20 flex justify-between items-center">
         <div className="flex items-center gap-3">
@@ -44,10 +47,10 @@ export const Header = ({ onStartTour, onOpenUserManual, authenticatedUser, onLog
         <div className="flex items-center gap-4">
            {authenticatedUser && (
                 <div className="flex items-center gap-4">
-                    {authenticatedUser.role === Role.Admin && (
+                    {[Role.Admin, Role.Manager].includes(authenticatedUser.role) && (
                         <button
                             onClick={onToggleViewMode}
-                            className="py-2 px-4 bg-purple-600 text-white font-semibold rounded-lg border border-purple-500 hover:bg-purple-500 transition-transform active:scale-95 text-sm flex items-center gap-2"
+                            className="py-2 px-4 bg-purple-600 text-white font-semibold rounded-lg border border-purple-500 hover:bg-purple-500 transition active:scale-95 text-sm flex items-center gap-2"
                         >
                             {viewMode === 'app' ? (
                                 <>
@@ -64,7 +67,7 @@ export const Header = ({ onStartTour, onOpenUserManual, authenticatedUser, onLog
                     )}
                    <button
                     onClick={onOpenUserManual}
-                    className="py-2 px-4 bg-gray-700 text-white font-semibold rounded-lg border border-gray-600 hover:bg-gray-600 transition-transform active:scale-95 text-sm flex items-center gap-2"
+                    className="py-2 px-4 bg-gray-700 text-white font-semibold rounded-lg border border-gray-600 hover:bg-gray-600 transition active:scale-95 text-sm flex items-center gap-2"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" />
@@ -73,7 +76,7 @@ export const Header = ({ onStartTour, onOpenUserManual, authenticatedUser, onLog
                   </button>
                   <button
                     onClick={onStartTour}
-                    className="py-2 px-4 bg-gray-700 text-white font-semibold rounded-lg border border-gray-600 hover:bg-gray-600 transition-transform active:scale-95 text-sm flex items-center gap-2"
+                    className="py-2 px-4 bg-gray-700 text-white font-semibold rounded-lg border border-gray-600 hover:bg-gray-600 transition active:scale-95 text-sm flex items-center gap-2"
                   >
                       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
                           <path strokeLinecap="round" strokeLinejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
@@ -81,9 +84,22 @@ export const Header = ({ onStartTour, onOpenUserManual, authenticatedUser, onLog
                     Tour
                   </button>
                    <div className="h-8 border-l border-gray-600"></div>
+
+                    {/* Presence indicator for collaboration */}
+                    <div className="flex items-center -space-x-2" title="Alex, Dana and Casey are also viewing this project">
+                        {MOCK_USERS.filter(u => u.id !== authenticatedUser.id && ['user-1', 'user-4', 'user-3'].includes(u.id)).map(user => (
+                            <img 
+                                key={user.id}
+                                className="inline-block h-8 w-8 rounded-full ring-2 ring-gray-900"
+                                src={user.picture}
+                                alt={user.name}
+                            />
+                        ))}
+                    </div>
+
                    <div className="relative" ref={profileRef}>
-                        <button onClick={() => setIsProfileOpen(!isProfileOpen)} className="flex items-center gap-2 text-white font-semibold">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8 p-1.5 bg-gray-700 rounded-full"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" /></svg>
+                        <button onClick={() => setIsProfileOpen(!isProfileOpen)} className="flex items-center gap-2 text-white font-semibold transition-colors duration-200 hover:text-cyan-300">
+                            <img src={authenticatedUser.picture} alt={authenticatedUser.name} className="w-8 h-8 rounded-full border-2 border-gray-600" />
                             {authenticatedUser.name}
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className={`w-4 h-4 transition-transform ${isProfileOpen ? 'rotate-180' : ''}`}><path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
                         </button>

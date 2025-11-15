@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Project } from '../types';
+import { ExtractedProjectDetails } from '../services/geminiService';
 
 interface ProjectModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (details: { name: string; description: string; tags: string[] }) => void;
   project: Project | null; // null for create mode, project object for edit mode
+  initialData?: Omit<ExtractedProjectDetails, 'initialPrompt'>;
 }
 
-export const ProjectModal = ({ isOpen, onClose, onSave, project }: ProjectModalProps) => {
+export const ProjectModal = ({ isOpen, onClose, onSave, project, initialData }: ProjectModalProps) => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [tags, setTags] = useState('');
@@ -20,14 +22,19 @@ export const ProjectModal = ({ isOpen, onClose, onSave, project }: ProjectModalP
         setName(project.name);
         setDescription(project.description);
         setTags(project.tags.join(', '));
+      } else if (initialData) {
+        // Create mode with pre-filled data
+        setName(initialData.name);
+        setDescription(initialData.description);
+        setTags(initialData.tags.join(', '));
       } else {
-        // Create mode
+        // Create mode from scratch
         setName('');
         setDescription('');
         setTags('');
       }
     }
-  }, [isOpen, project]);
+  }, [isOpen, project, initialData]);
 
   const handleSave = () => {
     if (!name.trim()) {

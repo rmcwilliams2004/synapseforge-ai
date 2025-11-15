@@ -1,4 +1,4 @@
-import { AnalysisResult, GeneratedDrawing, Project } from '../types';
+import { AnalysisResult, GeneratedDrawing, GeneratedImage, Project } from '../types';
 
 // This is a global variable from the script tag in index.html
 declare const jspdf: any;
@@ -6,18 +6,23 @@ declare const jspdf: any;
 const { jsPDF } = jspdf;
 
 const addHeaderFooter = (doc: any, projectName: string, pageNumber: number, totalPages: number) => {
-    const header = `SynapseForge AI: Reverse Engineering Report - ${projectName}`;
+    const header = `SynapseForge AI Report | ${projectName}`;
     const footer = `Page ${pageNumber} of ${totalPages}`;
     const pageHeight = doc.internal.pageSize.getHeight();
     const pageWidth = doc.internal.pageSize.getWidth();
 
-    doc.setFontSize(9);
+    doc.setFontSize(8);
     doc.setTextColor(150);
+    // Header
     doc.text(header, 15, 10);
+    // Footer
     doc.text(footer, pageWidth / 2, pageHeight - 10, { align: 'center' });
+    // Line above footer
+    doc.setDrawColor(200);
+    doc.line(15, pageHeight - 15, pageWidth - 15, pageHeight - 15);
 };
 
-export const exportFullReportPDF = (project: Project, drawings: GeneratedDrawing[]) => {
+export const exportFullReportPDF = (project: Project, drawings: GeneratedDrawing[], inspirationalImages: GeneratedImage[]) => {
     const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
     const latestVersion = project.history[0];
     const projectName = project.name;
@@ -52,21 +57,23 @@ export const exportFullReportPDF = (project: Project, drawings: GeneratedDrawing
     const addSectionTitle = (title: string) => {
         y += y > 25 ? 12 : 0;
         checkPageBreak(20);
-        doc.setFontSize(16);
+        doc.setFontSize(18);
+        doc.setFont(undefined, 'bold');
         doc.setTextColor(6, 182, 212); // brand-cyan
-        addText(title, {}, 0);
-        y+= 2;
+        addText(title, {}, 2);
         doc.setDrawColor(100);
-        doc.line(margin, y - 1, pageWidth - margin, y - 1);
+        doc.setLineWidth(0.5);
+        doc.line(margin, y, pageWidth - margin, y);
+        doc.setFont(undefined, 'normal');
         doc.setFontSize(11);
         doc.setTextColor(40);
-        y += 5;
+        y += 8;
     };
     
     const addSubTitle = (title: string) => {
         y += 6;
         checkPageBreak(10);
-        doc.setFontSize(13);
+        doc.setFontSize(14);
         doc.setFont(undefined, 'bold');
         doc.setTextColor(80);
         addText(title);
@@ -75,18 +82,63 @@ export const exportFullReportPDF = (project: Project, drawings: GeneratedDrawing
         y -= 2;
     };
 
+    const coverImage = drawings.find(d => d.isCoverImage && d.url) || inspirationalImages.find(i => i.isCoverImage && i.url);
+
     // --- Title Page ---
-    doc.setFontSize(28);
-    doc.setTextColor(15, 23, 42);
-    doc.text('Reverse Engineering & Product Analysis Report', pageWidth / 2, 120, { align: 'center' });
+    doc.setFontSize(26);
+    doc.setTextColor(15, 23, 42); // brand-dark
+    doc.setFont(undefined, 'bold');
+    doc.text('Reverse Engineering & Product Analysis Report', pageWidth / 2, 40, { align: 'center' });
     
-    doc.setFontSize(22);
+    doc.setFontSize(20);
+    doc.setFont(undefined, 'normal');
     const projectTitleLines = doc.splitTextToSize(projectName, 180);
-    doc.text(projectTitleLines, pageWidth / 2, 140, { align: 'center' });
+    doc.text(projectTitleLines, pageWidth / 2, 60, { align: 'center' });
+
+    if (coverImage) {
+        try {
+            // FIX: Property 'aspectRatio' does not exist on type 'GeneratedDrawing'.
+            // The cover image can be a GeneratedDrawing (no aspectRatio, defaults to 16:9) or
+            // a GeneratedImage (has aspectRatio). This logic correctly handles both cases.
+            let aspect;
+            if ('aspectRatio' in coverImage && coverImage.aspectRatio) {
+                switch (coverImage.aspectRatio) {
+                    case '9:16': aspect = 9 / 16; break;
+                    case '1:1': aspect = 1; break;
+                    case '4:3': aspect = 4 / 3; break;
+                    case '3:4': aspect = 3 / 4; break;
+                    case '16:9': default: aspect = 16 / 9; break;
+                }
+            } else {
+                // GeneratedDrawing is always 16:9
+                aspect = 16 / 9;
+            }
+            const imgWidth = 160;
+            const imgHeight = imgWidth / aspect;
+            const imgX = (pageWidth - imgWidth) / 2;
+            const imgY = 80;
+            doc.addImage(coverImage.url, 'PNG', imgX, imgY, imgWidth, imgHeight);
+            doc.setDrawColor(220); // light gray border
+            doc.rect(imgX - 1, imgY - 1, imgWidth + 2, imgHeight + 2);
+        } catch (e) {
+            console.error("Failed to add cover image to PDF", e);
+            doc.setTextColor(255, 0, 0);
+            doc.text("Cover image could not be loaded.", pageWidth / 2, 120, { align: 'center' });
+            doc.setTextColor(40);
+        }
+    }
     
-    doc.setFontSize(14);
+    doc.setFontSize(12);
     doc.setTextColor(100);
-    doc.text(`Generated: ${new Date().toLocaleString()}`, pageWidth / 2, 160 + (projectTitleLines.length * 10), { align: 'center' });
+    const descriptionLines = doc.splitTextToSize(`Description: ${project.description}`, 180);
+    doc.text(descriptionLines, pageWidth / 2, 190, { align: 'center' });
+
+    const tagsText = `Tags: ${project.tags.join(', ')}`;
+    doc.text(tagsText, pageWidth/2, 200 + (descriptionLines.length * 5), { align: 'center' });
+
+    doc.setFontSize(11);
+    doc.text(`Report Generated: ${new Date().toLocaleString()}`, pageWidth / 2, 250, { align: 'center' });
+    doc.text(`Version Commit: "${latestVersion.commitMessage}"`, pageWidth / 2, 256, { align: 'center' });
 
 
     // --- Start Content ---
@@ -94,6 +146,7 @@ export const exportFullReportPDF = (project: Project, drawings: GeneratedDrawing
     y = 20;
 
     addSectionTitle('Executive Summary');
+    doc.setFontSize(11);
     addText(result.executive_summary);
 
     addSectionTitle('Faction Rationale');
@@ -151,23 +204,83 @@ export const exportFullReportPDF = (project: Project, drawings: GeneratedDrawing
         addText(`Description: ${sys.description}`);
         addText(`Rationale: ${sys.rationale}`);
     });
-
-    // --- All other documentation sections ---
-    // This could be made more modular in a real app
     
-    addSectionTitle('Technical Specification');
-    addSubTitle('Introduction');
-    addText(result.technicalSpecification.introduction);
+    // --- New Documentation Suite ---
+    addSectionTitle('Requirement Specification');
+    addText(result.requirementSpecification.introduction);
     addSubTitle('Functional Requirements');
-    addText(result.technicalSpecification.functional_requirements.map(r => `- ${r}`));
-    addSubTitle('Performance Targets');
-    addText(result.technicalSpecification.performance_targets.map(t => `- ${t}`));
+    addText(result.requirementSpecification.functional_requirements.map(r => `- ${r}`));
+    addSubTitle('Non-Functional Requirements');
+    addText(result.requirementSpecification.non_functional_requirements.map(r => `- ${r}`));
+    addSubTitle('Performance Criteria');
+    addText(result.requirementSpecification.performance_criteria.map(t => `- ${t}`));
+    addSubTitle('Constraints');
+    addText(result.requirementSpecification.constraints.map(c => `- ${c}`));
 
-    addSectionTitle('Risk Assessment');
+    addSectionTitle('Design Document');
+    addSubTitle('System Architecture');
+    addText(result.designDocument.system_architecture);
+    addSubTitle('Component Designs');
+    result.designDocument.component_designs.forEach(c => {
+        addText(`- ${c.component_name}: ${c.design_details}`);
+    });
+    addSubTitle('Design Rationale');
+    addText(result.designDocument.design_rationale);
+
+    addSectionTitle('Bill of Materials (BOM)');
+    (doc as any).autoTable({
+        startY: y,
+        head: [['#', 'Name', 'Qty', 'Material', 'Description']],
+        body: result.billOfMaterials.map(b => [
+            b.part_number, b.name, b.quantity, b.material, b.description
+        ]),
+        theme: 'grid',
+        headStyles: { fillColor: [15, 23, 42] },
+        styles: { fontSize: 9 }
+    });
+    y = (doc as any).autoTable.previous.finalY + 10;
+    
+    addSectionTitle('Preliminary Cost Estimate');
+    addText(`Total Estimate Range: ${result.preliminaryCostEstimate.total_estimate_range}`);
+    addText(`Confidence Level: ${result.preliminaryCostEstimate.confidence}`);
+    addSubTitle('Assumptions');
+    addText(result.preliminaryCostEstimate.assumptions.map(a => `- ${a}`));
+     (doc as any).autoTable({
+        startY: y,
+        head: [['Item', 'Cost Estimate', 'Rationale']],
+        body: result.preliminaryCostEstimate.breakdown.map(item => [
+            item.item, item.cost_estimate, item.rationale
+        ]),
+        theme: 'grid',
+        headStyles: { fillColor: [15, 23, 42] },
+        styles: { fontSize: 9 }
+    });
+    y = (doc as any).autoTable.previous.finalY + 10;
+
+
+    addSectionTitle('Test Plan');
+    addText(result.testPlan.overview);
+    (doc as any).autoTable({
+        startY: y,
+        head: [['ID', 'Description', 'Procedure', 'Expected Results']],
+        body: result.testPlan.test_cases.map(tc => [
+            tc.id, tc.description, tc.procedure, tc.expected_results
+        ]),
+        theme: 'grid',
+        headStyles: { fillColor: [15, 23, 42] },
+        styles: { fontSize: 9 }
+    });
+    y = (doc as any).autoTable.previous.finalY + 10;
+
+    addSectionTitle('Compliance & Safety');
+    addText(result.complianceAndSafety.overview);
+    addSubTitle('Applicable Standards');
+    addText(result.complianceAndSafety.applicable_standards.map(s => `- ${s}`));
+    addSubTitle('Safety Risk Assessment');
     (doc as any).autoTable({
         startY: y,
         head: [['Risk', 'Likelihood', 'Impact', 'Mitigation']],
-        body: result.riskAssessment.risks.map(r => [
+        body: result.complianceAndSafety.safety_risks.map(r => [
             r.risk, r.likelihood, r.impact, r.mitigation
         ]),
         theme: 'grid',
@@ -176,51 +289,12 @@ export const exportFullReportPDF = (project: Project, drawings: GeneratedDrawing
     });
     y = (doc as any).autoTable.previous.finalY + 10;
     
-    if (drawings && drawings.length > 0) {
-        const successfulDrawings = drawings.filter(d => d.url);
-        if (successfulDrawings.length > 0) {
-            checkPageBreak(20);
-            addSectionTitle('Generated 2D Technical Drawings');
-            successfulDrawings.forEach((drawing, index) => {
-                // Each drawing gets its own page to ensure it fits well
-                if (index > 0) { // Add a page before the second drawing onwards
-                   doc.addPage();
-                   y = 20;
-                }
-                addSubTitle(`Drawing ${index + 1}: ${drawing.prompt}`);
-                try {
-                    const imgWidth = maxLineWidth;
-                    const imgHeight = (imgWidth / 16) * 9;
-                    checkPageBreak(imgHeight + 10);
-                    doc.addImage(drawing.url, 'PNG', margin, y, imgWidth, imgHeight);
-                    y += imgHeight + 10;
-                } catch (e) {
-                    console.error("Failed to add image to PDF:", e);
-                    addText(`Error: The drawing for "${drawing.prompt}" could not be embedded.`, { color: 'red' });
-                }
-            });
-        }
-    }
-    
-    addSectionTitle('2D Drawing Specification');
-    addSubTitle('General Specifications');
-    addText(`Drawing Standard: ${result.drawingSpecification.standard || 'Not Specified'}`);
-
-    addSubTitle('Required Views');
-    addText(result.drawingSpecification.required_views.length > 0 ? result.drawingSpecification.required_views.map(v => `- ${v}`) : 'No specific views requested.');
-
-    addSubTitle('Key Dimensions & Tolerances');
-    addText(result.drawingSpecification.key_dimensions_tolerances.length > 0 ? result.drawingSpecification.key_dimensions_tolerances.map(d => `- ${d}`) : 'No key dimensions or tolerances specified.');
-
-    addSubTitle('General Notes');
-    addText(result.drawingSpecification.general_notes || 'No general notes provided.');
-
-    addSubTitle('Bill of Materials (BOM)');
+    addSectionTitle('Engineering Change Orders');
     (doc as any).autoTable({
         startY: y,
-        head: [['#', 'Name', 'Qty', 'Material', 'Description']],
-        body: result.drawingSpecification.bill_of_materials.map(b => [
-            b.part_number, b.name, b.quantity, b.material, b.description
+        head: [['ID', 'Title', 'Reason', 'Impact']],
+        body: result.engineeringChangeOrders.map(eco => [
+            eco.eco_id, eco.change_title, eco.reason_for_change, eco.impact_analysis
         ]),
         theme: 'grid',
         headStyles: { fillColor: [15, 23, 42] },
@@ -228,12 +302,60 @@ export const exportFullReportPDF = (project: Project, drawings: GeneratedDrawing
     });
     y = (doc as any).autoTable.previous.finalY + 10;
 
+    const drawingsToInclude = drawings.filter(d => d.includeInReport && d.url);
+    if (drawingsToInclude.length > 0) {
+        checkPageBreak(20);
+        addSectionTitle('Visual Documentation: Technical Drawings');
+        drawingsToInclude.forEach((drawing, index) => {
+            if (y > 40) { // Add page break if there isn't enough space for a new drawing
+                doc.addPage();
+                y = 20;
+            }
+            addSubTitle(`Drawing ${index + 1}: ${drawing.prompt}`);
+            try {
+                const imgWidth = maxLineWidth;
+                const imgHeight = (imgWidth / 16) * 9;
+                checkPageBreak(imgHeight + 10);
+                doc.addImage(drawing.url, 'PNG', margin, y, imgWidth, imgHeight);
+                y += imgHeight + 10;
+            } catch (e) {
+                console.error("Failed to add image to PDF:", e);
+                addText(`Error: The drawing for "${drawing.prompt}" could not be embedded.`, { color: 'red' });
+            }
+        });
+    }
 
+    const imagesToInclude = inspirationalImages.filter(i => i.includeInReport && i.url);
+    if (imagesToInclude.length > 0) {
+        checkPageBreak(20);
+        addSectionTitle('Visual Documentation: Photorealistic Concepts');
+        imagesToInclude.forEach((image, index) => {
+             if (y > 40) { 
+                doc.addPage();
+                y = 20;
+            }
+            addSubTitle(`Concept ${index + 1}: ${image.prompt}`);
+            try {
+                const aspect = image.aspectRatio === '9:16' ? 9/16 : (image.aspectRatio === '1:1' ? 1 : 16/9);
+                const imgWidth = maxLineWidth;
+                const imgHeight = imgWidth / aspect;
+                checkPageBreak(imgHeight + 10);
+                doc.addImage(image.url, 'JPEG', margin, y, imgWidth, imgHeight);
+                y += imgHeight + 10;
+            } catch (e) {
+                console.error("Failed to add image to PDF:", e);
+                addText(`Error: The image for "${image.prompt}" could not be embedded.`, { color: 'red' });
+            }
+        });
+    }
+    
     // Add headers and footers to all content pages
     const pageCount = doc.internal.getNumberOfPages();
-    for (let i = 2; i <= pageCount; i++) {
+    for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
-        addHeaderFooter(doc, projectName, i - 1, pageCount - 1);
+        if (i > 1) { // Don't add header/footer to title page
+            addHeaderFooter(doc, projectName, i - 1, pageCount - 1);
+        }
     }
     
     doc.save(`${projectName.replace(/\s/g, '_')}_Analysis_Report.pdf`);

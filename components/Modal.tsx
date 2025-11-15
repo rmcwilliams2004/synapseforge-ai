@@ -1,5 +1,3 @@
-
-
 import React from 'react';
 
 interface ModalProps {
@@ -7,13 +5,14 @@ interface ModalProps {
   onClose: () => void;
   title: string;
   confirmText?: string;
+  confirmDisabled?: boolean;
   cancelText?: string | null;
   onConfirm: () => void;
   // FIX: Added 'children' to ModalProps to allow the component to accept child elements for its content.
   children: React.ReactNode;
 }
 
-export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, confirmText = 'Confirm', cancelText, onConfirm }) => {
+export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, confirmText = 'Confirm', confirmDisabled = false, cancelText, onConfirm }) => {
   if (!isOpen) return null;
 
   const handleConfirm = () => {
@@ -38,7 +37,7 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
               {cancelText ?? 'Cancel'}
             </button>
           )}
-          <button onClick={handleConfirm} className="py-2 px-4 bg-brand-cyan text-white font-bold rounded-lg hover:bg-cyan-500 transition active:scale-95">
+          <button onClick={handleConfirm} disabled={confirmDisabled} className="py-2 px-4 bg-brand-cyan text-white font-bold rounded-lg hover:bg-cyan-500 transition active:scale-95 disabled:opacity-50">
             {confirmText}
           </button>
         </div>

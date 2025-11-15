@@ -1,40 +1,88 @@
 import { useState, useCallback } from 'react';
-import { generateTechnicalDrawingImage, parseApiError } from '../services/geminiService';
-import { GeneratedDrawing, LogEntry } from '../types';
+import { generateTechnicalDrawingImage, parseApiError, generateDrawingFromImage } from '../services/geminiService';
+import { AnalysisResult, GeneratedDrawing, LogEntry } from '../types';
+import { Part } from '@google/genai';
 
-export const useDrawingGenerator = (basePrompt: string | null, addLog: (level: LogEntry['level'], message: string) => void) => {
+const fileToGenerativePart = async (file: File): Promise<Part> => {
+  const base64 = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve((reader.result as string).split(',')[1]);
+    reader.onerror = (error) => reject(error);
+  });
+  return {
+    inlineData: {
+      data: base64,
+      mimeType: file.type,
+    },
+  };
+};
+
+export const useDrawingGenerator = (addLog: (level: LogEntry['level'], message: string) => void) => {
   const [drawings, setDrawings] = useState<GeneratedDrawing[]>([]);
 
-  const requestDrawing = useCallback(async (specificPrompt: string) => {
-    if (!basePrompt) {
-        // This case should ideally be prevented by the UI
-        addLog('ERROR', 'Drawing generation failed: No base product context available.');
-        return;
-    }
-
-    const newDrawing: GeneratedDrawing = {
-        id: `drawing-${Date.now()}`,
-        prompt: specificPrompt,
-        url: null,
-        isLoading: true,
-        error: null,
-    };
-
-    setDrawings(prev => [...prev, newDrawing]);
+  const requestDrawing = useCallback(async (specificPrompt: string, analysisResult: AnalysisResult, fileUrls?: string[]) => {
+    const drawingId = crypto.randomUUID();
     addLog('INFO', `Starting 2D drawing generation for "${specificPrompt}".`);
 
+    setDrawings(prev => {
+        const newDrawing: GeneratedDrawing = {
+            id: drawingId,
+            prompt: specificPrompt,
+            url: null,
+            isLoading: true,
+            error: null,
+            includeInReport: true,
+            isCoverImage: prev.length === 0, // Set as cover if it's the first one
+        };
+        return [...prev, newDrawing];
+    });
+
     try {
-      const url = await generateTechnicalDrawingImage(basePrompt, specificPrompt);
-      setDrawings(prev => prev.map(d => d.id === newDrawing.id ? { ...d, url, isLoading: false } : d));
+      const url = await generateTechnicalDrawingImage(analysisResult, specificPrompt, fileUrls);
+      setDrawings(prev => prev.map(d => d.id === drawingId ? { ...d, url, isLoading: false } : d));
       addLog('INFO', `2D drawing generation for "${specificPrompt}" succeeded.`);
     } catch (e) {
       const errorMessage = parseApiError(e);
-      setDrawings(prev => prev.map(d => d.id === newDrawing.id ? { ...d, error: errorMessage, isLoading: false } : d));
+      setDrawings(prev => prev.map(d => d.id === drawingId ? { ...d, error: errorMessage, isLoading: false } : d));
       addLog('ERROR', `2D drawing generation for "${specificPrompt}" failed: ${errorMessage}`);
     }
-  }, [basePrompt, addLog]);
+  }, [addLog]);
+
+  const requestDrawingFromImage = useCallback(async (imageFile: File, specificPrompt: string) => {
+    const drawingId = crypto.randomUUID();
+    const promptText = `Drawing from image: ${specificPrompt || imageFile.name}`;
+    addLog('INFO', `Starting image-to-drawing generation for "${promptText}".`);
+
+    setDrawings(prev => {
+        const newDrawing: GeneratedDrawing = {
+            id: drawingId,
+            prompt: promptText,
+            url: null,
+            isLoading: true,
+            error: null,
+            includeInReport: true,
+            isCoverImage: false,
+        };
+        return [...prev, newDrawing];
+    });
+
+    try {
+        const imagePart = await fileToGenerativePart(imageFile);
+        const url = await generateDrawingFromImage(imagePart, specificPrompt);
+        setDrawings(prev => prev.map(d => d.id === drawingId ? { ...d, url, isLoading: false } : d));
+        addLog('INFO', `Image-to-drawing generation for "${promptText}" succeeded.`);
+    } catch (e) {
+        const errorMessage = parseApiError(e);
+        setDrawings(prev => prev.map(d => d.id === drawingId ? { ...d, error: errorMessage, isLoading: false } : d));
+        addLog('ERROR', `Image-to-drawing generation for "${promptText}" failed: ${errorMessage}`);
+    }
+  }, [addLog]);
   
   const removeDrawing = useCallback((id: string) => {
+    // FIX: Removed buggy logic that automatically reassigned a cover image.
+    // This logic was unaware of inspirational images and could lead to multiple
+    // cover images being selected, causing state inconsistencies.
     setDrawings(prev => prev.filter(d => d.id !== id));
   }, []);
   
@@ -42,5 +90,9 @@ export const useDrawingGenerator = (basePrompt: string | null, addLog: (level: L
     setDrawings([]);
   }, []);
 
-  return { drawings, requestDrawing, removeDrawing, setDrawings, clearAllDrawings };
+  const toggleDrawingReportInclusion = useCallback((id: string) => {
+    setDrawings(prev => prev.map(d => d.id === id ? { ...d, includeInReport: !d.includeInReport } : d));
+  }, []);
+
+  return { drawings, requestDrawing, requestDrawingFromImage, removeDrawing, setDrawings, clearAllDrawings, toggleDrawingReportInclusion };
 };
