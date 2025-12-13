@@ -31,6 +31,12 @@ const defaultDrawingViews = {
     'Cross-Section': false,
 };
 
+const SparklesIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z" />
+    </svg>
+);
+
 const ExportDropdown = ({ onExportPDF, onExportGoogle, onGoogleSignIn, onGoogleSignOut, isGoogleAuthLoading, isGoogleAuthenticated, googleExporterUser, isGoogleExporting, googleExportStatus, googleExportError, googleDocContent, onOpenGoogleDocPreview }: { onExportPDF: () => void, onExportGoogle: () => void, onGoogleSignIn: () => void, onGoogleSignOut: () => void, isGoogleAuthLoading: boolean, isGoogleAuthenticated: boolean, googleExporterUser: { name: string; email: string; } | null, isGoogleExporting: boolean, googleExportStatus: string, googleExportError: string | null, googleDocContent: GoogleDocContent | null, onOpenGoogleDocPreview: () => void }) => {
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
@@ -834,6 +840,11 @@ export const ResultView = ({
     setDrawingImageFile(null);
   };
 
+  const handleRequestAssemblyOverview = () => {
+    const prompt = "An isometric view of the main product assembly, showing overall dimensions and key features.";
+    onRequestDrawing(prompt, result, activeVersion?.fileUrls);
+  };
+
   const handleGenerateAndViewCad = async () => {
     const data = await onGenerateCad(drawings, result);
     if (data) {
@@ -1234,9 +1245,20 @@ export const ResultView = ({
                                 </div>
                             </div>
                         )}
-                        <button onClick={handleRequestDrawing} disabled={isGenerateDisabled} className="w-full py-2 px-5 bg-purple-600 text-white font-bold rounded-lg border border-purple-500 hover:bg-purple-500 transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
-                            {generateButtonText()}
-                        </button>
+                        <div className="flex items-stretch gap-4">
+                            <button onClick={handleRequestDrawing} disabled={isGenerateDisabled} className="flex-1 py-2 px-5 bg-purple-600 text-white font-bold rounded-lg border border-purple-500 hover:bg-purple-500 transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
+                                {generateButtonText()}
+                            </button>
+                             <button
+                                onClick={handleRequestAssemblyOverview}
+                                disabled={isDrawingInProgress}
+                                className="py-2 px-5 bg-teal-600 text-white font-semibold rounded-lg border border-teal-500 hover:bg-teal-500 transition active:scale-95 disabled:opacity-50 flex items-center gap-2"
+                                title="Generate an isometric view of the main product assembly, showing overall dimensions and key features."
+                            >
+                                <SparklesIcon />
+                                Assembly Overview
+                            </button>
+                        </div>
                     </div>
                  )}
 
@@ -1385,7 +1407,9 @@ export const ResultView = ({
 
         <RotordynamicsStudio id="rotordynamics_studio" model={rotorModel} onModelChange={onRotorModelChange} rossAnalysis={rossAnalysis} isViewer={isViewer} />
         
-        <FabricationPlanner fabricationPlanner={fabricationPlanner} analysisResult={result} isViewer={isViewer} gcodeVisualizer={gcodeVisualizer} />
+        <Section id="fabrication_planner" title="⚙️ Forge Fabrication Planner" defaultOpen={false}>
+            <FabricationPlanner fabricationPlanner={fabricationPlanner} analysisResult={result} isViewer={isViewer} gcodeVisualizer={gcodeVisualizer} />
+        </Section>
         
         <Section id="test_plan" title="Test Plan">
             <p className="text-gray-400 mb-4">{result.testPlan.overview}</p>

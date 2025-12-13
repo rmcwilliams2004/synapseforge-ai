@@ -131,7 +131,7 @@ export const CadViewerModal: React.FC<CadViewerModalProps> = ({ isOpen, onClose,
         t.scene.add(dirLight1);
 
         t.snapIndicator = new THREE.Mesh(new THREE.SphereGeometry(2), new THREE.MeshBasicMaterial({ color: 0x06b6d4 }));
-        // FIX: The 'visible' property was being accessed on a potentially un-narrowed type, causing an 'unknown' type error. This check ensures the type is correctly inferred as THREE.Mesh before access.
+        // FIX: Corrected assignment in `if` condition to a property check to prevent runtime errors and correctly narrow the type.
         if (t.snapIndicator) {
             t.snapIndicator.visible = false;
             t.scene.add(t.snapIndicator);
