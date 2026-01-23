@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -101,7 +102,8 @@ export const CadViewerModal: React.FC<CadViewerModalProps> = ({ isOpen, onClose,
         const mouse = new THREE.Vector2(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1);
         const raycaster = new THREE.Raycaster();
         raycaster.setFromCamera(mouse, t.camera);
-        const intersects = raycaster.intersectObjects(Array.from(t.meshMap.values()).filter(m => m.visible));
+        // FIX: Added explicit type cast to resolve 'unknown' property access on 'visible' property during filtering
+        const intersects = raycaster.intersectObjects(Array.from(t.meshMap.values()).filter((m: THREE.Mesh) => m.visible));
         return intersects.length > 0 ? intersects[0] : null;
     }, []);
 
@@ -130,21 +132,17 @@ export const CadViewerModal: React.FC<CadViewerModalProps> = ({ isOpen, onClose,
         dirLight1.position.set(1, 1, 1).normalize();
         t.scene.add(dirLight1);
 
-        t.snapIndicator = new THREE.Mesh(new THREE.SphereGeometry(2), new THREE.MeshBasicMaterial({ color: 0x06b6d4 }));
-        // FIX: Corrected assignment in `if` condition to a property check to prevent runtime errors and correctly narrow the type.
-        if (t.snapIndicator) {
-            t.snapIndicator.visible = false;
-            t.scene.add(t.snapIndicator);
-        }
+        const snapIndicator = new THREE.Mesh(new THREE.SphereGeometry(2), new THREE.MeshBasicMaterial({ color: 0x06b6d4 }));
+        t.snapIndicator = snapIndicator;
+        t.snapIndicator.visible = false;
+        t.scene.add(t.snapIndicator);
         
         const previewLineGeom = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
-        t.previewLine = new THREE.Line(previewLineGeom, new THREE.LineDashedMaterial({ color: 0xffeb3b, dashSize: 3, gapSize: 1 }));
-        // FIX: The 'visible' property was being accessed on a potentially un-narrowed type. This check ensures the type is correctly inferred as THREE.Line before access.
-        if (t.previewLine) {
-            t.previewLine.computeLineDistances();
-            t.previewLine.visible = false;
-            t.scene.add(t.previewLine);
-        }
+        const previewLine = new THREE.Line(previewLineGeom, new THREE.LineDashedMaterial({ color: 0xffeb3b, dashSize: 3, gapSize: 1 }));
+        t.previewLine = previewLine;
+        t.previewLine.computeLineDistances();
+        t.previewLine.visible = false;
+        t.scene.add(t.previewLine);
 
         const group = new THREE.Group();
         t.meshMap.clear();

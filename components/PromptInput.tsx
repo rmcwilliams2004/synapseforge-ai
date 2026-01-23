@@ -1,16 +1,11 @@
 import React, { useRef, useState, useCallback, useEffect, useMemo } from 'react';
-import { Faction, FactionId, User } from '../types';
+import { Faction, FactionId, User, InnovatorId } from '../types';
 import { UseSetupAssistant } from '../hooks/useSetupAssistant';
 import { ENGINEERING_PHILOSOPHIES } from '../constants';
 import { RoiEditorModal } from './RoiEditorModal';
 import { usePromptValidator } from '../hooks/usePromptValidator';
-
-// Icon for cropping
-const CropIcon = ({className}: {className?: string}) => (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 10.5H21L11.25 21V13.5M13.5 10.5H10.5M13.5 10.5V3M10.5 13.5H3L12.75 3H10.5M10.5 13.5V21" />
-    </svg>
-);
+import { InnovatorSelector } from './InnovatorSelector';
+import { transcribeAudio } from '../services/geminiService';
 
 interface PromptInputProps {
   projectName: string;
@@ -36,9 +31,17 @@ interface PromptInputProps {
   selectedFaction: Faction | null;
   activeVersionFactionId: FactionId | undefined;
   promptValidator: ReturnType<typeof usePromptValidator>;
+  selectedInnovatorId?: InnovatorId;
+  onSelectInnovator: (id: InnovatorId) => void;
+  isDeepThought: boolean;
+  onToggleDeepThought: (active: boolean) => void;
 }
 
-const FileIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>;
+const FileIcon = ({ type }: { type: string }) => {
+    if (type.startsWith('image/')) return <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-cyan-400"><path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" /></svg>;
+    if (type.startsWith('video/')) return <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-purple-400"><path strokeLinecap="round" strokeLinejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72V10.5Z" /><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 18h11.25a2.25 2.25 0 0 0 2.25-2.25V8.25A2.25 2.25 0 0 0 15 6H3.75A2.25 2.25 0 0 0 1.5 8.25v7.5A2.25 2.25 0 0 0 3.75 18Z" /></svg>;
+    return <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-400"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>;
+};
 
 const TagInput = ({ tags, onTagsChange, disabled }: { tags: string[]; onTagsChange: (tags: string[]) => void; disabled: boolean; }) => {
     const [inputValue, setInputValue] = useState('');
@@ -107,13 +110,21 @@ export const PromptInput = ({
   selectedFaction,
   activeVersionFactionId,
   promptValidator,
+  selectedInnovatorId,
+  onSelectInnovator,
+  isDeepThought,
+  onToggleDeepThought
 }: PromptInputProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [roiEditorState, setRoiEditorState] = useState<{ isOpen: boolean; file: File | null; fileIndex: number | null }>({ isOpen: false, file: null, fileIndex: null });
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+
   const isViewer = authenticatedUser.role === 'Viewer';
   const { validationResult, isChecking, checkPrompt, clearValidation, error: validationError } = promptValidator;
-
 
   const canReanalyze = selectedFaction && activeVersionFactionId && selectedFaction.id !== activeVersionFactionId;
 
@@ -124,7 +135,6 @@ export const PromptInput = ({
   const handleCropComplete = (croppedFiles: File[]) => {
       if (roiEditorState.fileIndex !== null) {
           const newFiles = [...files];
-          // Replace the single original file with the array of cropped files
           newFiles.splice(roiEditorState.fileIndex, 1, ...croppedFiles);
           onFilesChange(newFiles);
       }
@@ -136,13 +146,64 @@ export const PromptInput = ({
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
+  // Audio Transcription Feature: Uses gemini-3-flash-preview
+  const startRecording = async () => {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mediaRecorder = new MediaRecorder(stream);
+        mediaRecorderRef.current = mediaRecorder;
+        audioChunksRef.current = [];
+
+        mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+                audioChunksRef.current.push(event.data);
+            }
+        };
+
+        mediaRecorder.onstop = async () => {
+            const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+            setIsTranscribing(true);
+            try {
+                const reader = new FileReader();
+                reader.readAsDataURL(audioBlob);
+                reader.onloadend = async () => {
+                    const base64Audio = (reader.result as string).split(',')[1];
+                    const transcription = await transcribeAudio({
+                        inlineData: { data: base64Audio, mimeType: 'audio/webm' }
+                    });
+                    if (transcription) {
+                        onPromptChange(prompt ? `${prompt}\n\n${transcription}` : transcription);
+                    }
+                };
+            } catch (err) {
+                console.error("Transcription failed", err);
+            } finally {
+                setIsTranscribing(false);
+                stream.getTracks().forEach(track => track.stop());
+            }
+        };
+
+        mediaRecorder.start();
+        setIsRecording(true);
+    } catch (err) {
+        console.error("Microphone access denied", err);
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+        mediaRecorderRef.current.stop();
+        setIsRecording(false);
+    }
+  };
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       const isUndo = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z';
       const isRedo = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'y';
       const isMacRedo = event.metaKey && event.shiftKey && event.key.toLowerCase() === 'z';
 
-      if (isUndo && !event.shiftKey) { // Exclude Shift+Ctrl+Z
+      if (isUndo && !event.shiftKey) {
         event.preventDefault();
         if (canUndo) onUndo();
       } else if (isRedo || isMacRedo) {
@@ -157,12 +218,10 @@ export const PromptInput = ({
     };
   }, [canUndo, canRedo, onUndo, onRedo]);
   
-  // New useEffect to trigger validation
   useEffect(() => {
     checkPrompt(prompt);
   }, [prompt, checkPrompt]);
   
-  // Clean up on unmount or when prompt is cleared
   useEffect(() => {
     return () => clearValidation();
   }, [clearValidation]);
@@ -210,7 +269,24 @@ export const PromptInput = ({
       <div>
         <div className="flex justify-between items-center mb-3">
           <h2 className="text-xl font-semibold text-brand-light">2. Project Details & Concept</h2>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-3">
+            {/* Deep Thought Mode: Activates thinkingBudget logic */}
+            <button
+                onClick={() => onToggleDeepThought(!isDeepThought)}
+                disabled={isLoading || isViewer}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all duration-300 border ${
+                    isDeepThought 
+                    ? 'bg-purple-900/40 border-purple-400 text-purple-200 shadow-[0_0_15px_rgba(168,85,247,0.4)]' 
+                    : 'bg-gray-800 border-gray-600 text-gray-400 hover:border-purple-500/50'
+                }`}
+                title="Deep Thought Mode: Activates gemini-3-pro-preview with 32k thinking tokens for extreme reasoning."
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className={`w-4 h-4 ${isDeepThought ? 'animate-pulse' : ''}`}><path strokeLinecap="round" strokeLinejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.383a14.406 14.406 0 0 1-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 1 0-7.517 0c.85.493 1.509 1.333 1.509 2.316V18" /></svg>
+                {isDeepThought ? 'DEEP THOUGHT ACTIVE' : 'DEEP THOUGHT'}
+            </button>
+
+            <div className="h-4 w-px bg-gray-700 mx-1"></div>
+
             <button onClick={onUndo} disabled={!canUndo || isLoading || isViewer} className="p-2 text-gray-400 rounded-md hover:bg-gray-700 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition" title="Undo (Ctrl+Z)">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" /></svg>
             </button>
@@ -224,19 +300,43 @@ export const PromptInput = ({
           value={projectName}
           onChange={(e) => onProjectNameChange(e.target.value)}
           placeholder="Enter a name for your project..."
-          className="w-full p-3 mb-3 bg-gray-800 border-2 border-gray-700 rounded-lg text-gray-300 focus:ring-2 focus:ring-brand-cyan focus:border-brand-cyan transition disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full p-3 mb-3 bg-gray-800 border-2 border-gray-700 rounded-lg text-gray-300 focus:ring-2 focus:ring-brand-cyan focus:border-brand-cyan transition disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
           disabled={isLoading || isViewer}
         />
-        <textarea
-          id="tour-step-2"
-          value={prompt}
-          onChange={(e) => onPromptChange(e.target.value)}
-          placeholder="e.g., Analyze the gear mechanism and power system of this cordless drill based on the attached images..."
-          className="w-full h-48 p-3 bg-gray-800 border-2 border-gray-700 rounded-lg text-gray-300 focus:ring-2 focus:ring-brand-cyan focus:border-brand-cyan transition disabled:opacity-50 disabled:cursor-not-allowed"
-          disabled={isLoading || isViewer}
-        />
+        <div className="relative group">
+            <textarea
+              id="tour-step-2"
+              value={prompt}
+              onChange={(e) => onPromptChange(e.target.value)}
+              placeholder="Describe your design. You can also hold the microphone button to dictate requirements."
+              className="w-full h-48 p-3 bg-gray-800 border-2 border-gray-700 rounded-lg text-gray-300 focus:ring-2 focus:ring-brand-cyan focus:border-brand-cyan transition disabled:opacity-50 disabled:cursor-not-allowed resize-none"
+              disabled={isLoading || isViewer}
+            />
+            {/* Audio Transcription Microphone Tool */}
+            <div className="absolute bottom-3 right-3 flex items-center gap-2">
+                {isTranscribing && (
+                    <span className="flex items-center gap-2 text-xs font-mono text-cyan-400 animate-pulse bg-gray-900/80 px-2 py-1 rounded">
+                        <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                        TRANSCRIBING...
+                    </span>
+                )}
+                <button
+                    onMouseDown={startRecording}
+                    onMouseUp={stopRecording}
+                    onMouseLeave={stopRecording}
+                    disabled={isLoading || isViewer || isTranscribing}
+                    className={`p-3 rounded-full transition-all duration-200 shadow-lg ${
+                        isRecording 
+                        ? 'bg-red-600 text-white scale-110 animate-pulse' 
+                        : 'bg-gray-700 text-gray-300 hover:bg-cyan-600 hover:text-white'
+                    } disabled:opacity-50`}
+                    title="Dictate engineering requirements (Direct Audio Transcription)"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6"><path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 0 0 6-6v-1.5m-6 7.5a6 6 0 0 1-6-6v-1.5m12 0v-1.5a6 6 0 0 0-6-6v1.5m-6 0v-1.5a6 6 0 0 1 6-6v1.5m0 0v1.5m0-1.5a6 6 0 0 0-6 6v1.5m6-7.5a6 6 0 0 1 6 6v1.5" /></svg>
+                </button>
+            </div>
+        </div>
 
-        {/* Prompt Validation Assistant */}
         {(isChecking || validationResult || validationError) && (
           <div className={`mt-4 p-3 rounded-lg animate-fade-in flex items-start gap-3 ${validationError ? 'bg-red-900/30 border-red-700' : 'bg-gray-800/50 border-gray-700'}`}>
             {isChecking ? (
@@ -265,6 +365,13 @@ export const PromptInput = ({
             <TagInput tags={tags} onTagsChange={onTagsChange} disabled={isLoading || isViewer} />
         </div>
       </div>
+
+      <InnovatorSelector 
+          selectedId={selectedInnovatorId}
+          onSelect={onSelectInnovator}
+          disabled={isLoading || isViewer}
+      />
+
       {(setupAssistant.isLoading || setupAssistant.suggestions || setupAssistant.error) && (
         <div className="p-4 bg-gray-800/50 border border-gray-700 rounded-lg animate-fade-in">
           <h3 className="text-md font-semibold text-brand-light mb-2 flex items-center gap-2">
@@ -298,7 +405,7 @@ export const PromptInput = ({
       )}
 
       <div>
-        <h2 className="text-xl font-semibold text-brand-light mb-3">3. Upload Files (Optional)</h2>
+        <h2 className="text-xl font-semibold text-brand-light mb-3">3. Multimedia Input (Images, Videos, PDFs)</h2>
         <div
           id="tour-step-3"
           onDragEnter={handleDragEnter}
@@ -316,22 +423,27 @@ export const PromptInput = ({
             ref={fileInputRef}
             onChange={handleFileChange}
             multiple
-            accept="image/*,application/pdf"
+            accept="image/*,video/*,application/pdf"
             className="hidden"
             disabled={isLoading || isViewer}
           />
           {files.length === 0 ? (
-            <div className="text-center">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-10 h-10 text-gray-500 mb-2 mx-auto">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 16.5V9.75m0 0l-3.75 3.75M12 9.75l3.75 3.75M3 17.25V8.25c0-1.121.904-2.025 2.025-2.025h13.95A2.025 2.025 0 0 1 21 8.25v9a2.025 2.025 0 0 1-2.025 2.025H5.025A2.025 2.025 0 0 1 3 17.25Z" />
-              </svg>
-              <p className="text-sm text-gray-400">Drag & drop files (Images, PDFs) or click to browse</p>
-              <p className="text-xs text-gray-500 mt-1">For images, you can select a Region of Interest (ROI) after uploading.</p>
+            <div className="text-center py-4">
+              <div className="flex gap-4 justify-center mb-2">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-10 h-10 text-cyan-400">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
+                </svg>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-10 h-10 text-purple-400">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72V10.5Z" /><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 18h11.25a2.25 2.25 0 0 0 2.25-2.25V8.25A2.25 2.25 0 0 0 15 6H3.75A2.25 2.25 0 0 0 1.5 8.25v7.5A2.25 2.25 0 0 0 3.75 18Z" />
+                </svg>
+              </div>
+              <p className="text-sm text-gray-400">Drag & drop files (Photos, Videos, PDFs) or click to browse</p>
+              <p className="text-xs text-gray-500 mt-1">Video understanding and photo analysis powered by gemini-3-pro-preview.</p>
             </div>
           ) : (
             <div className="w-full text-left">
               <div className="flex justify-between items-center mb-2">
-                <h4 className="text-sm font-semibold text-brand-light">Attached Files:</h4>
+                <h4 className="text-sm font-semibold text-brand-light">Input Files:</h4>
                 <button 
                   onClick={(e) => { e.stopPropagation(); handleClearAllFiles(); }} 
                   className="text-xs text-gray-400 hover:text-white disabled:opacity-50" 
@@ -343,20 +455,20 @@ export const PromptInput = ({
               </div>
               <ul className="text-xs space-y-1 max-h-36 overflow-y-auto pr-2">
                 {files.map((file, index) => (
-                   <li key={index} className="flex items-center justify-between gap-2 p-1 bg-gray-700/50 rounded">
+                   <li key={index} className="flex items-center justify-between gap-2 p-1 bg-gray-700/50 rounded group">
                         <div className="flex items-center gap-2 min-w-0">
-                            <FileIcon />
+                            <FileIcon type={file.type} />
                             <span className="truncate flex-1" title={file.name}>{file.name}</span>
                             {file.name.startsWith('roi_') && <span className="text-xs text-cyan-400 font-semibold flex-shrink-0">[ROI]</span>}
                         </div>
                         {file.type.startsWith('image/') && !file.name.startsWith('roi_') && !isViewer && (
                             <button
                                 onClick={(e) => { e.stopPropagation(); handleOpenRoiEditor(file, index); }}
-                                className="text-xs py-1 px-2 bg-gray-600 rounded hover:bg-gray-500 transition-transform active:scale-95 flex-shrink-0"
+                                className="text-[10px] py-0.5 px-2 bg-gray-600 rounded hover:bg-gray-500 transition-transform active:scale-95 flex-shrink-0 opacity-0 group-hover:opacity-100"
                                 disabled={isLoading}
-                                title="Select a specific region of the image for analysis"
+                                title="Target a specific part of the photo for analysis"
                             >
-                                Edit ROI
+                                Targeted ROI
                             </button>
                         )}
                     </li>
@@ -377,7 +489,11 @@ export const PromptInput = ({
           id="tour-step-4"
           onClick={onEngage}
           disabled={!isReady || isLoading || isViewer}
-          className="flex-grow py-3 px-4 bg-brand-cyan text-white font-bold rounded-lg text-lg hover:bg-cyan-500 transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
+          className={`flex-grow py-3 px-4 text-white font-bold rounded-lg text-lg transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 ${
+              isDeepThought 
+              ? 'bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-500 hover:to-cyan-500 shadow-[0_0_20px_rgba(168,85,247,0.3)]' 
+              : 'bg-brand-cyan hover:bg-cyan-500'
+          }`}
         >
           {isLoading ? (
             <>
@@ -385,14 +501,15 @@ export const PromptInput = ({
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
-              <span>Analyzing...</span>
+              <span>{isDeepThought ? 'Deep Thinking In Progress...' : 'Synthesizing (Omni-Innovator)...'}</span>
             </>
           ) : (
             <>
+            {isDeepThought && <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6 animate-pulse"><path strokeLinecap="round" strokeLinejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.383a14.406 14.406 0 0 1-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 1 0-7.517 0c.85.493 1.509 1.333 1.509 2.316V18" /></svg>}
             {validationResult && !validationResult.isClear && !isViewer && (
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-yellow-300" title="Prompt could be improved"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" /></svg>
             )}
-            {isViewer ? "Viewing Mode" : "Engage SynapseForge AI"}
+            {isViewer ? "Viewing Mode" : (isDeepThought ? "Engage Deep Thought Synthesis" : "Engage SynapseForge AI")}
             </>
           )}
         </button>
@@ -403,7 +520,7 @@ export const PromptInput = ({
             title={canReanalyze ? `Apply '${selectedFaction?.name}' and re-run analysis` : 'Select a different faction to enable re-analysis'}
         >
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0 0 11.667 0l3.181-3.183m-4.991-2.691V5.25a3.375 3.375 0 0 0-3.375-3.375H8.25a3.375 3.375 0 0 0-3.375 3.375v4.992" /></svg>
-            Apply Faction
+            Apply Lens
         </button>
       </div>
     </div>

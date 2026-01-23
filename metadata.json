@@ -1,5 +1,5 @@
 {
-  "name": "Forge AI: Reverse Engineering v 11.5",
+  "name": "Forge AI: Reverse Engineering v 20.1",
   "description": "An AI-powered platform for reverse engineering and product analysis. Transform product concepts into detailed reports, documentation, and innovative redesign proposals.",
   "requestFramePermissions": [
     "microphone",

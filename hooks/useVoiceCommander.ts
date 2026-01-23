@@ -84,7 +84,9 @@ export const useVoiceCommander = ({ onNavigate, onDownloadDrawings, onGenerateVi
             sessionPromise.current = null;
         }
         
-        audioRefs.current.sources.forEach(source => source.stop());
+        audioRefs.current.sources.forEach(source => {
+            try { source.stop(); } catch(e) {}
+        });
         audioRefs.current.sources.clear();
         
         audioRefs.current.inputAudioContext?.close().catch(console.error);
@@ -113,7 +115,8 @@ export const useVoiceCommander = ({ onNavigate, onDownloadDrawings, onGenerateVi
         outputNode.connect(audioRefs.current.outputAudioContext.destination);
 
         sessionPromise.current = ai.live.connect({
-            model: 'gemini-2.5-flash-native-audio-preview-09-2025',
+            // Model updated to the latest 12-2025 version for better real-time audio performance
+            model: 'gemini-2.5-flash-native-audio-preview-12-2025',
             config: {
                 responseModalities: [Modality.AUDIO],
                 speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } },
@@ -137,6 +140,16 @@ export const useVoiceCommander = ({ onNavigate, onDownloadDrawings, onGenerateVi
                     scriptProcessor.connect(inputCtx.destination);
                 },
                 onmessage: async (message: LiveServerMessage) => {
+                    // Handle model interruption: stop all currently playing audio chunks
+                    const interrupted = message.serverContent?.interrupted;
+                    if (interrupted) {
+                        for (const source of audioRefs.current.sources.values()) {
+                            try { source.stop(); } catch (e) {}
+                        }
+                        audioRefs.current.sources.clear();
+                        audioRefs.current.nextStartTime = 0;
+                    }
+
                     if (message.toolCall) {
                         setState('thinking');
                         for (const fc of message.toolCall.functionCalls) {

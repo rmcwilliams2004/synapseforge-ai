@@ -19,6 +19,54 @@ export interface Faction {
   icon: React.FC<{ className?: string }>;
 }
 
+// --- INNOVATORS & PARTNERS ---
+export type InnovatorModule = 'Visionary Architect' | 'Empirical Optimizer' | 'Lateral Thinker' | 'Systematic Problem Solver';
+
+export type InnovatorId = 
+  | 'tesla' | 'brunel' | 'musk' | 'edison' | 'shen_kuo' | 'da_vinci' | 'carver' 
+  | 'lamarr' | 'hopper' | 'altshuller' | 'al_jazari' | 'hamilton' | 'lovelace' 
+  | 'fuller' | 'rutan' | 'dyson' | 'einstein' | 'hawking' | 'nash' | 'aristotle' 
+  | 'oppenheimer' | 'johnson' | 'ramanujan' | 'hadid' | 'morgan' | 'ross' | 'haytham' | 'wu'
+  | 'sagan' | 'hubble' | 'bohr' | 'rutherford' | 'curie' | 'fermi' | 'rubin' | 'feynman' | 'faraday' | 'huygens' | 'meitner' | 'dirac' | 'pauli' | 'maxwell'
+  | 'darwin' | 'franklin' | 'pasteur' | 'turing' | 'shannon'
+  | 'spock' | 'laforge' | 'data';
+
+export interface Innovator {
+  id: InnovatorId;
+  name: string;
+  era: string;
+  module: InnovatorModule;
+  methodology: string;
+  mentalModel: string;
+  trigger: string;
+  lexicalFingerprint: string[]; // Specific vocabulary
+  solvingHeuristic: string;    // Their internal "how"
+  historicalAnchor: string;    // Metaphor source
+}
+
+// --- WAR ROOM COUNCIL ---
+export type FrictionPoint = 'theoretical' | 'engineering' | 'systemic';
+
+export interface CouncilMemberRecommendation {
+  innovator_id: InnovatorId;
+  role_in_room: string;
+  reason_for_selection: string;
+  friction_point: FrictionPoint;
+}
+
+export interface InnovationCouncil {
+  project_analysis: string;
+  recommended_council: CouncilMemberRecommendation[];
+  suggested_opening_question: string;
+}
+
+export interface InnovatorInsight {
+  innovator_id: InnovatorId;
+  application_rationale: string;
+  specific_suggestion: string;
+  synthesis_score: number; // 0-100 indicating relevance to the current design
+}
+
 // --- COLLABORATION ---
 export enum Role {
   Admin = 'Admin',
@@ -192,6 +240,7 @@ export interface AnalysisResult {
   product_name: string;
   executive_summary: string;
   faction_rationale: FactionRationale;
+  innovator_insights: InnovatorInsight[]; // Historical knowledge synthesis
   material_suggestions: MaterialSuggestion[];
   manufacturing_analysis: ManufacturingProcess[];
   comparative_analysis: ComparativeAnalysis[];
@@ -259,58 +308,21 @@ export interface AssemblyInstructions {
     steps: AssemblyInstructionStep[];
 }
 
-export interface RotorMaterial {
-    name: string;
-    E: number; // Young's Modulus
-    G_s: number; // Shear Modulus
-    rho: number; // Density
-}
-
-export interface RotorShaftElement {
-    id: string;
-    n: number;
-    L: number; // Length
-    idl: number; // Inner diameter
-    odl: number; // Outer diameter
-    material: RotorMaterial;
-}
-
-export interface RotorDiskElement {
-    id: string;
-    n: number; // Node position
-    m: number; // Mass
-    Id: number; // Diametral moment of inertia
-    Ip: number; // Polar moment of inertia
-}
-
-export interface RotorBearingElement {
-    id: string;
-    n: number; // Node position
-    kxx: number; kxy: number;
-    kyx: number; kyy: number;
-    cxx: number; cxy: number;
-    cyx: number; cyy: number;
-}
-
-export interface RotorModel {
-    shaft: RotorShaftElement[];
-    disks: RotorDiskElement[];
-    bearings: RotorBearingElement[];
-}
-
-
 export interface ProjectVersion {
   versionId: string;
   createdAt: string; // ISO string
   commitMessage: string; // e.g., "Initial analysis", "Incorporated material suggestions"
   prompt: string;
   factionId: FactionId;
+  preferredInnovatorId?: InnovatorId; 
+  isDeepThought?: boolean; 
   result: AnalysisResult | null;
   fileUrls: string[]; // data URLs
-  drawings?: GeneratedDrawing[]; // Optional for backward compatibility
+  drawings?: GeneratedDrawing[]; 
   inspirationalImages?: GeneratedImage[];
-  incorporatedSuggestions?: string[]; // New field to track used suggestions
-  rotorModel?: RotorModel;
+  incorporatedSuggestions?: string[]; 
+  rotorModel?: RotorModel; 
+  activeCouncil?: InnovationCouncil; // NEW: Store council data for War Room workflows
 }
 
 export interface Project {
@@ -327,29 +339,14 @@ export interface Project {
 export interface EditorState {
   prompt: string;
   selectedFaction: Faction | null;
+  selectedInnovatorId?: InnovatorId;
+  isDeepThought: boolean;
   tags: string[];
 }
 
 
-// FIX: Add ProjectIndexEntry type for use across the application.
-// This type is used for project listings to avoid loading the full 'history' for every project.
+// ProjectIndexEntry type for project listings
 export type ProjectIndexEntry = Omit<Project, 'history'> & { searchKeywords?: string };
-
-// --- DEVINCI CONVERSATIONAL AI ---
-export type DeVinciState = 'idle' | 'connecting' | 'listening' | 'speaking' | 'thinking' | 'error' | 'paused' | 'reconnecting' | 'reconnect_failed';
-
-export interface TranscriptEntry {
-    source: 'user' | 'devinci';
-    text: string;
-    isFinal: boolean;
-    speakerName?: string; // Add speakerName for multi-user simulation
-}
-
-export type DeVinciVoice = 'Zephyr' | 'Puck' | 'Charon' | 'Kore' | 'Fenrir';
-
-// --- VOICE COMMANDER ---
-export type VoiceCommanderState = 'idle' | 'listening' | 'thinking' | 'error';
-
 
 // --- ADMIN DASHBOARD ---
 export interface LogEntry {
@@ -387,20 +384,6 @@ export interface CadData {
 // --- CAD VIEWER ---
 export type CadViewerTool = 'select' | 'measure' | 'section';
 
-export interface CadAnnotation {
-  id: string;
-  x: number;
-  y: number;
-  text: string;
-}
-
-export interface CadMeasurement {
-  id: string;
-  type: string; // e.g., 'V-V', 'V-S', 'S-S' for Vertex-Vertex, Vertex-Surface, etc.
-  distance: number;
-  units: string;
-}
-
 // --- CAD COMPARISON ---
 export interface CadModification {
     name: string;
@@ -433,7 +416,6 @@ export interface SetupSuggestions {
   suggestedTags: string[];
 }
 
-// FIX: Add Fabrication Planner types to resolve compilation errors.
 // --- FABRICATION PLANNER ---
 export type ManufacturingProcessType = 'CNC Machining' | '3D Printing' | 'Sheet Metal';
 
@@ -494,3 +476,66 @@ export interface InProgressState {
   drawings: GeneratedDrawing[];
   inspirationalImages: GeneratedImage[];
 }
+
+// --- DEVINCI CONVERSATION ---
+export type DeVinciState = 'idle' | 'connecting' | 'listening' | 'speaking' | 'thinking' | 'error' | 'paused' | 'reconnecting' | 'reconnect_failed';
+export type DeVinciVoice = 'Zephyr' | 'Puck' | 'Charon' | 'Kore' | 'Fenrir';
+
+export interface TranscriptEntry {
+  source: 'user' | 'devinci';
+  text: string;
+  isFinal: boolean;
+  speakerName?: string;
+}
+
+// --- ROTORDYNAMICS (ROSS) ---
+export interface RotorMaterial {
+  name: string;
+  E: number;
+  G_s: number;
+  rho: number;
+}
+
+export interface RotorShaftElement {
+  L: number;
+  idl: number;
+  odl: number;
+  material: RotorMaterial;
+  n: number;
+}
+
+export interface RotorDiskElement {
+  n: number;
+  m: number;
+  Id: number;
+  Ip: number;
+}
+
+export interface RotorBearingElement {
+  n: number;
+  kxx: number;
+  kxy?: number;
+  kyx?: number;
+  kyy: number;
+  cxx?: number;
+  cxy?: number;
+  cyx?: number;
+  cyy?: number;
+}
+
+export interface RotorModel {
+  shaft: RotorShaftElement[];
+  disks: RotorDiskElement[];
+  bearings: RotorBearingElement[];
+}
+
+// --- CAD MEASUREMENT ---
+export interface CadMeasurement {
+  id: string;
+  distance: number;
+  type: string;
+  units: string;
+}
+
+// --- VOICE COMMANDER ---
+export type VoiceCommanderState = 'idle' | 'listening' | 'thinking' | 'error';
