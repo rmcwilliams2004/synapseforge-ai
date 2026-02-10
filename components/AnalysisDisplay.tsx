@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { AnalysisResult, Faction, GeneratedDrawing, Project, User, CadData, ProjectVersion, GeneratedImage, RotorModel, GoogleDocContent } from '../types';
 import { InitialView } from './analysis/InitialView';
@@ -12,6 +13,7 @@ import { useSuggestionExplorer } from '../hooks/useSuggestionExplorer';
 import { useBomSourcing } from '../hooks/useBomSourcing';
 import { useLiveCosting } from '../hooks/useLiveCosting';
 import { useNextStepAssistant } from '../hooks/useNextStepAssistant';
+import { usePatentGenerator } from '../hooks/usePatentGenerator';
 
 interface AnalysisDisplayProps {
   projectName: string;
@@ -90,6 +92,8 @@ interface AnalysisDisplayProps {
   liveCosting: ReturnType<typeof useLiveCosting>;
   // Next Step Assistant props
   nextStepAssistant: ReturnType<typeof useNextStepAssistant>;
+  // Patent Generator props
+  patentGenerator: ReturnType<typeof usePatentGenerator>;
 }
 
 export const AnalysisDisplay = (props: AnalysisDisplayProps) => {
@@ -161,6 +165,7 @@ export const AnalysisDisplay = (props: AnalysisDisplayProps) => {
         bomSourcing={props.bomSourcing}
         liveCosting={props.liveCosting}
         nextStepAssistant={props.nextStepAssistant}
+        patentGenerator={props.patentGenerator}
       />
     );
   }

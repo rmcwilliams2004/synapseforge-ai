@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { generateAnalysis as performAnalysis, parseApiError } from '../services/geminiService';
 import { AnalysisResult, Faction, LogEntry } from '../types';
@@ -39,6 +40,7 @@ const dataUrlToGenerativePart = (dataUrl: string) => {
 interface FileSource {
     files: File[];
     fileUrls?: string[];
+    technicalContext?: string; // New field for Knowledge Retrieval
 }
 
 export const runFullAnalysis = async (projectName: string, prompt: string, faction: Faction, source: FileSource): Promise<AnalysisResult> => {
@@ -58,7 +60,7 @@ export const runFullAnalysis = async (projectName: string, prompt: string, facti
       }
     }
     
-    const analysisResult = await performAnalysis(projectName, prompt, faction, fileParts.length > 0 ? fileParts : null);
+    const analysisResult = await performAnalysis(projectName, prompt, faction, fileParts.length > 0 ? fileParts : null, source.technicalContext);
     return analysisResult;
 };
 

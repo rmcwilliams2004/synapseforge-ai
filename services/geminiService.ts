@@ -1,5 +1,6 @@
+
 import { GoogleGenAI, Part, Type, FunctionDeclaration, Modality, GenerateContentResponse } from '@google/genai';
-import { Faction, AnalysisResult, CadData, FactionId, SetupSuggestions, CadComparisonResult, FabricationPlan, GCodeSummary, SimulationType, ManufacturingProcessType, BillOfMaterialsItem, ProcurementInfo, PreliminaryCostEstimate, PromptValidationResult, NextStepSuggestion, GeneratedDrawing, ManufacturingProcess } from '../types';
+import { Faction, AnalysisResult, CadData, FactionId, SetupSuggestions, CadComparisonResult, FabricationPlan, GCodeSummary, SimulationType, ManufacturingProcessType, BillOfMaterialsItem, ProcurementInfo, PreliminaryCostEstimate, PromptValidationResult, NextStepSuggestion, GeneratedDrawing, ManufacturingProcess, PatentApplication } from '../types';
 
 /**
  * Interface for product details extracted from images, PDFs, or videos.
@@ -236,6 +237,21 @@ const extractionSchema = {
     required: ["name", "description", "tags", "initialPrompt"]
 };
 
+const patentSchema = {
+    type: Type.OBJECT,
+    properties: {
+        title: { type: Type.STRING },
+        abstract: { type: Type.STRING },
+        background: { type: Type.STRING },
+        summary: { type: Type.STRING },
+        independent_claims: { type: Type.ARRAY, items: { type: Type.STRING } },
+        dependent_claims: { type: Type.ARRAY, items: { type: Type.STRING } },
+        novelty_points: { type: Type.ARRAY, items: { type: Type.STRING } },
+        inventive_step_rationale: { type: Type.STRING }
+    },
+    required: ["title", "abstract", "background", "summary", "independent_claims", "dependent_claims", "novelty_points", "inventive_step_rationale"]
+};
+
 /**
  * Standard API error parser.
  */
@@ -275,9 +291,22 @@ const parseMarkdownJson = (text: string) => {
 /**
  * Core analysis function for reverse engineering projects.
  */
-export const generateAnalysis = async (projectName: string, prompt: string, faction: Faction, files: Part[] | null): Promise<AnalysisResult> => {
+export const generateAnalysis = async (
+    projectName: string, 
+    prompt: string, 
+    faction: Faction, 
+    files: Part[] | null,
+    technicalContext?: string
+): Promise<AnalysisResult> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
-    // Using gemini-3-pro-preview for complex reasoning task as per instructions
+    
+    // Prepare retrieval context
+    const retrievalBlock = technicalContext ? `
+### PROJECT KNOWLEDGE BASE (AUGMENTED RETRIEVAL)
+Use the following technical reference data to ground your analysis. If information is found in these sources, prioritize it.
+${technicalContext}
+` : '';
+
     const response = await ai.models.generateContent({
         model: 'gemini-3-pro-preview',
         contents: [
@@ -296,6 +325,8 @@ export const generateAnalysis = async (projectName: string, prompt: string, fact
                       Project Name: ${projectName}
                       Prompt: ${prompt}
                       
+                      ${retrievalBlock}
+
                       Output must strictly follow the provided JSON schema.` }
                 ]
             }
@@ -308,6 +339,30 @@ export const generateAnalysis = async (projectName: string, prompt: string, fact
         }
     });
 
+    return JSON.parse(response.text!);
+};
+
+/**
+ * Generates a patent draft application based on analysis results.
+ */
+export const generatePatentDraft = async (result: AnalysisResult): Promise<PatentApplication> => {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+    const response = await ai.models.generateContent({
+        model: 'gemini-3-pro-preview',
+        contents: `Act as a patent attorney and mechanical engineer. Based on the provided technical analysis for "${result.product_name}", draft a formal patent application. Focus on non-obvious technical improvements, unique component interactions, and specific material/system optimizations identified in the report.
+        
+        Analysis Context:
+        Summary: ${result.executive_summary}
+        BOM: ${JSON.stringify(result.billOfMaterials)}
+        Systems: ${JSON.stringify(result.suggested_systems)}
+        Architecture: ${result.designDocument.system_architecture}`,
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: patentSchema,
+            maxOutputTokens: 8000,
+            thinkingConfig: { thinkingBudget: 3000 }
+        }
+    });
     return JSON.parse(response.text!);
 };
 
@@ -498,9 +553,9 @@ export const getSetupSuggestions = async (prompt: string): Promise<SetupSuggesti
                 type: Type.OBJECT,
                 properties: {
                     recommendedFactionId: { type: Type.STRING, enum: Object.values(FactionId) },
-                    suggestedTags: { type: Type.ARRAY, items: { type: Type.STRING } }
+                    suggested_tags: { type: Type.ARRAY, items: { type: Type.STRING } }
                 },
-                required: ["recommendedFactionId", "suggestedTags"]
+                required: ["recommendedFactionId", "suggested_tags"]
             }
         }
     });
@@ -992,7 +1047,7 @@ export const showSectionFunctionDeclaration: FunctionDeclaration = {
     parameters: {
         type: Type.OBJECT,
         properties: {
-            sectionId: { type: Type.STRING, enum: ['executive_summary', 'faction_rationale', 'ai_suggestions', 'visual_documentation', 'cad_export', 'bom', 'live_costing', 'advanced_simulation', 'rotordynamics_studio', 'fabrication_planner', 'test_plan', 'compliance_safety', 'change_orders'] }
+            sectionId: { type: Type.STRING, enum: ['executive_summary', 'faction_rationale', 'ai_suggestions', 'visual_documentation', 'cad_export', 'bom', 'live_costing', 'advanced_simulation', 'rotordynamics_studio', 'fabrication_planner', 'test_plan', 'compliance_safety', 'change_orders', 'patent_application'] }
         },
         required: ["sectionId"]
     }

@@ -1,3 +1,4 @@
+
 import React, { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { Faction, FactionId, User } from '../types';
 import { UseSetupAssistant } from '../hooks/useSetupAssistant';
@@ -36,6 +37,7 @@ interface PromptInputProps {
   selectedFaction: Faction | null;
   activeVersionFactionId: FactionId | undefined;
   promptValidator: ReturnType<typeof usePromptValidator>;
+  hasKnowledgeContext?: boolean; // New prop
 }
 
 const FileIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>;
@@ -64,7 +66,7 @@ const TagInput = ({ tags, onTagsChange, disabled }: { tags: string[]; onTagsChan
                 {tags.map((tag, index) => (
                     <div key={index} className="flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-purple-100 dark:bg-purple-600/50 text-purple-700 dark:text-purple-200">
                         {tag}
-                        <button onClick={() => !disabled && removeTag(index)} disabled={disabled} className="text-purple-500 dark:text-purple-200 hover:text-purple-900 dark:hover:text-white disabled:cursor-not-allowed">
+                        <button onClick={() => !disabled && removeTag(index)} disabled={disabled} className="text-purple-500 dark:text-purple-200 hover:text-purple-900 dark:hover:white disabled:cursor-not-allowed">
                             &times;
                         </button>
                     </div>
@@ -107,6 +109,7 @@ export const PromptInput = ({
   selectedFaction,
   activeVersionFactionId,
   promptValidator,
+  hasKnowledgeContext = false,
 }: PromptInputProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -234,7 +237,17 @@ export const PromptInput = ({
     <div className="space-y-4">
       <div>
         <div className="flex justify-between items-center mb-3">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-brand-light">2. Project Details & Concept</h2>
+          <div className="flex items-center gap-3">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-brand-light">2. Project Details & Concept</h2>
+              {hasKnowledgeContext && (
+                  <div className="flex items-center gap-1.5 px-2 py-0.5 bg-brand-cyan/10 border border-brand-cyan/30 rounded-full animate-pulse">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3 h-3 text-brand-cyan">
+                          <path fillRule="evenodd" d="M10 1a4.5 4.5 0 0 0-4.5 4.5V9H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-.5V5.5A4.5 4.5 0 0 0 10 1Zm3 8V5.5a3 3 0 1 0-6 0V9h6Z" clipRule="evenodd" />
+                      </svg>
+                      <span className="text-[10px] font-black text-brand-cyan uppercase tracking-tighter">Retrieval Active</span>
+                  </div>
+              )}
+          </div>
           <div className="flex items-center gap-1">
             <button onClick={onUndo} disabled={!canUndo || isLoading || isViewer} className="p-2 text-gray-400 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition" title="Undo (Ctrl+Z)">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" /></svg>
@@ -310,7 +323,8 @@ export const PromptInput = ({
               <div>
                 <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Suggested Tags:</h4>
                 <div className="flex flex-wrap gap-2 mt-1">
-                  {setupAssistant.suggestions.suggestedTags.map(tag => (
+                  {/* FIX: Corrected suggestedTags to suggested_tags to match SetupSuggestions interface */}
+                  {setupAssistant.suggestions.suggested_tags.map(tag => (
                     <button key={tag} onClick={() => onTagsChange(Array.from(new Set([...tags, tag])))} className="px-2 py-1 text-xs rounded-full bg-purple-100 dark:bg-purple-600/50 text-purple-700 dark:text-purple-200 hover:bg-purple-200 dark:hover:bg-purple-600/80 transition">
                       + {tag}
                     </button>
@@ -377,7 +391,7 @@ export const PromptInput = ({
                         {file.type.startsWith('image/') && !file.name.startsWith('roi_') && !isViewer && (
                             <button
                                 onClick={(e) => { e.stopPropagation(); handleOpenRoiEditor(file, index); }}
-                                className="text-xs py-1 px-2 bg-gray-200 dark:bg-gray-600 rounded hover:bg-gray-300 dark:hover:bg-gray-500 transition-transform active:scale-95 flex-shrink-0 text-gray-700 dark:text-gray-200"
+                                className="text-xs py-1 px-2 bg-gray-200 dark:bg-gray-700 rounded hover:bg-gray-300 dark:hover:bg-gray-500 transition-transform active:scale-95 flex-shrink-0 text-gray-700 dark:text-gray-200"
                                 disabled={isLoading}
                                 title="Select a specific region of the image for analysis"
                             >

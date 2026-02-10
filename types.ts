@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 export enum FactionId {
@@ -188,6 +189,17 @@ export interface EngineeringChangeOrder {
     impact_analysis: string;
 }
 
+export interface PatentApplication {
+  title: string;
+  abstract: string;
+  background: string;
+  summary: string;
+  independent_claims: string[];
+  dependent_claims: string[];
+  novelty_points: string[];
+  inventive_step_rationale: string;
+}
+
 export interface AnalysisResult {
   product_name: string;
   executive_summary: string;
@@ -208,6 +220,7 @@ export interface AnalysisResult {
   preliminaryCostEstimate: PreliminaryCostEstimate;
   complianceAndSafety: ComplianceAndSafety;
   engineeringChangeOrders: EngineeringChangeOrder[];
+  patentApplication?: PatentApplication;
 }
 
 // --- ADVANCED SIMULATION ---
@@ -298,6 +311,15 @@ export interface RotorModel {
     bearings: RotorBearingElement[];
 }
 
+export interface IngestedDocument {
+  id: string;
+  name: string;
+  type: string;
+  content: string; // The extracted technical text
+  summary: string;
+  timestamp: string;
+  isLoading?: boolean;
+}
 
 export interface ProjectVersion {
   versionId: string;
@@ -322,6 +344,7 @@ export interface Project {
   createdAt: string; // Initial creation date
   updatedAt: string; // Date of the latest version
   inspirationalImageHistory?: GeneratedImage[];
+  knowledgeBase?: IngestedDocument[]; // Step A: Retrieval Layer
 }
 
 export interface EditorState {
@@ -396,8 +419,7 @@ export type CadViewerTool = 'select' | 'measure' | 'section';
 
 export interface CadAnnotation {
   id: string;
-  x: number;
-  y: number;
+  x: number; y: number;
   text: string;
 }
 
@@ -437,7 +459,7 @@ export type GoogleDocContent = GoogleDocContentItem[];
 // --- SETUP ASSISTANT ---
 export interface SetupSuggestions {
   recommendedFactionId: FactionId;
-  suggestedTags: string[];
+  suggested_tags: string[];
 }
 
 // FIX: Add Fabrication Planner types to resolve compilation errors.

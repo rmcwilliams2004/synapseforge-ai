@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Faction, ProjectVersion, Project, AnalysisResult, User, LogEntry, Role, GeneratedDrawing, FactionId, GeneratedImage, EditorState, RotorModel, CadData, InProgressState } from './types';
+import { Faction, ProjectVersion, Project, AnalysisResult, User, LogEntry, Role, GeneratedDrawing, FactionId, GeneratedImage, EditorState, RotorModel, CadData, InProgressState, IngestedDocument } from './types';
 import { ENGINEERING_PHILOSOPHIES, TOUR_STEPS, MOCK_USERS } from './constants';
 import { useAnalysis, runFullAnalysis } from './hooks/useAnalysis';
 import { useVideoGenerator } from './hooks/useVideoGenerator';
@@ -75,6 +75,7 @@ import { ToolSuite } from './components/suite/ToolSuite';
 import { VideoImportModal } from './components/VideoImportModal';
 import { useGoogleDriveStorage } from './hooks/useGoogleDriveStorage';
 import { GoogleDrivePickerModal } from './components/GoogleDrivePickerModal';
+import { usePatentGenerator } from './hooks/usePatentGenerator';
 
 // A hook to manage the Ross analysis web worker
 const useRossAnalysis = (addLog: (level: LogEntry['level'], message: string) => void) => {
@@ -295,6 +296,8 @@ export function App() {
     loadProject,
     addImageToHistory,
     deleteImageFromHistory,
+    addIngestedDocument,
+    removeIngestedDocument,
   } = useProjects();
   
   // State for the "editor" or current working area
@@ -365,8 +368,9 @@ export function App() {
   const promptValidator = usePromptValidator();
   const liveCosting = useLiveCosting(addLog);
   const nextStepAssistant = useNextStepAssistant(addLog);
-  const aiChat = useAiChat(addLog);
+  const aiChat = useAiChat(addLog, activeProject?.knowledgeBase || []);
   const googleDriveStorage = useGoogleDriveStorage(addLog);
+  const patentGenerator = usePatentGenerator(addLog);
 
   const { drawings, requestDrawing, requestDrawingFromImage, removeDrawing, setDrawings, clearAllDrawings, toggleDrawingReportInclusion } = useDrawingGenerator(addLog);
   const { inspirationalImages, requestInspirationalImage, removeInspirationalImage, setInspirationalImages, clearAllInspirationalImages, toggleImageReportInclusion } = useInspirationalImageGenerator(addLog);
@@ -395,7 +399,6 @@ export function App() {
 
     let imageFile: File | undefined = undefined;
     if (useUploadedImage) {
-        // Find the first available image file from the main file input
         imageFile = files.find(f => f.type.startsWith('image/'));
         if (!imageFile) {
             addLog('WARN', 'Voice command for video from image failed: No image found in file input.');
@@ -403,7 +406,7 @@ export function App() {
         }
     }
     
-    generateVideo(prompt, imageFile); // This function is from useVideoGenerator
+    generateVideo(prompt, imageFile);
     addLog('INFO', `Voice command triggered video generation for: "${prompt}" ${imageFile ? `using image ${imageFile.name}`: ''}.`);
     return "Video generation started.";
 
@@ -423,7 +426,6 @@ export function App() {
 
   const { result, isLoading, error, generateAnalysis, clearAnalysis, setResult } = useAnalysis(addLog);
   const { saveInProgressAnalysis, loadInProgressAnalysis, clearInProgressAnalysis } = useAnalysisPersistence();
-  const [savedSessionData, setSavedSessionData] = useState<InProgressState | null>(null);
   
   const activeVersion: ProjectVersion | null = useMemo(() => {
     if (!activeProject) return null;
@@ -432,10 +434,9 @@ export function App() {
   
   const displayedResult = result || activeVersion?.result || null;
 
-  const { summary, isSummaryLoading, summaryError, generateSummary, clearSummary } = useSummaryGenerator(addLog);
+  const { isSummaryLoading, generateSummary, clearSummary } = useSummaryGenerator(addLog);
   const { cadData, isCadLoading, cadError, generateCad, clearCad } = useCadGenerator(addLog);
 
-    // --- Post-Analysis Audio Feedback ---
     const prevIsLoadingRef = useRef(false);
     useEffect(() => {
         if (prevIsLoadingRef.current && !isLoading && result) {
@@ -453,42 +454,37 @@ export function App() {
     }, [isLoading, result, tts]);
 
 
-  // --- AI Setup Assistant Logic ---
   useEffect(() => {
     if (prompt && prompt.length > 20) {
       setupAssistant.fetchSuggestions(prompt);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prompt]);
 
-  // --- Warn user about unsaved changes ---
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (hasUnsavedChanges) {
         e.preventDefault();
-        e.returnValue = ''; // Required for Chrome
+        e.returnValue = '';
       }
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [hasUnsavedChanges]);
 
-  // --- Auto-Save Session Persistence ---
   useEffect(() => {
       const autoSaveInterval = setInterval(() => {
-          // Check if there's something to save to avoid writing empty data
           if (displayedResult && selectedFaction && (activeProject || projectName)) {
               saveInProgressAnalysis({
                   projectName: activeProject?.name || projectName,
                   prompt,
                   factionId: selectedFaction.id,
                   result: displayedResult,
-                  drawings, // These will be stripped by the hook
-                  inspirationalImages, // These will be stripped by the hook
+                  drawings, 
+                  inspirationalImages,
               });
               addLog('INFO', 'Project auto-saved to local storage.');
           }
-      }, 60000); // 60 seconds
+      }, 60000);
 
       return () => {
           clearInterval(autoSaveInterval);
@@ -506,22 +502,21 @@ export function App() {
   ]);
 
 
-   // --- AUTH HANDLERS ---
   const handleGoogleAuth = async () => {
     try {
         const googleData = await googleApiService.signInWithGoogle();
         let user = users.find(u => u.email === googleData.email);
 
-        if (user) { // User exists, sign them in
+        if (user) {
             user = { ...user, lastActive: new Date().toISOString(), picture: googleData.picture };
             setUsers(prev => prev.map(u => u.id === user!.id ? user! : u));
-        } else { // User does not exist, sign them up
+        } else {
             user = {
                 id: `user-${Date.now()}`,
                 name: googleData.name,
                 email: googleData.email,
                 picture: googleData.picture,
-                role: Role.Editor, // New users are Editors
+                role: Role.Editor,
                 analysesRun: 0,
                 lastActive: new Date().toISOString()
             };
@@ -562,7 +557,6 @@ export function App() {
     addLog('INFO', `User profile updated: ${updatedUser.name}`, { user: updatedUser.name });
   }
 
-  // --- DEVINCI & AI HANDLERS ---
   const handleRequestInspirationalImage = useCallback(async (prompt: string, aspectRatio: string) => {
     const newImage = await requestInspirationalImage(prompt, aspectRatio);
     if (newImage && !newImage.error) {
@@ -742,7 +736,7 @@ ${JSON.stringify({
         const details = await extractProjectDetailsFromImage(filePart);
         
         setInitialProjectData(details);
-        setProjectToEdit(null); // Ensure modal is in "create" mode
+        setProjectToEdit(null);
         setIsProjectModalOpen(true);
         addLog('INFO', `Successfully extracted project details from "${file.name}".`, { project: details.name });
     } catch (e) {
@@ -762,7 +756,7 @@ ${JSON.stringify({
         const details = await extractProjectDetailsFromPdf(filePart);
         
         setInitialProjectData(details);
-        setProjectToEdit(null); // Ensure modal is in "create" mode
+        setProjectToEdit(null);
         setIsProjectModalOpen(true);
         addLog('INFO', `Successfully extracted project details from "${file.name}".`, { project: details.name });
     } catch (e) {
@@ -786,8 +780,6 @@ ${JSON.stringify({
           setInitialProjectData(details);
           setProjectToEdit(null);
           setIsProjectModalOpen(true);
-          
-          // Set the file in the editor state so it's included in the full analysis
           setFiles([file]); 
           
           addLog('INFO', `Successfully extracted project details from video "${file.name}".`, { project: details.name });
@@ -865,7 +857,6 @@ ${summary}
     await imageIdentifier.identifyImage(file);
   };
 
-  // Sync drawings array in project version history whenever it changes
   useEffect(() => {
     if(activeVersion && (drawings.length > 0 || inspirationalImages.length > 0)) {
       const drawingsChanged = JSON.stringify(drawings) !== JSON.stringify(activeVersion.drawings || []);
@@ -911,8 +902,8 @@ ${summary}
     bomSourcing.clearSourcing();
     simulation.clearSimulation();
     fabricationPlanner.clearPlanner();
+    patentGenerator.clearPatent();
     
-    // Reset editor state
     setFiles([]);
     if (activeProject) {
         const newProjectId = onNewProject({ name: `${activeProject.name} - New Analysis`, description: activeProject.description, tags: activeProject.tags });
@@ -923,7 +914,7 @@ ${summary}
     }
 
     setHasUnsavedChanges(false);
-  }, [hasUnsavedChanges, activeProject, clearAnalysis, clearAllDrawings, clearAllInspirationalImages, clearVideo, clearCad, clearSummary, liveCosting, bomSourcing, simulation, fabricationPlanner, onNewProject, onSelectProject, resetEditorState]);
+  }, [hasUnsavedChanges, activeProject, clearAnalysis, clearAllDrawings, clearAllInspirationalImages, clearVideo, clearCad, clearSummary, liveCosting, bomSourcing, simulation, fabricationPlanner, onNewProject, onSelectProject, resetEditorState, patentGenerator]);
   
   const handleEngage = useCallback(async (isReanalysis = false) => {
     if (!selectedFaction || !prompt.trim() || !projectName.trim()) {
@@ -937,14 +928,21 @@ ${summary}
         }
     }
 
-    const newResult = await generateAnalysis(projectName, prompt, selectedFaction, { files, fileUrls: activeVersion?.fileUrls });
+    const technicalContext = activeProject?.knowledgeBase && activeProject.knowledgeBase.length > 0
+        ? activeProject.knowledgeBase.map(doc => `[SOURCE: ${doc.name}]\n${doc.content}`).join('\n\n---\n\n')
+        : undefined;
+
+    const newResult = await generateAnalysis(projectName, prompt, selectedFaction, { 
+        files, 
+        fileUrls: activeVersion?.fileUrls,
+        technicalContext 
+    });
 
     if (newResult) {
       const commitMessage = isReanalysis ? `Re-analyzed with ${selectedFaction.name}` : 'New analysis from editor';
       
       const fileUrls = files.length > 0 ? await Promise.all(files.map(fileToDataUrl)) : activeVersion?.fileUrls || [];
 
-      // If we don't have an active project yet, create one now
       if (!activeProject) {
          onNewProject({ name: projectName, description: 'Created from analysis', tags }, { 
             prompt, 
@@ -952,9 +950,7 @@ ${summary}
             result: newResult,
             fileUrls: fileUrls
          });
-         // The new project version is already created as part of onNewProject's initial logic
       } else {
-          // Save the new version into the existing project
           saveNewVersion({
               prompt,
               factionId: selectedFaction.id,
@@ -965,7 +961,6 @@ ${summary}
             }, commitMessage);
       }
 
-      // Reset states for the new version
       setActiveVersionIndex(0);
       clearAllDrawings();
       clearAllInspirationalImages();
@@ -973,11 +968,12 @@ ${summary}
       clearCad();
       clearSummary();
       liveCosting.initialize(newResult);
+      patentGenerator.clearPatent();
       setRotorModel(undefined);
       setHasUnsavedChanges(false);
       clearInProgressAnalysis();
     }
-  }, [selectedFaction, prompt, projectName, activeProject, hasUnsavedChanges, generateAnalysis, files, activeVersion, saveNewVersion, clearAllDrawings, clearAllInspirationalImages, clearVideo, clearCad, clearSummary, liveCosting, clearInProgressAnalysis, onNewProject, tags]);
+  }, [selectedFaction, prompt, projectName, activeProject, hasUnsavedChanges, generateAnalysis, files, activeVersion, saveNewVersion, clearAllDrawings, clearAllInspirationalImages, clearVideo, clearCad, clearSummary, liveCosting, clearInProgressAnalysis, onNewProject, tags, patentGenerator]);
 
   const handleIncorporateSuggestions = useCallback((suggestionTexts: string[]) => {
     if (!activeVersion || !selectedFaction) return;
@@ -986,7 +982,6 @@ ${summary}
     
     setEditorState({ ...editorState, prompt: incorporatedPrompt });
 
-    // Trigger analysis after state update
     setTimeout(() => handleEngage(true), 0);
     
     updateVersion(activeVersion.versionId, {
@@ -1027,7 +1022,6 @@ ${summary}
       reader.readAsText(file);
   };
 
-  // --- Google Drive Integration Handlers ---
   const handleSaveToDrive = async () => {
       if (!activeProject) return;
       if (!googleDriveStorage.isAuthenticated) {
@@ -1058,11 +1052,8 @@ ${summary}
     }
     const projectToLoad = projects.find(p => p.id === projectId);
     if(projectToLoad) {
-        // Here we'd need to load the full project history, which we don't store in the index
-        // This is a limitation of the current local-first model. We alert the user.
         alert(`Switching context to "${projectToLoad.name}". To see full history, please re-open the project file.`);
-        // Create a temporary project stub to make the UI update
-        const stubProject: Project = { ...projectToLoad, history: [], inspirationalImageHistory: [] };
+        const stubProject: Project = { ...projectToLoad, history: [], inspirationalImageHistory: [] } as any;
         loadProject(stubProject);
     }
   }, [activeProject, hasUnsavedChanges, projects, loadProject]);
@@ -1074,12 +1065,11 @@ ${summary}
 
     setActiveVersionIndex(index);
     
-    // IMPORTANT: Rehydrate all application state from version
     setResult(version.result);
     setDrawings(version.drawings || []);
     setInspirationalImages(version.inspirationalImages || []);
     setRotorModel(version.rotorModel);
-    setFiles([]); // Clear current file uploads as they are part of the new "session"
+    setFiles([]); 
     
     const faction = ENGINEERING_PHILOSOPHIES.find(f => f.id === version.factionId) || null;
     resetEditorState({
@@ -1089,7 +1079,6 @@ ${summary}
     });
     setProjectName(activeProject.name);
     
-    // Re-initialize derived tools and clear temporary results
     liveCosting.initialize(version.result);
     bomSourcing.clearSourcing();
     simulation.clearSimulation();
@@ -1098,18 +1087,17 @@ ${summary}
     versionComparer.clearComparison();
     gcodeVisualizer.closeModal();
     suggestionExplorer.clearExploration();
+    patentGenerator.clearPatent();
     clearCad();
     clearSummary();
     
     setHasUnsavedChanges(false);
     addLog('INFO', `Loaded version: "${version.commitMessage}"`);
 
-  }, [activeProject, resetEditorState, bomSourcing, fabricationPlanner, liveCosting, simulation, clearCad, imageIdentifier, versionComparer, gcodeVisualizer, suggestionExplorer, clearSummary, addLog, setResult, setDrawings, setInspirationalImages]);
+  }, [activeProject, resetEditorState, bomSourcing, fabricationPlanner, liveCosting, simulation, clearCad, imageIdentifier, versionComparer, gcodeVisualizer, suggestionExplorer, clearSummary, addLog, setResult, setDrawings, setInspirationalImages, patentGenerator]);
   
   const handleRevertVersion = (index: number) => {
     revertToVersion(index);
-    // After reverting, a new version is created at index 0 which is a copy of the old version.
-    // We need to load this new version.
     setTimeout(() => handleLoadVersion(0), 100);
   };
   
@@ -1125,12 +1113,12 @@ ${summary}
   };
   
   const handleSaveProjectDetails = (details: {name: string, description: string, tags: string[]}) => {
-    if (projectToEdit) { // Editing existing project
+    if (projectToEdit) {
       updateProjectDetails(projectToEdit.id, details);
       setProjectName(details.name);
       setEditorState({ ...editorState, tags: details.tags });
       addLog('INFO', `Project details updated for "${details.name}".`);
-    } else { // Creating new project
+    } else {
       const newId = onNewProject(details, { prompt: initialProjectData?.initialPrompt, factionId: selectedFaction?.id });
       onSelectProject(newId);
       addLog('INFO', `New project created: "${details.name}".`);
@@ -1143,7 +1131,6 @@ ${summary}
   const handleCommitVersion = async (commitMessage: string) => {
       if (!activeVersion || !selectedFaction) return;
       
-      // Handle file persistence: Convert newly uploaded files to Data URLs for storage
       let newFileUrls = activeVersion.fileUrls;
       if (files.length > 0) {
          newFileUrls = await Promise.all(files.map(fileToDataUrl));
@@ -1162,7 +1149,7 @@ ${summary}
 
       setHasUnsavedChanges(false);
       setIsCommitModalOpen(false);
-      setActiveVersionIndex(0); // Switch to the newly created version
+      setActiveVersionIndex(0);
   };
   
   const handleCompareVersions = (project: Project, newVersionIndex: number) => {
@@ -1173,17 +1160,7 @@ ${summary}
     if (activeProject) {
         handleLoadVersion(activeVersionIndex);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeProject]);
-
-  // Check for saved session on initial load
-  useEffect(() => {
-    const saved = loadInProgressAnalysis();
-    if (saved) {
-        setSavedSessionData(saved);
-        // Maybe open a modal here to ask the user if they want to restore
-    }
-  }, [loadInProgressAnalysis]);
 
   if (!authenticatedUser) {
     return <AuthPage onGoogleAuth={handleGoogleAuth} onDemoLogin={handleDemoLogin} />;
@@ -1201,10 +1178,8 @@ ${summary}
         onSwitchView={setViewMode}
       />
 
-      {/* Main Layout: Single Column Stack */}
       <div className="flex-1 flex flex-col overflow-y-auto">
         {viewMode === 'app' && (
-          /* Input Section - Formerly Sidebar, now top block */
           <div className="w-full bg-white dark:bg-gray-800 p-6 flex-shrink-0 border-b border-gray-200 dark:border-gray-700 space-y-6 transition-colors duration-300">
              <div className="max-w-5xl mx-auto space-y-6">
                  <ProjectManager
@@ -1235,11 +1210,13 @@ ${summary}
                     onCompareVersions={(p, idx) => handleCompareVersions(p, idx)}
                     disabled={isLoading}
                     authenticatedUser={authenticatedUser}
-                    // Google Drive Handlers
                     onSaveToDrive={handleSaveToDrive}
                     onOpenFromDrive={handleOpenFromDriveClick}
                     isSavingToDrive={googleDriveStorage.isSaving}
                     isDriveAuthenticated={googleDriveStorage.isAuthenticated}
+                    onAddDocument={addIngestedDocument}
+                    onRemoveDocument={removeIngestedDocument}
+                    addLog={addLog}
                 />
                 <FactionSelector
                   selectedFaction={selectedFaction}
@@ -1271,12 +1248,12 @@ ${summary}
                   selectedFaction={selectedFaction}
                   activeVersionFactionId={activeVersion?.factionId}
                   promptValidator={promptValidator}
+                  hasKnowledgeContext={(activeProject?.knowledgeBase?.length || 0) > 0}
                 />
              </div>
           </div>
         )}
 
-        {/* Main Output Area - Stacks below the input section */}
         <main className="flex-1 w-full bg-gray-50 dark:bg-brand-dark animate-fade-in transition-colors duration-300">
           {viewMode === 'app' ? (
             <div className="max-w-5xl mx-auto p-6">
@@ -1308,7 +1285,7 @@ ${summary}
                 authenticatedUser={authenticatedUser}
                 onGenerateSummary={generateSummary}
                 isSummaryLoading={isSummaryLoading}
-                summaryError={summaryError}
+                summaryError={null}
                 cadData={cadData}
                 onGenerateCad={generateCad}
                 isCadLoading={isCadLoading}
@@ -1339,6 +1316,7 @@ ${summary}
                 bomSourcing={bomSourcing}
                 liveCosting={liveCosting}
                 nextStepAssistant={nextStepAssistant}
+                patentGenerator={patentGenerator}
               />
             </div>
           ) : viewMode === 'admin' ? (
@@ -1359,7 +1337,6 @@ ${summary}
         </main>
       </div>
 
-      {/* Modals */}
       <Tour isOpen={isTourOpen} stepIndex={tourStep} steps={TOUR_STEPS} onClose={() => setIsTourOpen(false)} onNext={() => setTourStep(s => s + 1)} onPrev={() => setTourStep(s => s - 1)} tts={tts} />
       <UserManualModal isOpen={isUserManualOpen} onClose={() => setIsUserManualOpen(false)} />
       <TechnicalDocumentModal isOpen={isTechDocOpen} onClose={() => setIsTechDocOpen(false)} />
@@ -1471,7 +1448,7 @@ ${summary}
           className="fixed bottom-6 left-6 z-30 bg-purple-600 text-white font-semibold py-3 px-5 rounded-full shadow-lg flex items-center gap-3 transition-transform hover:scale-105 active:scale-100"
           title="Open AI Chat for brainstorming and refinement"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6"><path strokeLinecap="round" strokeLinejoin="round" d="M8.625 9.75a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375m-13.5 3.01c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.184-4.183a.375.375 0 0 1 .265-.108h3.284a3.375 3.375 0 0 0 3.375-3.375V9.75a3.375 3.375 0 0 0-3.375-3.375H5.25a3.375 3.375 0 0 0-3.375 3.375v3.01Z" /></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6"><path strokeLinecap="round" strokeLinejoin="round" d="M8.625 9.75a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375m-13.5 3.01c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.184-4.183a.375.375 0 0 1 .265-.108h3.284a3.375 3.375 0 0 0 3.375-3.375V9.75a3.375 3.375 0 0 0-3.375 3.375H5.25a3.375 3.375 0 0 0-3.375 3.375v3.01Z" /></svg>
           AI Chat
         </button>}
       <AiChatModal

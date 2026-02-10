@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { AnalysisResult, Faction, MaterialSuggestion, BillOfMaterials, TestPlan, ComplianceAndSafety, Project, User, GeneratedDrawing, CadData, ProjectVersion, EngineeringChangeOrder, PreliminaryCostEstimate, GeneratedImage, RotorModel, RotorShaftElement, RotorDiskElement, RotorBearingElement, RotorMaterial, GoogleDocContent } from '../../types';
 import { exportFullReportPDF } from '../../services/pdfService';
@@ -13,16 +12,17 @@ import { useFabricationPlanner } from '../../hooks/useFabricationPlanner';
 import { FabricationPlanner } from './FabricationPlanner';
 import { useGCodeVisualizer } from '../../hooks/useGCodeVisualizer';
 import { useSuggestionExplorer } from '../../hooks/useSuggestionExplorer';
-// FIX: Add missing import for useBomSourcing to be used in props and component.
 import { useBomSourcing } from '../../hooks/useBomSourcing';
-// FIX: Added imports for the Live Costing feature to resolve compilation error.
 import { useLiveCosting } from '../../hooks/useLiveCosting';
 import { LiveCostingDashboard } from './LiveCostingDashboard';
 import { useNextStepAssistant } from '../../hooks/useNextStepAssistant';
 import { NextStepAssistant } from './NextStepAssistant';
 import { Section } from './Section';
 import { createDrawingsZip } from '../../services/zipService';
-import { generateFactionInspirationalPrompts } from '../../../services/geminiService';
+import { ProjectDashboard } from './ProjectDashboard';
+import { generateFactionInspirationalPrompts } from '../../services/geminiService';
+import { PatentModule } from './PatentModule';
+import { usePatentGenerator } from '../../hooks/usePatentGenerator';
 
 const defaultDrawingViews = {
     'Top': false,
@@ -54,7 +54,7 @@ const ExportDropdown = ({ onExportPDF, onExportGoogle, onGoogleSignIn, onGoogleS
     }, []);
 
     const ExportIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>;
-    const GoogleDriveIcon = () => <svg className="w-5 h-5" viewBox="0 0 24 24"><path fill="#4285F4" d="M19.34 9.47l-3.53-6.12L12 9.47h7.34z" /><path fill="#34A853" d="M12 15.65l3.54-6.12H8.46l3.54 6.12z" /><path fill="#F9BC05" d="M5.13 9.94l3.53-6.11L4.81 15.6l-3.3-5.66z" /><path fill="#EA4335" d="M12 9.47L8.46 3.35l-7.15 12.25h14.16z" opacity="0.5" /><path fill-opacity="0.2" fill="#263238" d="M15.82 15.65l3.52-6.18h-7.06z"/></svg>;
+    const GoogleDriveIcon = () => <svg className="w-5 h-5" viewBox="0 0 24 24"><path fill="#4285F4" d="M19.34 9.47l-3.53-6.12L12 9.47h7.34z" /><path fill="#34A853" d="M12 15.65l3.54-6.12H8.46l3.54 6.12z" /><path fill="#F9BC05" d="M5.13 9.94l3.53-6.11L4.81 15.6l-3.3-5.66z" /><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" opacity="0.5" /><path fill-opacity="0.2" fill="#263238" d="M15.82 15.65l3.52-6.18h-7.06z"/></svg>;
     
     return (
         <div className="relative" ref={dropdownRef}>
@@ -291,7 +291,6 @@ const RotordynamicsStudio = ({ id, model, onModelChange, rossAnalysis, isViewer 
         }
     }, [rossAnalysis.rossResult]);
 
-    // FIX: Safely update model properties, especially when the model is initially undefined.
     const handleShaftChange = (index: number, field: keyof RotorShaftElement, value: any) => {
         const newShaft = [...(model?.shaft || [])];
         if (newShaft[index]) {
@@ -314,7 +313,6 @@ const RotordynamicsStudio = ({ id, model, onModelChange, rossAnalysis, isViewer 
         onModelChange({ shaft: [...currentShaft, newElement], disks: model?.disks || [], bearings: model?.bearings || [] });
     };
     
-    // FIX: Safely update model properties, especially when the model is initially undefined.
     const addDiskElement = () => {
          const newElement: RotorDiskElement = { id: `d-${Date.now()}`, n: 0, m: 1, Id: 0.05, Ip: 0.1 };
          onModelChange({
@@ -324,7 +322,6 @@ const RotordynamicsStudio = ({ id, model, onModelChange, rossAnalysis, isViewer 
         });
     };
     
-    // FIX: Safely update model properties, especially when the model is initially undefined.
     const addBearingElement = () => {
         const newElement: RotorBearingElement = { id: `b-${Date.now()}`, n: 0, kxx: 1e6, kyy: 1e6, cxx: 1e3, cyy: 1e3, kxy: 0, kyx: 0, cxy: 0, cyx: 0 };
         onModelChange({
@@ -412,7 +409,7 @@ const ReadAloudButton = ({ text, tts, voice }: { text: string; tts: ReturnType<t
             return <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>;
         }
         if (isPlaying) {
-            return <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5"><path fillRule="evenodd" d="M4.5 7.5a3 3 0 0 1 3-3h9a3 3 0 0 1 3 3v9a3 3 0 0 1-3-3h-9a3 3 0 0 1-3-3v-9Z" clipRule="evenodd" /></svg>;
+            return <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5"><path fillRule="evenodd" d="M4.5 7.5a3 3 0 0 1 3-3h9a3 3 0 1 1 3 3v9a3 3 0 0 1-3 3h-9a3 3 0 0 1-3-3v-9Z" clipRule="evenodd" /></svg>;
         }
         return <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 0 1 0 12.728M16.463 8.288a5.25 5.25 0 0 1 0 7.424M6.75 8.25l4.72-4.72a.75.75 0 0 1 1.28.53v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75Z" /></svg>;
     };
@@ -604,11 +601,12 @@ interface ResultViewProps {
   bomSourcing: ReturnType<typeof useBomSourcing>;
   liveCosting: ReturnType<typeof useLiveCosting>;
   nextStepAssistant: ReturnType<typeof useNextStepAssistant>;
+  patentGenerator: ReturnType<typeof usePatentGenerator>;
 }
 
 const CommentIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.76c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.184-4.183a.375.375 0 0 1 .265-.108h3.284a3.375 3.375 0 0 0 3.375-3.375V9.75a3.375 3.375 0 0 0-3.375-3.375H5.25a3.375 3.375 0 0 0-3.375 3.375v3.01Z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.76c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.184-4.183a.375.375 0 0 1 .265-.108h3.284a3.375 3.375 0 0 0 3.375-3.375V9.75a3.375 3.375 0 0 0-3.375 3.375H5.25a3.375 3.375 0 0 0-3.375 3.375v3.01Z" />
     </svg>
 );
 
@@ -678,6 +676,7 @@ export const ResultView = ({
   bomSourcing,
   liveCosting,
   nextStepAssistant,
+  patentGenerator,
 }: ResultViewProps) => {
   const Icon = selectedFaction?.icon;
   const [showVideoModal, setShowVideoModal] = useState(false);
@@ -964,8 +963,10 @@ export const ResultView = ({
                 isOpen={commentSection?.id === 'executive_summary'}
             />
           </>}>
-          <p className="text-gray-700 dark:text-gray-300 leading-relaxed">{result.executive_summary}</p>
+          <p className="text-gray-700 dark:text-gray-300 leading-relaxed mb-6">{result.executive_summary}</p>
+          <ProjectDashboard result={result} />
         </Section>
+        
         <Section id="faction_rationale" title="Faction Rationale" actions={
             <CommentButton
                 sectionId="faction_rationale"
@@ -1192,6 +1193,8 @@ export const ResultView = ({
         <Section id="fabrication_planner" title="Fabrication Planner">
             <FabricationPlanner fabricationPlanner={fabricationPlanner} analysisResult={result} isViewer={isViewer} gcodeVisualizer={gcodeVisualizer} />
         </Section>
+
+        <PatentModule result={result} patentGenerator={patentGenerator} isViewer={isViewer} />
 
         <Section id="test_plan" title="Test Plan">
             <TestPlanTable testPlan={result.testPlan} />

@@ -1,5 +1,6 @@
+
 import { useState, useEffect, useCallback } from 'react';
-import { Project, ProjectVersion, FactionId, ProjectIndexEntry, GeneratedImage, AnalysisResult } from '../types';
+import { Project, ProjectVersion, FactionId, ProjectIndexEntry, GeneratedImage, AnalysisResult, IngestedDocument } from '../types';
 
 const getProjectKeywords = (projectHistory: ProjectVersion[]): string => {
     const keywords: (string | undefined)[] = [];
@@ -43,6 +44,7 @@ const createNewProject = (details: {name: string; description: string; tags: str
         updatedAt: timestamp,
         history: [initialVersion],
         inspirationalImageHistory: [],
+        knowledgeBase: [],
     };
 };
 
@@ -69,7 +71,6 @@ export const useProjects = () => {
         const newIndexEntry: ProjectIndexEntry = { ...indexEntry, searchKeywords };
 
         setProjects(prev => {
-            // Avoid duplicates if the same file is opened multiple times
             if (prev.some(p => p.id === newIndexEntry.id)) {
                 return prev.map(p => p.id === newIndexEntry.id ? newIndexEntry : p);
             }
@@ -82,10 +83,9 @@ export const useProjects = () => {
 
         if (activeProject?.id === projectId) {
             if (projects.length > 1) {
-                 // Find the project that is NOT the one being deleted to select next
                 const nextProjectIndex = projects.findIndex(p => p.id !== projectId);
                 const nextProject = projects[nextProjectIndex];
-                setActiveProject(nextProject ? { ...nextProject, history: [] } : null); // Load stub for now, full load is handled by onSelectProject
+                setActiveProject(nextProject ? { ...nextProject, history: [] } : null);
             } else {
                 setActiveProject(null);
             }
@@ -93,18 +93,9 @@ export const useProjects = () => {
     };
     
     const onSelectProject = (projectId: string) => {
-        // Since we are not storing full projects in a list, we can assume the activeProject holds the full data.
-        // Selecting from the list is more about switching the view context if multiple projects were loaded.
-        // For this local-first model, we assume only the activeProject is fully in memory.
-        // A more complex implementation might keep all loaded projects in memory.
         if (activeProject?.id !== projectId) {
-             // This case is tricky in a pure local-first model without keeping all opened projects in memory.
-             // For now, we assume the user will re-open the file to switch contexts if needed.
-             // This function will effectively just change the highlighted item in the UI.
              const projectIndex = projects.find(p => p.id === projectId);
              if (projectIndex) {
-                 // To prevent errors, we create a temporary active project.
-                 // The user needs to re-open the file for full history.
                  setActiveProject({ ...projectIndex, history: [] });
                  console.warn("To view the full history of another project, please open its file.");
              }
@@ -120,7 +111,6 @@ export const useProjects = () => {
 
         setProjects(prev => {
             const updatedIndex = prev.map(p => p.id === updatedProject.id ? newIndexEntry : p)
-            // Move updated project to the top of the list
             const projectIndex = updatedIndex.findIndex(p => p.id === updatedProject.id);
             if (projectIndex > 0) {
                 const [item] = updatedIndex.splice(projectIndex, 1);
@@ -140,7 +130,6 @@ export const useProjects = () => {
             commitMessage,
             versionId: `ver-${Date.now()}`,
             createdAt: timestamp,
-            // Explicit deep copy for array/object properties to ensure immutability in history
             drawings: versionData.drawings ? JSON.parse(JSON.stringify(versionData.drawings)) : [],
             inspirationalImages: versionData.inspirationalImages ? JSON.parse(JSON.stringify(versionData.inspirationalImages)) : [],
             fileUrls: [...(versionData.fileUrls || [])],
@@ -165,7 +154,6 @@ export const useProjects = () => {
             v.versionId === versionId ? { ...v, ...updates } : v
         );
         const updatedProject = { ...activeProject, history: newHistory };
-        // This is a background update, so we just update the active project state
         setActiveProject(updatedProject);
 
     }, [activeProject]);
@@ -176,8 +164,6 @@ export const useProjects = () => {
         const oldVersion = activeProject.history[versionIndex];
         const timestamp = new Date().toISOString();
         
-        // Deep copy everything from oldVersion to create newVersion
-        // This ensures that if the user modifies the reverted state, it doesn't affect the old version history entry
         const newVersion: ProjectVersion = {
             ...oldVersion,
             versionId: `ver-${Date.now()}`,
@@ -216,12 +202,11 @@ export const useProjects = () => {
         if (!activeProject) return;
         
         const history = activeProject.inspirationalImageHistory || [];
-        // Avoid duplicates
         if (history.some(h => h.id === image.id)) return;
         
         const updatedProject = {
             ...activeProject,
-            inspirationalImageHistory: [image, ...history] // Add to the top
+            inspirationalImageHistory: [image, ...history]
         };
         updateProjectAndIndex(updatedProject);
     }, [activeProject, updateProjectAndIndex]);
@@ -239,6 +224,23 @@ export const useProjects = () => {
         updateProjectAndIndex(updatedProject);
     }, [activeProject, updateProjectAndIndex]);
 
+    const addIngestedDocument = useCallback((doc: IngestedDocument) => {
+        if (!activeProject) return;
+        const updatedProject = {
+            ...activeProject,
+            knowledgeBase: [doc, ...(activeProject.knowledgeBase || [])]
+        };
+        updateProjectAndIndex(updatedProject);
+    }, [activeProject, updateProjectAndIndex]);
+
+    const removeIngestedDocument = useCallback((docId: string) => {
+        if (!activeProject) return;
+        const updatedProject = {
+            ...activeProject,
+            knowledgeBase: (activeProject.knowledgeBase || []).filter(d => d.id !== docId)
+        };
+        updateProjectAndIndex(updatedProject);
+    }, [activeProject, updateProjectAndIndex]);
 
     return {
         projects,
@@ -253,5 +255,7 @@ export const useProjects = () => {
         loadProject,
         addImageToHistory,
         deleteImageFromHistory,
+        addIngestedDocument,
+        removeIngestedDocument,
     };
 };
