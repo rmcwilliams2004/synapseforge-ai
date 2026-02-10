@@ -4,9 +4,6 @@ import { GoogleGenAI, LiveServerMessage, Modality, Blob } from '@google/genai';
 import { VoiceCommanderState } from '../types';
 import { showSectionFunctionDeclaration, downloadDrawingsFunctionDeclaration, generateVideoFunctionDeclaration } from '../services/geminiService';
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
-
-// --- Audio Encoding/Decoding Utilities (from Live API implementation) ---
 function encode(bytes: Uint8Array): string {
     let binary = '';
     const len = bytes.byteLength;
@@ -64,7 +61,7 @@ interface VoiceCommanderCallbacks {
 
 export const useVoiceCommander = ({ onNavigate, onDownloadDrawings, onGenerateVideo }: VoiceCommanderCallbacks) => {
     const [state, setState] = useState<VoiceCommanderState>('idle');
-    const sessionPromise = useRef<ReturnType<typeof ai.live.connect> | null>(null);
+    const sessionPromise = useRef<Promise<any> | null>(null);
     const audioRefs = useRef<{
         inputAudioContext?: AudioContext,
         outputAudioContext?: AudioContext,
@@ -75,9 +72,6 @@ export const useVoiceCommander = ({ onNavigate, onDownloadDrawings, onGenerateVi
         sources: Set<AudioBufferSourceNode>
     }>({ nextStartTime: 0, sources: new Set() });
     
-    // Use refs for callbacks to avoid stale closures in the session event handlers.
-    // This is crucial for onGenerateVideo to see the latest 'files' state when the user uploads an image
-    // *after* the voice session has already started.
     const callbacksRef = useRef({ onNavigate, onDownloadDrawings, onGenerateVideo });
     
     useEffect(() => {
@@ -87,10 +81,10 @@ export const useVoiceCommander = ({ onNavigate, onDownloadDrawings, onGenerateVi
     const stopListening = useCallback(() => {
         audioRefs.current.mediaStream?.getTracks().forEach(track => track.stop());
         if (audioRefs.current.scriptProcessor) {
-            try { audioRefs.current.scriptProcessor.disconnect(); } catch (e) { /* ignore */ }
+            try { audioRefs.current.scriptProcessor.disconnect(); } catch (e) { }
         }
         if (audioRefs.current.source) {
-            try { audioRefs.current.source.disconnect(); } catch (e) { /* ignore */ }
+            try { audioRefs.current.source.disconnect(); } catch (e) { }
         }
 
         if (sessionPromise.current) {
@@ -99,7 +93,7 @@ export const useVoiceCommander = ({ onNavigate, onDownloadDrawings, onGenerateVi
         }
         
         audioRefs.current.sources.forEach(source => {
-            try { source.stop(); } catch (e) { /* ignore */ }
+            try { source.stop(); } catch (e) { }
         });
         audioRefs.current.sources.clear();
         
@@ -131,11 +125,13 @@ export const useVoiceCommander = ({ onNavigate, onDownloadDrawings, onGenerateVi
     }, []);
 
     const startListening = useCallback(async () => {
-        // Allow starting from 'idle' or 'error' state to enable retries.
         if (state !== 'idle' && state !== 'error') return;
 
         setState('listening');
         audioRefs.current = { nextStartTime: 0, sources: new Set() };
+
+        // Initialize AI client inside function to pick up latest API key
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
         
         try {
             audioRefs.current.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -151,7 +147,7 @@ export const useVoiceCommander = ({ onNavigate, onDownloadDrawings, onGenerateVi
         outputNode.connect(audioRefs.current.outputAudioContext.destination);
 
         sessionPromise.current = ai.live.connect({
-            model: 'gemini-2.5-flash-native-audio-preview-09-2025',
+            model: 'gemini-2.0-flash-exp', 
             config: {
                 responseModalities: [Modality.AUDIO],
                 speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } },
@@ -179,8 +175,6 @@ export const useVoiceCommander = ({ onNavigate, onDownloadDrawings, onGenerateVi
                         setState('thinking');
                         for (const fc of message.toolCall.functionCalls) {
                             let responseResult = 'ok';
-                            // IMPORTANT: Access callbacks from the ref to ensure we use the latest version
-                            // that has access to current state (like uploaded files).
                             const { onNavigate, onDownloadDrawings, onGenerateVideo } = callbacksRef.current;
                             
                             if (fc.name === 'show_section' && fc.args.sectionId) {

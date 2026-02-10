@@ -3,8 +3,6 @@ import { GoogleGenAI, Chat } from '@google/genai';
 import { AiChatState, ChatMessage, LogEntry } from '../types';
 import { parseApiError } from '../services/geminiService';
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
-
 export const useAiChat = (addLog: (level: LogEntry['level'], message: string) => void) => {
     const [state, setState] = useState<AiChatState>('idle');
     const [history, setHistory] = useState<ChatMessage[]>([]);
@@ -12,9 +10,10 @@ export const useAiChat = (addLog: (level: LogEntry['level'], message: string) =>
     const chatSessionRef = useRef<Chat | null>(null);
 
     const startChat = useCallback((systemInstruction: string) => {
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
         addLog('INFO', 'AI Chat session started.');
         chatSessionRef.current = ai.chats.create({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-3-flash-preview',
             config: { systemInstruction },
         });
         setHistory([]);

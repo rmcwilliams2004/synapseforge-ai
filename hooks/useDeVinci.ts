@@ -1,13 +1,9 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-// @google/genai guidelines do not export LiveSession. It will be inferred.
 import { GoogleGenAI, LiveServerMessage, Modality, Blob, FunctionDeclaration } from '@google/genai';
 import { Faction, ProjectVersion, DeVinciState, TranscriptEntry, DeVinciVoice, User } from '../types';
 import { MOCK_USERS } from '../constants';
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
-
-// --- Audio Encoding/Decoding Utilities ---
 function encode(bytes: Uint8Array): string {
     let binary = '';
     const len = bytes.byteLength;
@@ -57,7 +53,6 @@ function createBlob(data: Float32Array): Blob {
     };
 }
 
-// Helper function to convert file to the required Blob format for the session
 const fileToSessionBlob = async (file: File): Promise<Blob> => {
     const base64Data = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
@@ -71,13 +66,12 @@ const fileToSessionBlob = async (file: File): Promise<Blob> => {
     };
 };
 
-
 interface StartConversationConfig {
     systemInstruction: string;
     voice: DeVinciVoice;
     tools?: { functionDeclarations: FunctionDeclaration[] }[];
     onFunctionCall?: (fc: { name: string, args: any, id: string }) => Promise<any>;
-    authenticatedUser: User; // Add user for speaker tracking
+    authenticatedUser: User;
 }
 
 export const useDeVinci = () => {
@@ -86,8 +80,7 @@ export const useDeVinci = () => {
     const [analyzableFile, setAnalyzableFile] = useState<File | null>(null);
     const [knownSpeakers, setKnownSpeakers] = useState<User[]>([]);
     const [retryCount, setRetryCount] = useState(0);
-    // FIX: The LiveSession type is not exported. Infer it from the return type of ai.live.connect.
-    const sessionPromise = useRef<ReturnType<typeof ai.live.connect> | null>(null);
+    const sessionPromise = useRef<Promise<any> | null>(null);
     const audioRefs = useRef<{
         inputAudioContext?: AudioContext,
         outputAudioContext?: AudioContext,
@@ -99,13 +92,10 @@ export const useDeVinci = () => {
     }>({ nextStartTime: 0, sources: new Set() });
     const previousStateRef = useRef<DeVinciState>('listening');
     const configRef = useRef<StartConversationConfig | null>(null);
-    const retryAttemptRef = useRef(1);
     const transcriptRef = useRef(transcript);
     useEffect(() => { transcriptRef.current = transcript; }, [transcript]);
 
-
     const stopConversation = useCallback(() => {
-        // Disconnect audio processing first to prevent further onaudioprocess events
         audioRefs.current.mediaStream?.getTracks().forEach(track => track.stop());
         if (audioRefs.current.scriptProcessor) {
             audioRefs.current.scriptProcessor.disconnect();
@@ -116,7 +106,6 @@ export const useDeVinci = () => {
             audioRefs.current.source = undefined;
         }
 
-        // Now, safely close the session
         if (sessionPromise.current) {
             sessionPromise.current.then(session => {
                 session?.close();
@@ -124,17 +113,13 @@ export const useDeVinci = () => {
             sessionPromise.current = null;
         }
         
-        // Stop any currently playing/scheduled audio buffers
         audioRefs.current.sources.forEach(source => {
             try {
                 source.stop();
-            } catch (e) {
-                // Ignore errors if it's already stopped
-            }
+            } catch (e) { }
         });
         audioRefs.current.sources.clear();
         
-        // Finally, close the audio contexts with robust error handling
         const inputCtx = audioRefs.current.inputAudioContext;
         if (inputCtx) {
             try {
@@ -192,13 +177,10 @@ export const useDeVinci = () => {
         }
 
         const session = await sessionPromise.current;
-
-        // Manually add user prompt to transcript to give immediate feedback
         const userPromptText = `(Uploaded file: ${file.name}) Please analyze this file and provide a detailed description.`;
         setTranscript(prev => {
             const last = prev[prev.length - 1];
             const speakerName = knownSpeakers[0]?.name;
-            // Finalize previous user turn if it's still in-progress
             if (last?.source === 'user' && !last.isFinal) {
                 const finalLast = { ...last, isFinal: true };
                 return [...prev.slice(0, -1), finalLast, { source: 'user', text: userPromptText, isFinal: true, speakerName }];
@@ -206,7 +188,6 @@ export const useDeVinci = () => {
             return [...prev, { source: 'user', text: userPromptText, isFinal: true, speakerName }];
         });
         
-        // Convert file and send both the media and a text prompt
         const mediaBlob = await fileToSessionBlob(file);
         session.sendRealtimeInput({ media: mediaBlob });
         session.sendRealtimeInput({ text: "Please analyze the file I just uploaded and provide a detailed description." });
@@ -239,10 +220,7 @@ export const useDeVinci = () => {
 
     const simulateNewSpeaker = useCallback(() => {
         const unintroducedUsers = MOCK_USERS.filter(mockUser => !knownSpeakers.some(known => known.id === mockUser.id));
-        if (unintroducedUsers.length === 0) {
-            // No new users to add, maybe show a message
-            return;
-        }
+        if (unintroducedUsers.length === 0) return;
         const newSpeaker = unintroducedUsers[Math.floor(Math.random() * unintroducedUsers.length)];
 
         setTranscript(prev => [
@@ -260,11 +238,12 @@ export const useDeVinci = () => {
         }
         
         configRef.current = config;
-        retryAttemptRef.current = 1;
+        
+        // Initialize AI client inside function to pick up latest API key
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
 
-        // This inner function handles the actual connection and can be called for retries.
         const connect = async (currentConfig: StartConversationConfig, attempt: number) => {
-            if (attempt === 1) { // This is a fresh start
+            if (attempt === 1) { 
                 setState('connecting');
                 setTranscript([]);
                 setAnalyzableFile(null);
@@ -275,12 +254,10 @@ export const useDeVinci = () => {
                 setState('reconnecting');
             }
 
-            // Clean up any previous session/audio processors before connecting/reconnecting
             audioRefs.current.scriptProcessor?.disconnect();
             audioRefs.current.source?.disconnect();
             if(sessionPromise.current) await sessionPromise.current.then(s => s.close());
 
-            // Initialize audio contexts if they don't exist or are closed
             if (!audioRefs.current.inputAudioContext || audioRefs.current.inputAudioContext.state === 'closed') {
                 audioRefs.current.inputAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
             }
@@ -290,7 +267,6 @@ export const useDeVinci = () => {
             const outputNode = audioRefs.current.outputAudioContext.createGain();
             outputNode.connect(audioRefs.current.outputAudioContext.destination);
 
-            // Re-acquire microphone stream if needed
             if (!audioRefs.current.mediaStream || audioRefs.current.mediaStream.getTracks().every(t => t.readyState === 'ended')) {
                 try {
                     audioRefs.current.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -302,8 +278,9 @@ export const useDeVinci = () => {
                 }
             }
 
+            // Using gemini-2.0-flash-exp as requested for Live functionality
             sessionPromise.current = ai.live.connect({
-                model: 'gemini-2.5-flash-native-audio-preview-09-2025',
+                model: 'gemini-2.0-flash-exp', 
                 config: {
                     responseModalities: [Modality.AUDIO],
                     speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: currentConfig.voice } } },
@@ -314,7 +291,6 @@ export const useDeVinci = () => {
                 },
                 callbacks: {
                     onopen: () => {
-                        retryAttemptRef.current = 1; // Reset on successful connection
                         const inputCtx = audioRefs.current.inputAudioContext!;
                         const stream = audioRefs.current.mediaStream!;
                         audioRefs.current.source = inputCtx.createMediaStreamSource(stream);
@@ -333,7 +309,6 @@ export const useDeVinci = () => {
                         setState('listening');
                     },
                     onmessage: async (message: LiveServerMessage) => {
-                        retryAttemptRef.current = 1; // Reset on successful message
                         if (message.toolCall && currentConfig.onFunctionCall) {
                             setState('thinking');
                             for (const fc of message.toolCall.functionCalls) {
@@ -405,9 +380,8 @@ export const useDeVinci = () => {
                         const isNetworkError = errorMessage.includes('Network error');
                         
                         if ((isServiceUnavailable || isNetworkError) && attempt < 4) {
-                            console.warn(`DeVinci session connection issue (attempt ${attempt}), retrying...`, e);
                             setRetryCount(attempt);
-                            const delay = Math.min(1000 * (2 ** (attempt - 1)), 8000); // 1s, 2s, 4s
+                            const delay = Math.min(1000 * (2 ** (attempt - 1)), 8000);
                             setTimeout(() => {
                                 const originalConfig = configRef.current;
                                 if (!originalConfig) {
@@ -421,8 +395,8 @@ export const useDeVinci = () => {
                             }, delay);
                         } else {
                             console.error('Session error:', e);
-                            stopConversation(); // Cleans up and sets state to 'idle'
-                            if (isServiceUnavailable || isNetworkError) { // We've exhausted retries
+                            stopConversation(); 
+                            if (isServiceUnavailable || isNetworkError) {
                                 setState('reconnect_failed');
                             } else {
                                 setState('error');

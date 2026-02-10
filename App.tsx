@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Faction, ProjectVersion, Project, AnalysisResult, User, LogEntry, Role, GeneratedDrawing, FactionId, GeneratedImage, EditorState, RotorModel, CadData, InProgressState } from './types';
 import { ENGINEERING_PHILOSOPHIES, TOUR_STEPS, MOCK_USERS } from './constants';
@@ -38,7 +37,6 @@ import {
     buildDeVinciCreationSystemInstruction,
     runAnalysisWithFactionFunctionDeclaration,
     generateInspirationalImageFunctionDeclaration,
-    generateSummary,
     buildDeVinciSystemInstruction,
     summarizePdfForContext,
     downloadDrawingsFunctionDeclaration,
@@ -239,7 +237,7 @@ json.dumps(results)
         return () => {
             worker.terminate();
         };
-    }, [addLog, workerCode]);
+    }, [addLog]);
 
     const runAnalysis = (rotorModel: RotorModel, analysisType: 'critical_speed' | 'campbell') => {
         if (!isRossReady || !workerRef.current) {
@@ -880,7 +878,9 @@ ${summary}
     }
   }, [drawings, inspirationalImages, activeVersion, updateVersion]);
 
-  const isReady = !!selectedFaction && !!prompt.trim();
+  const isReady = useMemo(() => {
+      return !!selectedFaction && !!prompt.trim() && !!projectName.trim();
+  }, [selectedFaction, prompt, projectName]);
 
   const handleApplyFactionSuggestion = (factionId: FactionId) => {
     const faction = ENGINEERING_PHILOSOPHIES.find(f => f.id === factionId);
@@ -923,7 +923,7 @@ ${summary}
     }
 
     setHasUnsavedChanges(false);
-  }, [hasUnsavedChanges, activeProject, clearAnalysis, clearAllDrawings, clearAllInspirationalImages, clearVideo, clearCad, clearSummary, liveCosting, bomSourcing, simulation, fabricationPlanner, setFiles, onNewProject, onSelectProject, setProjectName, resetEditorState]);
+  }, [hasUnsavedChanges, activeProject, clearAnalysis, clearAllDrawings, clearAllInspirationalImages, clearVideo, clearCad, clearSummary, liveCosting, bomSourcing, simulation, fabricationPlanner, onNewProject, onSelectProject, resetEditorState]);
   
   const handleEngage = useCallback(async (isReanalysis = false) => {
     if (!selectedFaction || !prompt.trim() || !projectName.trim()) {
@@ -931,8 +931,6 @@ ${summary}
       return;
     }
 
-    // NOTE: Removed handleCommitVersion call here to avoid race condition.
-    // The current state will be saved naturally in the version created *after* analysis.
     if (activeProject && !isReanalysis && hasUnsavedChanges) {
         if (!window.confirm("You have unsaved changes. Engaging will start a new version based on your current inputs. Continue?")) {
             return;
@@ -944,20 +942,28 @@ ${summary}
     if (newResult) {
       const commitMessage = isReanalysis ? `Re-analyzed with ${selectedFaction.name}` : 'New analysis from editor';
       
+      const fileUrls = files.length > 0 ? await Promise.all(files.map(fileToDataUrl)) : activeVersion?.fileUrls || [];
+
       // If we don't have an active project yet, create one now
       if (!activeProject) {
-         const newId = onNewProject({ name: projectName, description: 'Created from analysis', tags }, { prompt, factionId: selectedFaction.id });
+         onNewProject({ name: projectName, description: 'Created from analysis', tags }, { 
+            prompt, 
+            factionId: selectedFaction.id,
+            result: newResult,
+            fileUrls: fileUrls
+         });
+         // The new project version is already created as part of onNewProject's initial logic
+      } else {
+          // Save the new version into the existing project
+          saveNewVersion({
+              prompt,
+              factionId: selectedFaction.id,
+              result: newResult,
+              fileUrls: fileUrls,
+              drawings: [],
+              inspirationalImages: [],
+            }, commitMessage);
       }
-
-      // Save the new version immediately
-      saveNewVersion({
-          prompt,
-          factionId: selectedFaction.id,
-          result: newResult,
-          fileUrls: files.length > 0 ? await Promise.all(files.map(fileToDataUrl)) : activeVersion?.fileUrls || [],
-          drawings: [],
-          inspirationalImages: [],
-        }, commitMessage);
 
       // Reset states for the new version
       setActiveVersionIndex(0);

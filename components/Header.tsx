@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Role, User } from '../types';
-import { MOCK_USERS } from '../constants';
 import { ThemeToggle } from './ThemeToggle';
 
 interface HeaderProps {
@@ -13,9 +12,50 @@ interface HeaderProps {
     onSwitchView: (view: 'app' | 'admin' | 'suite') => void;
 }
 
+const ViewToggle = ({ mode, currentMode, onSwitch, icon, label }: { mode: 'app' | 'admin' | 'suite', currentMode: string, onSwitch: (v: any) => void, icon: React.ReactNode, label: string }) => {
+    const isActive = mode === currentMode;
+    return (
+        <button
+            onClick={() => onSwitch(mode)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all duration-300 relative z-10 ${
+                isActive 
+                    ? 'text-white' 
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-brand-light'
+            }`}
+        >
+            <span className={`transition-transform duration-300 ${isActive ? 'scale-110' : 'scale-100 group-hover:scale-105'}`}>
+                {icon}
+            </span>
+            <span className="hidden md:inline">{label}</span>
+        </button>
+    );
+};
+
 export const Header = ({ onStartTour, onOpenUserManual, authenticatedUser, onLogout, onOpenProfile, viewMode, onSwitchView }: HeaderProps) => {
     const [isProfileOpen, setIsProfileOpen] = useState(false);
+    const [hasKey, setHasKey] = useState(false);
     const profileRef = useRef<HTMLDivElement>(null);
+
+    const checkKeyStatus = async () => {
+        if (typeof (window as any).aistudio !== 'undefined') {
+            const status = await (window as any).aistudio.hasSelectedApiKey();
+            setHasKey(status);
+        }
+    };
+
+    const handleSelectKey = async () => {
+        if (typeof (window as any).aistudio !== 'undefined') {
+            await (window as any).aistudio.openSelectKey();
+            // Assume success as per race condition mitigation rule
+            setHasKey(true);
+        }
+    };
+
+    useEffect(() => {
+        checkKeyStatus();
+        const interval = setInterval(checkKeyStatus, 5000);
+        return () => clearInterval(interval);
+    }, []);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -34,107 +74,115 @@ export const Header = ({ onStartTour, onOpenUserManual, authenticatedUser, onLog
             case 'admin': return 'Administration Dashboard';
             case 'suite': return 'Engineering Tool Suite';
             case 'app':
-            default: return 'AI-Powered Reverse Engineering & Product Analysis';
+            default: return 'Reverse Engineering & Analysis Workspace';
         }
     }
 
+    const canAccessAdmin = [Role.Admin, Role.Manager].includes(authenticatedUser.role);
+
     return (
-      <header className="py-4 px-6 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 sticky top-0 z-20 flex justify-between items-center transition-colors duration-300">
+      <header className="py-4 px-6 bg-white/90 dark:bg-gray-900/90 backdrop-blur-md border-b border-gray-200 dark:border-gray-700 sticky top-0 z-30 flex justify-between items-center transition-all duration-300">
         <div className="flex items-center gap-3">
-          <svg className="w-8 h-8 text-brand-cyan" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 2L2 7l10 5 10-5-10-5z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M2 17l10 5 10-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M2 12l10 5 10-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            <circle cx="12" cy="12" r="3" fill="currentColor"/>
+          <svg className="w-9 h-9 text-brand-cyan" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2L2 7l10 5 10-5-10-5z" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M2 17l10 5 10-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M2 12l10 5 10-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+            <circle cx="12" cy="12" r="3.5" fill="currentColor"/>
           </svg>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-brand-light tracking-wider">
+            <h1 className="text-2xl font-black text-gray-900 dark:text-brand-light tracking-tight leading-none">
               Synapse<span className="text-brand-cyan">Forge</span> AI
             </h1>
-            <p className="text-xs text-gray-500 dark:text-gray-400 -mt-1">{getSubtitle()}</p>
+            <p className="text-[10px] uppercase tracking-widest text-gray-400 dark:text-gray-500 font-bold mt-1">{getSubtitle()}</p>
           </div>
         </div>
-        <div className="flex items-center gap-4">
-           {authenticatedUser && (
-                <div className="flex items-center gap-4">
-                    {[Role.Admin, Role.Manager].includes(authenticatedUser.role) && (
-                        viewMode === 'app' ? (
-                        <>
-                            <button
-                                onClick={() => onSwitchView('suite')}
-                                className="py-2 px-4 bg-teal-600 text-white font-semibold rounded-lg border border-teal-500 hover:bg-teal-500 transition active:scale-95 text-sm flex items-center gap-2"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" /></svg>
-                                Tool Suite
-                            </button>
-                            <button
-                                onClick={() => onSwitchView('admin')}
-                                className="py-2 px-4 bg-purple-600 text-white font-semibold rounded-lg border border-purple-500 hover:bg-purple-500 transition active:scale-95 text-sm flex items-center gap-2"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75" /></svg>
-                                Admin Dashboard
-                            </button>
-                        </>
-                        ) : (
-                            <button
-                                onClick={() => onSwitchView('app')}
-                                className="py-2 px-4 bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-white font-semibold rounded-lg border border-gray-300 dark:border-gray-500 hover:bg-gray-300 dark:hover:bg-gray-500 transition active:scale-95 text-sm flex items-center gap-2"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="m15 15-6 6m0 0-6-6m6 6V9a6 6 0 0 1 12 0v3" /></svg>
-                                 Back to App
-                            </button>
-                        )
-                    )}
-                    
-                    <ThemeToggle />
 
-                   <button
-                    onClick={onOpenUserManual}
-                    className="py-2 px-4 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white font-semibold rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-300 dark:hover:bg-gray-600 transition active:scale-95 text-sm flex items-center gap-2"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" />
-                      </svg>
-                      Manual
-                  </button>
-                  <button
-                    onClick={onStartTour}
-                    className="py-2 px-4 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white font-semibold rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-300 dark:hover:bg-gray-600 transition active:scale-95 text-sm flex items-center gap-2"
-                  >
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
-                      </svg>
-                    Tour
-                  </button>
-                   <div className="h-8 border-l border-gray-300 dark:border-gray-600"></div>
+        {/* Dynamic View Switcher with Pill Indicator */}
+        <div className="flex items-center gap-1 p-1 bg-gray-100/50 dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700 relative">
+            {/* Active Highlight Pill */}
+            <div className={`absolute top-1 left-1 bottom-1 w-[calc(33.333%-2.666px)] bg-brand-cyan rounded-lg shadow-lg transition-transform duration-300 ease-out z-0 ${
+                viewMode === 'app' ? 'translate-x-0' : 
+                viewMode === 'suite' ? 'translate-x-full' : 
+                'translate-x-[200%]'
+            }`} />
 
-                    {/* Presence indicator for collaboration */}
-                    <div className="flex items-center -space-x-2" title="Alex, Dana and Casey are also viewing this project">
-                        {MOCK_USERS.filter(u => u.id !== authenticatedUser.id && ['user-1', 'user-4', 'user-3'].includes(u.id)).map(user => (
-                            <img 
-                                key={user.id}
-                                className="inline-block h-8 w-8 rounded-full ring-2 ring-white dark:ring-gray-900"
-                                src={user.picture}
-                                alt={user.name}
-                            />
-                        ))}
+            <ViewToggle 
+                mode="app" 
+                currentMode={viewMode} 
+                onSwitch={onSwitchView} 
+                label="Workspace"
+                icon={<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" /></svg>}
+            />
+            {canAccessAdmin ? (
+                <>
+                <ViewToggle 
+                    mode="suite" 
+                    currentMode={viewMode} 
+                    onSwitch={onSwitchView} 
+                    label="Tool Suite"
+                    icon={<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17 17.25 21A2.652 2.652 0 0 0 21 17.25l-5.829-5.83m-4.251 4.251-.524.524a2.5 2.5 0 0 1-3.536 0l-1.414-1.414a2.5 2.5 0 0 1 0-3.536l.524-.524m4.251 4.251.488-.488a2.5 2.5 0 0 0 0-3.536l-.488-.489m4.251 4.251a2.5 2.5 0 0 1-3.536 0l-.489-.488m4.251 4.251.524-.524a2.5 2.5 0 0 0 0-3.536l-1.414-1.414a2.5 2.5 0 0 0-3.536 0l-.524.524" /></svg>}
+                />
+                <ViewToggle 
+                    mode="admin" 
+                    currentMode={viewMode} 
+                    onSwitch={onSwitchView} 
+                    label="Admin Console"
+                    icon={<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" /></svg>}
+                />
+                </>
+            ) : (
+                <>
+                <div className="flex-1 px-4 py-2 pointer-events-none opacity-0" aria-hidden="true">Placeholder</div>
+                <div className="flex-1 px-4 py-2 pointer-events-none opacity-0" aria-hidden="true">Placeholder</div>
+                </>
+            )}
+        </div>
+
+        <div className="flex items-center gap-3">
+            <div className="hidden lg:flex items-center gap-2">
+                <button
+                    onClick={handleSelectKey}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${hasKey ? 'bg-green-900/20 text-green-400 border-green-500/50' : 'bg-red-900/20 text-red-400 border-red-500/50 animate-pulse'}`}
+                    title={hasKey ? "Gemini API Key Connected" : "Action Required: Connect Gemini API Key"}
+                >
+                    <div className={`w-2 h-2 rounded-full ${hasKey ? 'bg-green-400' : 'bg-red-400 animate-ping'}`} />
+                    {hasKey ? 'API Active' : 'Connect Key'}
+                </button>
+                <button onClick={onOpenUserManual} className="p-2 text-gray-500 dark:text-gray-400 hover:text-brand-cyan transition-colors" title="User Manual">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" /></svg>
+                </button>
+                <button onClick={onStartTour} className="p-2 text-gray-500 dark:text-gray-400 hover:text-brand-cyan transition-colors" title="Interactive Tour">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z" /></svg>
+                </button>
+                <ThemeToggle />
+                <div className="h-6 w-px bg-gray-200 dark:bg-gray-700 mx-1"></div>
+            </div>
+
+            <div className="relative" ref={profileRef}>
+                <button onClick={() => setIsProfileOpen(!isProfileOpen)} className="flex items-center gap-2.5 p-1 pr-2.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-all border border-transparent hover:border-gray-200 dark:hover:border-gray-700">
+                    <img src={authenticatedUser.picture} alt={authenticatedUser.name} className="w-8 h-8 rounded-full border-2 border-brand-cyan" />
+                    <span className="hidden sm:inline font-bold text-gray-700 dark:text-brand-light text-sm">{authenticatedUser.name.split(' ')[0]}</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className={`w-3.5 h-3.5 text-gray-400 transition-transform ${isProfileOpen ? 'rotate-180' : ''}`}><path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
+                </button>
+                {isProfileOpen && (
+                    <div className="absolute right-0 mt-3 w-56 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in origin-top-right">
+                        <div className="px-4 py-3 bg-gray-50 dark:bg-gray-700/30 border-b border-gray-200 dark:border-gray-700">
+                            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Account</p>
+                            <p className="text-sm font-bold text-gray-800 dark:text-white truncate">{authenticatedUser.email}</p>
+                        </div>
+                        <div className="p-1">
+                            <button onClick={() => { onOpenProfile(); setIsProfileOpen(false); }} className="flex items-center gap-3 w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-brand-cyan hover:text-white rounded-lg transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" /></svg>
+                                Profile Details
+                            </button>
+                            <button onClick={onLogout} className="flex items-center gap-3 w-full text-left px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" /></svg>
+                                Sign Out
+                            </button>
+                        </div>
                     </div>
-
-                   <div className="relative" ref={profileRef}>
-                        <button onClick={() => setIsProfileOpen(!isProfileOpen)} className="flex items-center gap-2 text-gray-800 dark:text-white font-semibold transition-colors duration-200 hover:text-brand-cyan dark:hover:text-cyan-300">
-                            <img src={authenticatedUser.picture} alt={authenticatedUser.name} className="w-8 h-8 rounded-full border-2 border-gray-300 dark:border-gray-600" />
-                            {authenticatedUser.name}
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className={`w-4 h-4 transition-transform ${isProfileOpen ? 'rotate-180' : ''}`}><path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
-                        </button>
-                        {isProfileOpen && (
-                            <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-30 animate-fade-in" style={{animationDuration: '0.15s'}}>
-                                <button onClick={() => { onOpenProfile(); setIsProfileOpen(false); }} className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Profile</button>
-                                <button onClick={() => { onLogout(); }} className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Sign Out</button>
-                            </div>
-                        )}
-                   </div>
-               </div>
-           )}
+                )}
+            </div>
         </div>
       </header>
     );

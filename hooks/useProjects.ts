@@ -1,6 +1,5 @@
-
 import { useState, useEffect, useCallback } from 'react';
-import { Project, ProjectVersion, FactionId, ProjectIndexEntry, GeneratedImage } from '../types';
+import { Project, ProjectVersion, FactionId, ProjectIndexEntry, GeneratedImage, AnalysisResult } from '../types';
 
 const getProjectKeywords = (projectHistory: ProjectVersion[]): string => {
     const keywords: (string | undefined)[] = [];
@@ -21,16 +20,16 @@ const getProjectKeywords = (projectHistory: ProjectVersion[]): string => {
 };
 
 
-const createNewProject = (details: {name: string; description: string; tags: string[]}, initialVersionData?: { prompt?: string; factionId?: FactionId }): Project => {
+const createNewProject = (details: {name: string; description: string; tags: string[]}, initialVersionData?: { prompt?: string; factionId?: FactionId; result?: AnalysisResult | null; fileUrls?: string[] }): Project => {
     const timestamp = new Date().toISOString();
     const initialVersion: ProjectVersion = {
         versionId: `ver-${Date.now()}`,
         createdAt: timestamp,
-        commitMessage: 'Initial Commit',
+        commitMessage: initialVersionData?.result ? 'Initial analysis' : 'Initial Commit',
         prompt: initialVersionData?.prompt || '',
         factionId: initialVersionData?.factionId || FactionId.PRAGMATIC_PRODUCTION,
-        result: null,
-        fileUrls: [],
+        result: initialVersionData?.result || null,
+        fileUrls: initialVersionData?.fileUrls || [],
         drawings: [],
         inspirationalImages: [],
         incorporatedSuggestions: [],
@@ -51,7 +50,7 @@ export const useProjects = () => {
     const [projects, setProjects] = useState<ProjectIndexEntry[]>([]);
     const [activeProject, setActiveProject] = useState<Project | null>(null);
 
-    const onNewProject = (details: {name: string; description: string; tags: string[]}, initialVersionData?: { prompt?: string; factionId?: FactionId }): string => {
+    const onNewProject = (details: {name: string; description: string; tags: string[]}, initialVersionData?: { prompt?: string; factionId?: FactionId; result?: AnalysisResult | null; fileUrls?: string[] }): string => {
         const newProject = createNewProject(details, initialVersionData);
         
         const { history, ...indexEntry } = newProject;

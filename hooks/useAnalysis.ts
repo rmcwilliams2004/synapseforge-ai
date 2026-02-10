@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { generateAnalysis as performAnalysis, parseApiError } from '../services/geminiService';
 import { AnalysisResult, Faction, LogEntry } from '../types';
@@ -75,13 +74,31 @@ export const useAnalysis = (addLog: (level: LogEntry['level'], message: string) 
     setResult(null);
 
     try {
+      // Check for API key presence if expected by environment
+      if (typeof (window as any).aistudio !== 'undefined' && !(await (window as any).aistudio.hasSelectedApiKey())) {
+          await (window as any).aistudio.openSelectKey();
+      }
+
       const analysisResult = await runFullAnalysis(projectName, prompt, faction, source);
       setResult(analysisResult);
       return analysisResult;
     } catch (e) {
       const errorMessage = parseApiError(e);
-      setError(errorMessage);
-      addLog('ERROR', `Core Analysis Failed: ${errorMessage}`);
+      
+      // Handle unauthenticated state by prompting for key
+      if (errorMessage.includes("Auth Error") || errorMessage.includes("Unauthenticated") || errorMessage.includes("API keys are not supported")) {
+          if (typeof (window as any).aistudio !== 'undefined') {
+              addLog('WARN', 'Unauthenticated request detected. Prompting user to select API key.');
+              await (window as any).aistudio.openSelectKey();
+              // Guide the user to try again
+              setError("Session re-authenticated. Please click 'Engage' again to run your analysis.");
+          } else {
+              setError(errorMessage);
+          }
+      } else {
+          setError(errorMessage);
+          addLog('ERROR', `Core Analysis Failed: ${errorMessage}`);
+      }
       return null;
     } finally {
       setIsLoading(false);
