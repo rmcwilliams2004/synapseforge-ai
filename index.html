@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -29,7 +30,6 @@
         animation: fadeIn 0.5s ease-out forwards;
       }
       
-      /* Add new class for staggered list items */
       .animate-stagger-in {
         opacity: 0;
         animation: fadeIn 0.5s ease-out forwards;
@@ -51,7 +51,6 @@
         animation: scaleIn 0.3s ease-out forwards;
       }
 
-      /* Tour Styles */
       .tour-overlay {
         position: fixed;
         top: 0;
@@ -65,9 +64,9 @@
       
       .tour-popover {
         position: absolute;
-        background-color: #1f2937; /* gray-800 */
-        color: #e2e8f0; /* brand-light */
-        border: 2px solid #06b6d4; /* brand-cyan */
+        background-color: #1f2937; 
+        color: #e2e8f0; 
+        border: 2px solid #06b6d4; 
         border-radius: 8px;
         padding: 16px;
         max-width: 350px;
@@ -103,11 +102,9 @@
         position: relative;
         z-index: 1000;
         border-radius: 6px;
-        /* The magic sauce for the spotlight effect */
         box-shadow: 0 0 0 9999px rgba(0,0,0,0.7);
       }
       
-      /* Voice Commander Pulse */
       @keyframes pulse-mic {
         0%, 100% {
           opacity: 1;
@@ -136,7 +133,8 @@
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
     "three": "https://cdn.jsdelivr.net/npm/three@0.166.1/build/three.module.js",
     "three/examples/jsm/controls/OrbitControls.js": "https://cdn.jsdelivr.net/npm/three@0.166.1/examples/jsm/controls/OrbitControls.js",
-    "three/": "https://aistudiocdn.com/three@^0.180.0/"
+    "three/": "https://aistudiocdn.com/three@^0.180.0/",
+    "idb": "https://cdn.jsdelivr.net/npm/idb@8/+esm"
   }
 }
 </script>

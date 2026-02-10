@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { AnalysisResult, Faction, MaterialSuggestion, BillOfMaterials, TestPlan, ComplianceAndSafety, Project, User, GeneratedDrawing, CadData, ProjectVersion, EngineeringChangeOrder, PreliminaryCostEstimate, GeneratedImage, RotorModel, RotorShaftElement, RotorDiskElement, RotorBearingElement, RotorMaterial, GoogleDocContent } from '../../types';
+import { AnalysisResult, Faction, MaterialSuggestion, BillOfMaterials, TestPlan, ComplianceAndSafety, Project, User, GeneratedDrawing, CadData, ProjectVersion, EngineeringChangeOrder, PreliminaryCostEstimate, GeneratedImage, RotorModel, RotorShaftElement, RotorDiskElement, RotorBearingElement, RotorMaterial, GoogleDocContent, EngineeringBranch } from '../../types';
 import { exportFullReportPDF } from '../../services/pdfService';
 import { Modal } from '../Modal';
 import { useTts } from '../../hooks/useTts';
@@ -39,6 +39,13 @@ const SparklesIcon = () => (
     </svg>
 );
 
+const AgentVerificationBadge = ({ branch }: { branch: string }) => (
+    <div className="flex items-center gap-1.5 px-2 py-0.5 bg-green-900/20 border border-green-500/30 rounded-full shadow-[0_0_8px_rgba(34,197,94,0.15)]">
+        <span className="animate-pulse w-1.5 h-1.5 bg-green-400 rounded-full"></span>
+        <span className="text-[9px] font-black text-green-400 uppercase tracking-tight">{branch} PhD Verified</span>
+    </div>
+);
+
 const ExportDropdown = ({ onExportPDF, onExportGoogle, onGoogleSignIn, onGoogleSignOut, isGoogleAuthLoading, isGoogleAuthenticated, googleExporterUser, isGoogleExporting, googleExportStatus, googleExportError, googleDocContent, onOpenGoogleDocPreview }: { onExportPDF: () => void, onExportGoogle: () => void, onGoogleSignIn: () => void, onGoogleSignOut: () => void, isGoogleAuthLoading: boolean, isGoogleAuthenticated: boolean, googleExporterUser: { name: string; email: string; } | null, isGoogleExporting: boolean, googleExportStatus: string, googleExportError: string | null, googleDocContent: GoogleDocContent | null, onOpenGoogleDocPreview: () => void }) => {
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
@@ -54,7 +61,7 @@ const ExportDropdown = ({ onExportPDF, onExportGoogle, onGoogleSignIn, onGoogleS
     }, []);
 
     const ExportIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>;
-    const GoogleDriveIcon = () => <svg className="w-5 h-5" viewBox="0 0 24 24"><path fill="#4285F4" d="M19.34 9.47l-3.53-6.12L12 9.47h7.34z" /><path fill="#34A853" d="M12 15.65l3.54-6.12H8.46l3.54 6.12z" /><path fill="#F9BC05" d="M5.13 9.94l3.53-6.11L4.81 15.6l-3.3-5.66z" /><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" opacity="0.5" /><path fill-opacity="0.2" fill="#263238" d="M15.82 15.65l3.52-6.18h-7.06z"/></svg>;
+    const GoogleDriveIcon = () => <svg className="w-5 h-5" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" /><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" /><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" /><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" opacity="0.5" /><path fill-opacity="0.2" fill="#263238" d="M15.82 15.65l3.52-6.18h-7.06z"/></svg>;
     
     return (
         <div className="relative" ref={dropdownRef}>
@@ -105,7 +112,7 @@ const ExportDropdown = ({ onExportPDF, onExportGoogle, onGoogleSignIn, onGoogleS
                                     </button>
                                 )}
 
-                                <button onClick={() => { onGoogleSignOut(); setIsOpen(false); }} className="w-full text-center text-xs text-gray-500 hover:text-gray-800 dark:hover:text-white pt-1">
+                                <button onClick={() => { onGoogleSignOut(); setIsOpen(false); }} className="w-full text-center text-xs text-gray-500 hover:text-gray-800 dark:hover:white pt-1">
                                     Sign Out
                                 </button>
                             </div>
@@ -171,12 +178,18 @@ const BillOfMaterialsTable = ({ bom, bomSourcing, isViewer }: { bom: BillOfMater
                                                 {results.length > 0 ? (
                                                 <ul className="space-y-1">
                                                     {results.map((res, j) => (
-                                                        <li key={j} className="text-xs text-gray-600 dark:text-gray-400 flex gap-2 items-center">
+                                                        <li key={j} className={`text-xs flex gap-2 items-center ${res.verified ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'}`}>
                                                             <a href={res.url} target="_blank" rel="noopener noreferrer" className="text-cyan-600 dark:text-cyan-400 hover:underline font-semibold">{res.supplier}</a> 
                                                             <span className="text-gray-400 dark:text-gray-500">|</span>
                                                             <span>Cost: {res.estimatedCost}</span> 
                                                             <span className="text-gray-400 dark:text-gray-500">|</span>
                                                             <span>Lead Time: {res.leadTime}</span>
+                                                            {res.verified && (
+                                                                <span className="flex items-center gap-1 text-[10px] uppercase font-bold text-green-500 bg-green-500/10 px-1.5 rounded" title={`AI Confidence: ${Math.round((res.confidence || 0) * 100)}%`}>
+                                                                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/></svg>
+                                                                    Verified
+                                                                </span>
+                                                            )}
                                                         </li>
                                                     ))}
                                                 </ul>
@@ -503,26 +516,26 @@ const ImageHistory = ({ history, onReinsert, onDelete, currentImages, isViewer }
             {isOpen && (
                 <div className="mt-4 space-y-3 max-h-96 overflow-y-auto pr-2">
                     {history.map(image => (
-                        <div key={image.id} className="flex items-center gap-4 bg-gray-50 dark:bg-gray-900/50 p-2 rounded-md border border-gray-200 dark:border-gray-600">
-                            <div className="w-24 h-16 flex-shrink-0 bg-gray-200 dark:bg-gray-700 rounded-sm">
-                                {image.url && <img src={image.url} alt={image.prompt} className="w-full h-full object-cover rounded-sm" />}
+                        <div key={image.id} className="flex items-center gap-4 bg-gray-50 dark:bg-gray-900/50 p-2 rounded-md border border-gray-200 dark:border-gray-700 text-xs text-gray-700 dark:text-gray-400">
+                            <div className="w-24 h-16 flex-shrink-0 bg-gray-200 dark:bg-gray-700 rounded-sm overflow-hidden">
+                                {image.url && <img src={image.url} alt={image.prompt} className="w-full h-full object-cover" />}
                             </div>
                             <div className="flex-1 min-w-0">
-                                <p className="text-xs text-gray-700 dark:text-gray-400 truncate" title={image.prompt}>"{image.prompt}"</p>
-                                <p className="text-xs text-gray-500">Aspect Ratio: {image.aspectRatio || 'N/A'}</p>
+                                <p className="truncate" title={image.prompt}>"{image.prompt}"</p>
+                                <p className="text-[10px] text-gray-500 mt-1">Aspect: {image.aspectRatio || '16:9'}</p>
                             </div>
                             {!isViewer && (
-                                <div className="flex flex-col gap-1.5 flex-shrink-0">
+                                <div className="flex flex-col gap-1">
                                     <button 
                                         onClick={() => onReinsert(image)}
                                         disabled={currentImageIds.has(image.id)}
-                                        className="py-1 px-2 text-[10px] bg-cyan-600 text-white rounded hover:bg-cyan-500 transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="px-2 py-1 bg-cyan-600/20 text-cyan-400 rounded border border-cyan-500/30 hover:bg-cyan-600/40 disabled:opacity-50"
                                     >
-                                        Re-insert
+                                        Insert
                                     </button>
                                     <button 
                                         onClick={() => onDelete(image.id)}
-                                        className="py-1 px-2 text-[10px] bg-red-700/80 text-white rounded hover:bg-red-600 transition-transform active:scale-95"
+                                        className="px-2 py-1 bg-red-900/20 text-red-400 rounded border border-red-500/30 hover:bg-red-900/40"
                                     >
                                         Delete
                                     </button>
@@ -898,6 +911,7 @@ export const ResultView = ({
             <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
               {Icon && <Icon className="w-5 h-5 text-brand-cyan" />}
               <span>Analysis via: <span className="font-semibold text-brand-cyan">{selectedFaction?.name}</span></span>
+              {result.branch && <span className="ml-2 px-2 py-0.5 bg-indigo-900/40 text-indigo-300 border border-indigo-500/30 rounded text-[10px] font-black uppercase tracking-widest">{result.branch} Branch</span>}
             </div>
           </div>
           <div className="flex gap-2 flex-wrap items-center">
@@ -953,7 +967,25 @@ export const ResultView = ({
           onRefresh={handleRefreshSuggestions}
         />
 
+        {/* Safety Audit Section */}
+        {result.safety_audit && result.safety_audit.length > 0 && (
+            <Section id="safety_audit" title="Agentic Safety Audit Interlock" actions={<span className="text-[10px] font-black text-green-400 bg-green-900/30 px-2 py-0.5 rounded border border-green-500/30 uppercase tracking-[0.2em]">PhD Agents Active</span>}>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {result.safety_audit.map((finding, i) => (
+                        <div key={i} className="p-4 bg-gray-800/50 border border-gray-700 rounded-lg flex items-start gap-4 hover:border-gray-600 transition-colors">
+                            <div className={`mt-1 flex-shrink-0 w-3 h-3 rounded-full ${finding.status === 'Pass' ? 'bg-green-500 shadow-[0_0_10px_#22c55e]' : finding.status === 'Warn' ? 'bg-yellow-500 shadow-[0_0_10px_#eab308]' : 'bg-red-500 shadow-[0_0_10px_#ef4444]'}`} />
+                            <div>
+                                <h5 className="font-bold text-sm text-gray-200 mb-1">{finding.protocol}</h5>
+                                <p className="text-xs text-gray-400 leading-relaxed">{finding.message}</p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </Section>
+        )}
+
         <Section id="executive_summary" title="Executive Summary" actions={<>
+            <AgentVerificationBadge branch={result.branch || "General"} />
             <ReadAloudButton text={result.executive_summary} tts={tts} voice={selectedTtsVoice} />
             <CommentButton
                 sectionId="executive_summary"
@@ -977,7 +1009,7 @@ export const ResultView = ({
             />
         }>
           <div className="space-y-6">
-              <div className="bg-green-50 dark:bg-green-900/30 p-4 rounded-lg border border-green-200 dark:border-green-700">
+              <div className="bg-green-50 dark:bg-green-900/30 p-4 rounded-lg border border-green-200 dark:border-gray-700">
                   <h4 className="text-lg font-semibold text-green-600 dark:text-green-300 mb-2">Pros</h4>
                   <ul className="list-disc pl-5 space-y-1 text-green-700 dark:text-green-300/90">
                       {(result.faction_rationale?.pros || []).map((pro, i) => <li key={i}>{pro}</li>)}
@@ -1032,8 +1064,8 @@ export const ResultView = ({
                                 </button>
                                 {openMaterialProperties.has(idx) && (
                                     <ul className="mt-2 text-xs text-gray-400 grid grid-cols-2 gap-2 bg-gray-800 p-2 rounded">
-                                        {Object.entries(mat.properties).map(([k, v]) => (
-                                            <li key={k}><span className="font-semibold">{k}:</span> {v}</li>
+                                        {Object.entries(mat.properties).map(([key, value]) => (
+                                            <li key={key}><span className="font-semibold">{key}:</span> {value}</li>
                                         ))}
                                     </ul>
                                 )}
@@ -1095,11 +1127,33 @@ export const ResultView = ({
                      <div className="space-y-4">
                          <h4 className="text-lg font-semibold text-brand-light">Technical Drawings</h4>
                          {drawings.map(d => (
-                             <div key={d.id} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                             <div key={d.id} className="group relative bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
                                  {d.url ? <img src={d.url} alt={d.prompt} className="w-full h-48 object-contain bg-white" /> : <div className="h-48 flex items-center justify-center bg-gray-100 dark:bg-gray-900 text-gray-500">{d.error ? 'Error' : 'Generating...'}</div>}
+                                 
+                                 {/* Cover Badge Overlay */}
+                                 {d.isCoverImage && (
+                                     <div className="absolute top-2 left-2 bg-brand-cyan text-white text-[10px] font-black px-2 py-0.5 rounded shadow-lg z-10 flex items-center gap-1">
+                                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3 h-3"><path fillRule="evenodd" d="M10.868 2.884c-.321-.772-1.415-.772-1.736 0l-1.83 4.401-4.753.381c-.833.067-1.171 1.107-.536 1.651l3.62 3.102-1.106 4.637c-.194.813.691 1.456 1.405 1.02L10 15.591l4.069 2.485c.713.436 1.598-.207 1.404-1.02l-1.106-4.637 3.62-3.102c.635-.544.297-1.584-.536-1.65l-4.752-.382-1.831-4.401Z" clipRule="evenodd" /></svg>
+                                         REPORT COVER
+                                     </div>
+                                 )}
+
                                  <div className="p-2 bg-gray-50 dark:bg-gray-700 flex justify-between items-center text-xs">
                                      <span className="truncate flex-1 text-gray-700 dark:text-gray-300" title={d.prompt}>{d.prompt}</span>
-                                     {!isViewer && <button onClick={() => onRemoveDrawing(d.id)} className="text-red-500 hover:text-red-400">Remove</button>}
+                                     <div className="flex gap-2">
+                                        {!isViewer && (
+                                            <>
+                                                <button 
+                                                    onClick={() => onSetCover(d.id, 'drawing')} 
+                                                    className={`transition-colors font-bold ${d.isCoverImage ? 'text-brand-cyan' : 'text-gray-400 hover:text-brand-cyan'}`}
+                                                    title="Set as report cover"
+                                                >
+                                                    {d.isCoverImage ? 'Selected' : 'Set Cover'}
+                                                </button>
+                                                <button onClick={() => onRemoveDrawing(d.id)} className="text-red-500 hover:text-red-400">Remove</button>
+                                            </>
+                                        )}
+                                     </div>
                                  </div>
                              </div>
                          ))}
@@ -1132,11 +1186,33 @@ export const ResultView = ({
                      <div className="space-y-4">
                          <h4 className="text-lg font-semibold text-brand-light">Concept Art</h4>
                          {inspirationalImages.map(img => (
-                             <div key={img.id} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                             <div key={img.id} className="group relative bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
                                   {img.url ? <img src={img.url} alt={img.prompt} className="w-full h-48 object-cover" /> : <div className="h-48 flex items-center justify-center bg-gray-100 dark:bg-gray-900 text-gray-500">{img.error ? 'Error' : 'Generating...'}</div>}
+                                   
+                                   {/* Cover Badge Overlay */}
+                                   {img.isCoverImage && (
+                                       <div className="absolute top-2 left-2 bg-brand-cyan text-white text-[10px] font-black px-2 py-0.5 rounded shadow-lg z-10 flex items-center gap-1">
+                                           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3 h-3"><path fillRule="evenodd" d="M10.868 2.884c-.321-.772-1.415-.772-1.736 0l-1.83 4.401-4.753.381c-.833.067-1.171 1.107-.536 1.651l3.62 3.102-1.106 4.637c-.194.813.691 1.456 1.405 1.02L10 15.591l4.069 2.485c.713.436 1.598-.207 1.404-1.02l-1.106-4.637 3.62-3.102c.635-.544.297-1.584-.536-1.65l-4.752-.382-1.831-4.401Z" clipRule="evenodd" /></svg>
+                                           REPORT COVER
+                                       </div>
+                                   )}
+
                                    <div className="p-2 bg-gray-50 dark:bg-gray-700 flex justify-between items-center text-xs">
                                      <span className="truncate flex-1 text-gray-700 dark:text-gray-300" title={img.prompt}>{img.prompt}</span>
-                                     {!isViewer && <button onClick={() => onRemoveInspirationalImage(img.id)} className="text-red-500 hover:text-red-400">Remove</button>}
+                                     <div className="flex gap-2">
+                                        {!isViewer && (
+                                            <>
+                                                <button 
+                                                    onClick={() => onSetCover(img.id, 'image')} 
+                                                    className={`transition-colors font-bold ${img.isCoverImage ? 'text-brand-cyan' : 'text-gray-400 hover:text-brand-cyan'}`}
+                                                    title="Set as report cover"
+                                                >
+                                                    {img.isCoverImage ? 'Selected' : 'Set Cover'}
+                                                </button>
+                                                <button onClick={() => onRemoveInspirationalImage(img.id)} className="text-red-500 hover:text-red-400">Remove</button>
+                                            </>
+                                        )}
+                                     </div>
                                  </div>
                              </div>
                          ))}
@@ -1182,7 +1258,7 @@ export const ResultView = ({
             <LiveCostingDashboard liveCosting={liveCosting} isViewer={isViewer} />
         </Section>
         
-        <Section id="advanced_simulation" title="Advanced Simulation">
+        <Section id="advanced_simulation" title="Advanced Simulation" actions={result.branch === EngineeringBranch.NUCLEAR && <AgentVerificationBadge branch="Nuclear" />}>
              <AdvancedSimulation bom={result.billOfMaterials} simulation={simulation} productContext={result.executive_summary} isViewer={isViewer} />
         </Section>
 
@@ -1190,17 +1266,21 @@ export const ResultView = ({
             <RotordynamicsStudio model={rotorModel} onModelChange={onRotorModelChange} rossAnalysis={rossAnalysis} isViewer={isViewer} />
         </Section>
 
-        <Section id="fabrication_planner" title="Fabrication Planner">
+        <Section id="fabrication_planner" title="Fabrication Planner" actions={result.branch === EngineeringBranch.AEROSPACE && <AgentVerificationBadge branch="Aerospace" />}>
             <FabricationPlanner fabricationPlanner={fabricationPlanner} analysisResult={result} isViewer={isViewer} gcodeVisualizer={gcodeVisualizer} />
         </Section>
 
-        <PatentModule result={result} patentGenerator={patentGenerator} isViewer={isViewer} />
+        <PatentModule result={result} patentGenerator={patentGenerator} isViewer={isViewer} knowledgeBase={activeProject?.knowledgeBase || []} authenticatedUser={authenticatedUser} />
 
         <Section id="test_plan" title="Test Plan">
             <TestPlanTable testPlan={result.testPlan} />
         </Section>
 
-        <Section id="compliance_safety" title="Compliance & Safety">
+        <Section id="compliance_safety" title="Compliance & Safety" actions={<>
+            {result.branch === EngineeringBranch.AEROSPACE && <AgentVerificationBadge branch="Aerospace" />}
+            {result.branch === EngineeringBranch.NUCLEAR && <AgentVerificationBadge branch="Nuclear" />}
+            <CommentButton sectionId="compliance_safety" sectionTitle="Compliance & Safety" onToggle={handleToggleCommentSection} count={commentCounts['compliance_safety'] || 0} isOpen={commentSection?.id === 'compliance_safety'} />
+        </>}>
              <ComplianceAndSafetyTable compliance={result.complianceAndSafety} />
         </Section>
         

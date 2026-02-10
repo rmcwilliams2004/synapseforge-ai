@@ -1,4 +1,3 @@
-
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { GoogleGenAI, LiveServerMessage, Modality, Blob } from '@google/genai';
 import { VoiceCommanderState } from '../types';
@@ -130,7 +129,6 @@ export const useVoiceCommander = ({ onNavigate, onDownloadDrawings, onGenerateVi
         setState('listening');
         audioRefs.current = { nextStartTime: 0, sources: new Set() };
 
-        // Initialize AI client inside function to pick up latest API key
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
         
         try {
@@ -146,12 +144,12 @@ export const useVoiceCommander = ({ onNavigate, onDownloadDrawings, onGenerateVi
         const outputNode = audioRefs.current.outputAudioContext.createGain();
         outputNode.connect(audioRefs.current.outputAudioContext.destination);
 
-        sessionPromise.current = ai.live.connect({
-            model: 'gemini-2.0-flash-exp', 
+        const livePromise = ai.live.connect({
+            model: 'gemini-2.5-flash-native-audio-preview-12-2025', 
             config: {
-                responseModalities: [Modality.AUDIO],
+                responseModalities: ['AUDIO'],
                 speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } },
-                systemInstruction: "You are a voice command assistant for a web application. Your job is to listen for user commands and call the appropriate function. You can navigate to sections using 'show_section', download all drawings as a zip file using 'download_drawings', or generate a video using 'generate_video'. If the user wants to animate an uploaded image or refers to 'this image', set 'useUploadedImage' to true. Be concise in your audio responses based on the tool execution result.",
+                systemInstruction: "Voice assistant. Command: 'show_section', 'download_drawings', or 'generate_video'. Concise audio responses only.",
                 tools: [{ functionDeclarations: [showSectionFunctionDeclaration, downloadDrawingsFunctionDeclaration, generateVideoFunctionDeclaration] }],
             },
             callbacks: {
@@ -165,7 +163,7 @@ export const useVoiceCommander = ({ onNavigate, onDownloadDrawings, onGenerateVi
                     scriptProcessor.onaudioprocess = (audioProcessingEvent) => {
                         const inputData = audioProcessingEvent.inputBuffer.getChannelData(0);
                         const pcmBlob = createBlob(inputData);
-                        sessionPromise.current?.then(session => session.sendRealtimeInput({ media: pcmBlob }));
+                        livePromise.then(session => session.sendRealtimeInput({ media: pcmBlob }));
                     };
                     audioRefs.current.source.connect(scriptProcessor);
                     scriptProcessor.connect(inputCtx.destination);
@@ -186,7 +184,7 @@ export const useVoiceCommander = ({ onNavigate, onDownloadDrawings, onGenerateVi
                                 responseResult = onGenerateVideo(fc.args.prompt, fc.args.useUploadedImage || false);
                             }
                             
-                            sessionPromise.current?.then(session => {
+                            livePromise.then(session => {
                                 session.sendToolResponse({
                                     functionResponses: { id: fc.id, name: fc.name, response: { result: responseResult } }
                                 });
@@ -222,6 +220,7 @@ export const useVoiceCommander = ({ onNavigate, onDownloadDrawings, onGenerateVi
                 },
             },
         });
+        sessionPromise.current = livePromise;
     }, [state, stopListening]);
 
     useEffect(() => {

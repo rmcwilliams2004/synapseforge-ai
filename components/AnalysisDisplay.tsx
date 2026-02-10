@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { AnalysisResult, Faction, GeneratedDrawing, Project, User, CadData, ProjectVersion, GeneratedImage, RotorModel, GoogleDocContent } from '../types';
 import { InitialView } from './analysis/InitialView';

@@ -1,4 +1,3 @@
-
 import React from 'react';
 
 export enum FactionId {
@@ -7,26 +6,33 @@ export enum FactionId {
   SYSTEMS_AUTOMATION = 'systems_automation',
 }
 
-export interface Faction {
-  id: FactionId;
-  name: string;
-  focus: string;
-  philosophy: string;
-  bias: {
-    materials: string;
-    manufacturing: string;
-    innovativeProposal: string;
-  };
-  icon: React.FC<{ className?: string }>;
+export enum EngineeringBranch {
+  CHEMICAL = 'Chemical',
+  CIVIL = 'Civil',
+  ELECTRICAL = 'Electrical',
+  MECHANICAL = 'Mechanical',
+  AEROSPACE = 'Aerospace',
+  NUCLEAR = 'Nuclear',
+  BIO_MEDICAL = 'Biomedical',
+  GENERAL = 'General Engineering'
 }
 
-// --- COLLABORATION ---
 export enum Role {
   Admin = 'Admin',
   Manager = 'Manager',
   Editor = 'Editor',
   Viewer = 'Viewer',
 }
+
+export enum SubscriptionStatus {
+  FREE = 'FREE',
+  PRO_TRIAL = 'PRO_TRIAL',
+  PRO_ACTIVE = 'PRO_ACTIVE',
+  ENTERPRISE = 'ENTERPRISE',
+  EXPIRED = 'EXPIRED'
+}
+
+export type ProtectionTypePref = 'PATENT' | 'COPYRIGHT' | 'TRADEMARK' | 'AI_RECOMMENDED';
 
 export interface User {
   id: string;
@@ -35,7 +41,28 @@ export interface User {
   picture: string;
   role: Role;
   analysesRun: number;
-  lastActive: string; // ISO string
+  lastActive: string;
+  company_name?: string;
+  legal_identity?: string;
+  use_company_attribution?: boolean;
+  default_protection_pref?: ProtectionTypePref;
+  subscriptionStatus: SubscriptionStatus;
+  trialEndsAt?: string;
+  certificatesGenerated?: number;
+  branch?: EngineeringBranch;
+  hasAcceptedLegal?: boolean;
+  lastAcceptedLegal?: string;
+  hasSignedPartnerProtocol?: boolean;
+}
+
+export interface InnovationCertificate {
+    id: string;
+    projectId: string;
+    versionId: string;
+    timestamp: string;
+    hash: string;
+    legalOwner: string;
+    innovationType: 'SOFTWARE' | 'HARDWARE' | 'MATERIAL' | 'PROCESS' | 'PATENT' | 'COPYRIGHT' | 'TRADEMARK';
 }
 
 export interface Comment {
@@ -44,12 +71,9 @@ export interface Comment {
     userName: string;
     userPicture: string;
     text: string;
-    createdAt: string; // ISO string
-    sectionId: string; // To associate comment with a report section
+    createdAt: string;
+    sectionId: string;
 }
-
-
-// --- CORE ANALYSIS DATA STRUCTURES ---
 
 export interface FactionRationale {
   pros: string[];
@@ -87,7 +111,6 @@ export interface SystemSuggestion {
   rationale: string;
 }
 
-// --- GENERATED DOCUMENTATION STRUCTURES ---
 export interface RequirementSpecification {
     introduction: string;
     functional_requirements: string[];
@@ -143,7 +166,6 @@ export interface ComplianceAndSafety {
     }[];
 }
 
-
 export interface BillOfMaterialsItem {
     part_number: number;
     name: string;
@@ -158,8 +180,9 @@ export interface ProcurementInfo {
     url: string;
     estimatedCost: string;
     leadTime: string;
+    verified?: boolean;
+    confidence?: number;
 }
-
 
 export interface DrawingSpecification {
     standard: string;
@@ -189,26 +212,40 @@ export interface EngineeringChangeOrder {
     impact_analysis: string;
 }
 
+export interface IndependentClaim {
+  text: string;
+  rationale: string;
+}
+
 export interface PatentApplication {
   title: string;
   abstract: string;
   background: string;
   summary: string;
-  independent_claims: string[];
+  independent_claims: IndependentClaim[];
   dependent_claims: string[];
   novelty_points: string[];
   inventive_step_rationale: string;
+  owner_of_record?: string;
+  protection_type?: ProtectionTypePref;
+  legal_hash?: string;
+}
+
+export interface SafetyAuditFinding {
+    protocol: string;
+    status: 'Pass' | 'Warn' | 'Fail';
+    message: string;
 }
 
 export interface AnalysisResult {
   product_name: string;
   executive_summary: string;
+  branch?: EngineeringBranch;
   faction_rationale: FactionRationale;
   material_suggestions: MaterialSuggestion[];
   manufacturing_analysis: ManufacturingProcess[];
   comparative_analysis: ComparativeAnalysis[];
   suggested_systems: SystemSuggestion[];
-  // Documentation
   requirementSpecification: RequirementSpecification;
   designDocument: DesignDocument;
   drawingSpecification: DrawingSpecification;
@@ -221,9 +258,9 @@ export interface AnalysisResult {
   complianceAndSafety: ComplianceAndSafety;
   engineeringChangeOrders: EngineeringChangeOrder[];
   patentApplication?: PatentApplication;
+  safety_audit?: SafetyAuditFinding[];
 }
 
-// --- ADVANCED SIMULATION ---
 export type SimulationType = 'FEA' | 'CFD' | 'THERMAL';
 
 export interface SimulationResult {
@@ -232,13 +269,10 @@ export interface SimulationResult {
     summary: string;
     keyFindings: string[];
     imageUrl: string | null;
-    imagePrompt: string; // The prompt used to generate the image
+    imagePrompt: string;
     isLoading: boolean;
     error: string | null;
 }
-
-
-// --- PROJECT & VERSION CONTROL STRUCTURES ---
 
 export interface GeneratedDrawing {
   id: string;
@@ -261,7 +295,6 @@ export interface GeneratedImage {
   isCoverImage?: boolean;
 }
 
-
 export interface AssemblyInstructionStep {
     step: number;
     action: string;
@@ -274,31 +307,31 @@ export interface AssemblyInstructions {
 
 export interface RotorMaterial {
     name: string;
-    E: number; // Young's Modulus
-    G_s: number; // Shear Modulus
-    rho: number; // Density
+    E: number;
+    G_s: number;
+    rho: number;
 }
 
 export interface RotorShaftElement {
     id: string;
     n: number;
-    L: number; // Length
-    idl: number; // Inner diameter
-    odl: number; // Outer diameter
+    L: number;
+    idl: number;
+    odl: number;
     material: RotorMaterial;
 }
 
 export interface RotorDiskElement {
     id: string;
-    n: number; // Node position
-    m: number; // Mass
-    Id: number; // Diametral moment of inertia
-    Ip: number; // Polar moment of inertia
+    n: number;
+    m: number;
+    Id: number;
+    Ip: number;
 }
 
 export interface RotorBearingElement {
     id: string;
-    n: number; // Node position
+    n: number;
     kxx: number; kxy: number;
     kyx: number; kyy: number;
     cxx: number; cxy: number;
@@ -311,40 +344,54 @@ export interface RotorModel {
     bearings: RotorBearingElement[];
 }
 
+export interface PhdMetadata {
+  governing_physics: string[];
+  critical_constants: Record<string, string>;
+  industry_standards: string[];
+  peer_review_context?: string;
+}
+
 export interface IngestedDocument {
   id: string;
   name: string;
   type: string;
-  content: string; // The extracted technical text
+  branch: EngineeringBranch;
+  phd_metadata: PhdMetadata;
+  content: string;
   summary: string;
   timestamp: string;
+  embedding?: number[];
   isLoading?: boolean;
 }
 
 export interface ProjectVersion {
   versionId: string;
-  createdAt: string; // ISO string
-  commitMessage: string; // e.g., "Initial analysis", "Incorporated material suggestions"
+  createdAt: string;
+  commitMessage: string;
   prompt: string;
   factionId: FactionId;
   result: AnalysisResult | null;
-  fileUrls: string[]; // data URLs
-  drawings?: GeneratedDrawing[]; // Optional for backward compatibility
+  fileUrls: string[];
+  drawings?: GeneratedDrawing[];
   inspirationalImages?: GeneratedImage[];
-  incorporatedSuggestions?: string[]; // New field to track used suggestions
+  incorporatedSuggestions?: string[];
   rotorModel?: RotorModel;
 }
 
-export interface Project {
-  id: string; // Stable ID for the project
-  name: string; // The primary name of the project
+export interface ProjectIndexEntry {
+  id: string;
+  name: string;
   description: string;
   tags: string[];
-  history: ProjectVersion[]; // Newest version is at index 0
-  createdAt: string; // Initial creation date
-  updatedAt: string; // Date of the latest version
+  createdAt: string;
+  updatedAt: string;
+  searchKeywords?: string;
+}
+
+export interface Project extends ProjectIndexEntry {
+  history: ProjectVersion[];
   inspirationalImageHistory?: GeneratedImage[];
-  knowledgeBase?: IngestedDocument[]; // Step A: Retrieval Layer
+  knowledgeBase?: IngestedDocument[];
 }
 
 export interface EditorState {
@@ -353,58 +400,37 @@ export interface EditorState {
   tags: string[];
 }
 
-
-// FIX: Add ProjectIndexEntry type for use across the application.
-// This type is used for project listings to avoid loading the full 'history' for every project.
-export type ProjectIndexEntry = Omit<Project, 'history'> & { searchKeywords?: string };
-
-// --- DEVINCI CONVERSATIONAL AI ---
 export type DeVinciState = 'idle' | 'connecting' | 'listening' | 'speaking' | 'thinking' | 'error' | 'paused' | 'reconnecting' | 'reconnect_failed';
 
 export interface TranscriptEntry {
     source: 'user' | 'devinci';
     text: string;
     isFinal: boolean;
-    speakerName?: string; // Add speakerName for multi-user simulation
+    speakerName?: string;
 }
 
 export type DeVinciVoice = 'Zephyr' | 'Puck' | 'Charon' | 'Kore' | 'Fenrir';
-
-// --- VOICE COMMANDER ---
 export type VoiceCommanderState = 'idle' | 'listening' | 'thinking' | 'error';
-
-// --- AI CHAT ---
 export type AiChatState = 'idle' | 'thinking' | 'error';
 export interface ChatMessage {
   role: 'user' | 'model';
   parts: { text: string }[];
 }
 
-
-// --- ADMIN DASHBOARD ---
 export interface LogEntry {
     id: number;
     timestamp: string;
     level: 'INFO' | 'WARN' | 'ERROR';
     message: string;
-    user?: string; // Name of the user performing the action
-    context?: string; // Name of the project or item affected
+    user?: string;
+    context?: string;
 }
 
-// --- CAD EXPORT SIMULATION ---
 export interface CadComponent {
     name: string;
     shape: 'cube' | 'cylinder' | 'sphere' | 'complex';
-    dimensions: {
-        x: number;
-        y: number;
-        z: number;
-    };
-    position: {
-        x: number;
-        y: number;
-        z: number;
-    };
+    dimensions: { x: number; y: number; z: number; };
+    position: { x: number; y: number; z: number; };
     children?: CadComponent[];
 }
 
@@ -414,7 +440,6 @@ export interface CadData {
     components: CadComponent[];
 }
 
-// --- CAD VIEWER ---
 export type CadViewerTool = 'select' | 'measure' | 'section';
 
 export interface CadAnnotation {
@@ -425,12 +450,11 @@ export interface CadAnnotation {
 
 export interface CadMeasurement {
   id: string;
-  type: string; // e.g., 'V-V', 'V-S', 'S-S' for Vertex-Vertex, Vertex-Surface, etc.
+  type: string;
   distance: number;
   units: string;
 }
 
-// --- CAD COMPARISON ---
 export interface CadModification {
     name: string;
     changes: string[];
@@ -441,8 +465,6 @@ export interface CadComparisonResult {
     modifications: CadModification[];
 }
 
-
-// --- GOOGLE EXPORT SIMULATION ---
 export type GoogleDocContentItem = {
   type: 'h1' | 'h2' | 'h3' | 'p' | 'bulletList' | 'table' | 'image';
   text?: string;
@@ -455,15 +477,11 @@ export type GoogleDocContentItem = {
 };
 export type GoogleDocContent = GoogleDocContentItem[];
 
-
-// --- SETUP ASSISTANT ---
 export interface SetupSuggestions {
   recommendedFactionId: FactionId;
   suggested_tags: string[];
 }
 
-// FIX: Add Fabrication Planner types to resolve compilation errors.
-// --- FABRICATION PLANNER ---
 export type ManufacturingProcessType = 'CNC Machining' | '3D Printing' | 'Sheet Metal';
 
 export interface GCodeSummary {
@@ -482,31 +500,27 @@ export interface FabricationPlan {
     tolerancingNotes: string[];
     processSpecificOutput: {
         title: string;
-        data: string; // e.g., G-code for CNC, slicer settings for 3D printing
+        data: string;
     };
 }
 
-// --- IMAGE IDENTIFICATION ---
 export interface ImageIdentificationResult {
   summary: string;
-  sources: any[]; // The structure from groundingChunks
-  imageUrl: string; // The data URL of the uploaded image
+  sources: any[];
+  imageUrl: string;
 }
 
-// --- SUGGESTION EXPLORATION ---
 export interface ExplorationResult {
   suggestionText: string;
   explanation: string;
   imageUrl: string;
 }
 
-// --- PROMPT VALIDATION ---
 export interface PromptValidationResult {
   isClear: boolean;
   suggestion: string | null;
 }
 
-// --- NEXT STEP ASSISTANT ---
 export interface NextStepSuggestion {
   title: string;
   rationale: string;
@@ -514,122 +528,162 @@ export interface NextStepSuggestion {
   icon: 'beaker' | 'cube' | 'bolt' | 'ruler' | 'chart' | 'dollar' | 'conversation' | 'play';
 }
 
-// --- IN-PROGRESS SESSION ---
 export interface InProgressState {
   projectName: string;
   prompt: string;
+  tags: string[];
   factionId: FactionId;
   result: AnalysisResult;
   drawings: GeneratedDrawing[];
   inspirationalImages: GeneratedImage[];
 }
 
-// --- SYNAPSEFORGE TOOL SUITE ---
+export interface Faction {
+  id: FactionId;
+  name: string;
+  focus: string;
+  philosophy: string;
+  bias: {
+    materials: string;
+    manufacturing: string;
+    innovativeProposal: string;
+  };
+  icon: React.FC<{ className?: string }>;
+}
+
+/**
+ * Interface representing a material entry in the tool suite.
+ */
 export interface Material {
-  id: string;
-  name: string;
-  category: 'Ferrous Metal' | 'Non-Ferrous Metal' | 'Polymer' | 'Composite' | 'Ceramic';
-  properties: {
-    'Density'?: string;
-    'Yield Strength'?: string;
-    'Ultimate Tensile Strength'?: string;
-    'Young\'s Modulus'?: string;
-    'Poisson\'s Ratio'?: string;
-    'Thermal Conductivity'?: string;
-    'Melting Point'?: string;
-    'Resistivity'?: string;
-  };
+    id: string;
+    name: string;
+    category: string;
+    properties: Record<string, string>;
 }
 
+/**
+ * Interface representing a standard component (like a screw or bearing).
+ */
 export interface StandardComponent {
-  id: string;
-  name: string;
-  category: 'Fasteners' | 'Bearings' | 'Electronics' | 'Connectors';
-  partNumber: string;
-  specifications: Record<string, string>;
+    id: string;
+    name: string;
+    category: string;
+    partNumber: string;
+    specifications: Record<string, string>;
 }
 
+/**
+ * Interface representing an engineering standard.
+ */
 export interface Standard {
-  id: string;
-  name: string;
-  organization: 'ASTM' | 'ISO' | 'SAE' | 'AISC' | 'IEEE';
-  publicationYear: number;
-  description: string;
-  status: 'Active' | 'Withdrawn';
+    id: string;
+    name: string;
+    organization: string;
+    publicationYear: number;
+    description: string;
+    status: 'Active' | 'Withdrawn';
 }
 
+/**
+ * Interface representing a project artifact in revision control.
+ */
 export interface ProjectArtifact {
-  id: string;
-  name: string;
-  type: 'Specification' | 'Report' | 'Script' | 'CAD Link';
-  version: string;
-  modifiedBy: string;
-  modifiedAt: string; // ISO string
+    id: string;
+    name: string;
+    type: string;
+    version: string;
+    modifiedBy: string;
+    modifiedAt: string;
 }
 
-// CM-2: Quality & Risk Analysis
+/**
+ * Interface for an item in a Failure Mode and Effects Analysis (FMEA).
+ */
 export interface FmeaItem {
-  id: number;
-  processStep: string;
-  failureMode: string;
-  failureEffects: string;
-  severity: number;
-  potentialCauses: string;
-  occurrence: number;
-  currentControls: string;
-  detection: number;
-  rpn: number;
-  recommendedAction: string;
-  actionStatus: 'Pending' | 'In Progress' | 'Complete';
+    id: number;
+    processStep: string;
+    failureMode: string;
+    failureEffects: string;
+    severity: number;
+    potentialCauses: string;
+    occurrence: number;
+    currentControls: string;
+    detection: number;
+    rpn: number;
+    recommendedAction: string;
+    actionStatus: 'Pending' | 'In Progress' | 'Complete';
 }
 
+/**
+ * A data point for Statistical Process Control (SPC) charts.
+ */
 export interface SpcDataPoint {
-  sample: number;
-  value: number;
+    sample: number;
+    value: number;
 }
 
+/**
+ * Status of an individual design or safety requirement.
+ */
 export enum RequirementStatus {
-  Draft = 'Draft',
-  Approved = 'Approved',
-  Tested = 'Tested',
-  Obsolete = 'Obsolete',
+    Draft = 'Draft',
+    Approved = 'Approved',
+    Tested = 'Tested',
+    Obsolete = 'Obsolete'
 }
 
+/**
+ * Interface for a specific design requirement.
+ */
 export interface Requirement {
-  id: string;
-  text: string;
-  status: RequirementStatus;
-  linkedTo: string[]; // e.g., other requirement IDs, test case IDs
+    id: string;
+    text: string;
+    status: RequirementStatus;
+    linkedTo: string[];
 }
 
-export type FishboneCategory = 'Manpower' | 'Methods' | 'Machines' | 'Materials' | 'Measurements' | 'Environment';
-
+/**
+ * Data structure for Root Cause Analysis (RCA) including 5 Whys and Fishbone.
+ */
 export interface RcaData {
-  problem: string;
-  fiveWhys: string[];
-  fishbone: Record<FishboneCategory, string[]>;
+    problem: string;
+    fiveWhys: string[];
+    fishbone: {
+        Manpower: string[];
+        Methods: string[];
+        Machines: string[];
+        Materials: string[];
+        Measurements: string[];
+        Environment: string[];
+    };
 }
 
-// CM-3: Modeling & Simulation
+/**
+ * Represents a single run of a simulation (e.g., FEA or CFD results).
+ */
 export interface SimulationRun {
-  id: string;
-  name: string;
-  description: string;
-  plotData: {
-    z: number[][];
-  };
+    id: string;
+    name: string;
+    description: string;
+    plotData: any;
 }
 
+/**
+ * A script that can be executed in the automation engine.
+ */
 export interface Script {
-  id: string;
-  name: string;
-  code: string;
-  description: string;
+    id: string;
+    name: string;
+    description: string;
+    code: string;
 }
 
+/**
+ * Data format for various engineering charts in the viz console.
+ */
 export interface ChartData {
-  id: string;
-  name: string;
-  type: 'bode' | 'gantt' | 'stress-strain';
-  data: any; // Plotly data structure
+    id: string;
+    name: string;
+    type: 'bode' | 'gantt' | 'stress-strain';
+    data: any;
 }

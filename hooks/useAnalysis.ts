@@ -1,7 +1,7 @@
 
 import { useState } from 'react';
 import { generateAnalysis as performAnalysis, parseApiError } from '../services/geminiService';
-import { AnalysisResult, Faction, LogEntry } from '../types';
+import { AnalysisResult, Faction, LogEntry, IngestedDocument } from '../types';
 
 const fileToGenerativePart = async (file: File) => {
   const base64 = await new Promise<string>((resolve, reject) => {
@@ -40,7 +40,8 @@ const dataUrlToGenerativePart = (dataUrl: string) => {
 interface FileSource {
     files: File[];
     fileUrls?: string[];
-    technicalContext?: string; // New field for Knowledge Retrieval
+    // Fixed: Changed technicalContext (string) to knowledgeBase (array) to match geminiService requirements
+    knowledgeBase?: IngestedDocument[];
 }
 
 export const runFullAnalysis = async (projectName: string, prompt: string, faction: Faction, source: FileSource): Promise<AnalysisResult> => {
@@ -60,7 +61,8 @@ export const runFullAnalysis = async (projectName: string, prompt: string, facti
       }
     }
     
-    const analysisResult = await performAnalysis(projectName, prompt, faction, fileParts.length > 0 ? fileParts : null, source.technicalContext);
+    // Fixed: Passing knowledgeBase array to geminiService instead of technicalContext string
+    const analysisResult = await performAnalysis(projectName, prompt, faction, fileParts.length > 0 ? fileParts : null, source.knowledgeBase || []);
     return analysisResult;
 };
 

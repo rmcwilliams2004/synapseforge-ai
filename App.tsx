@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Faction, ProjectVersion, Project, AnalysisResult, User, LogEntry, Role, GeneratedDrawing, FactionId, GeneratedImage, EditorState, RotorModel, CadData, InProgressState, IngestedDocument } from './types';
+import { Faction, ProjectVersion, Project, AnalysisResult, User, LogEntry, Role, GeneratedDrawing, FactionId, GeneratedImage, EditorState, RotorModel, CadData, InProgressState, IngestedDocument, ProjectIndexEntry, SubscriptionStatus, EngineeringBranch } from './types';
 import { ENGINEERING_PHILOSOPHIES, TOUR_STEPS, MOCK_USERS } from './constants';
-import { useAnalysis, runFullAnalysis } from './hooks/useAnalysis';
+import { useAnalysis } from './hooks/useAnalysis';
 import { useVideoGenerator } from './hooks/useVideoGenerator';
 import { Header } from './components/Header';
 import { FactionSelector } from './components/FactionSelector';
@@ -19,14 +20,13 @@ import { AdminDashboard } from './components/admin/AdminDashboard';
 import { ProjectModal } from './components/ProjectModal';
 import { AuthPage } from './components/AuthPage';
 import { ProfileModal } from './components/ProfileModal';
+import { ImageIdentifierModal } from './components/ImageIdentifierModal';
+import { VoiceCommanderWidget } from './components/VoiceCommanderWidget';
 import { useUndoRedo } from './hooks/useUndoRedo';
 import { useSummaryGenerator } from './hooks/useSummaryGenerator';
 import { useCadGenerator } from './hooks/useCadGenerator';
 import { useDeVinci } from './hooks/useDeVinci';
 import { 
-    generateTechnicalDrawingFunctionDeclaration,
-    researchWebFunctionDeclaration,
-    performWebSearch,
     extractProjectDetailsFromPdf,
     extractProjectDetailsFromImage,
     extractProjectDetailsFromVideo,
@@ -34,50 +34,38 @@ import {
     parseApiError,
     ExtractedProjectDetails,
     createProjectFunctionDeclaration,
-    buildDeVinciCreationSystemInstruction,
-    runAnalysisWithFactionFunctionDeclaration,
-    generateInspirationalImageFunctionDeclaration,
-    buildDeVinciSystemInstruction,
-    summarizePdfForContext,
-    downloadDrawingsFunctionDeclaration,
-    generateVideoFunctionDeclaration,
-    generateFactionInspirationalPrompts,
 } from './services/geminiService';
 import * as googleApiService from './services/googleApiService';
+import { projectApi } from './services/productionApiService';
 import { useInspirationalImageGenerator } from './hooks/useInspirationalImageGenerator';
 import { useSetupAssistant } from './hooks/useSetupAssistant';
 import { useGoogleExporter } from './hooks/useGoogleExporter';
-import { GoogleDocPreviewModal } from './components/GoogleDocPreviewModal';
 import { useTts } from './hooks/useTts';
-import { CadViewerModal } from './components/cad/CadViewerModal';
 import { useSimulation } from './hooks/useSimulation';
 import { useFabricationPlanner } from './hooks/useFabricationPlanner';
-import { CommitModal } from './components/CommitModal';
 import { useImageIdentifier } from './hooks/useImageIdentifier';
-import { ImageIdentifierModal } from './components/ImageIdentifierModal';
 import { useVersionComparer } from './hooks/useVersionComparer';
-import { ComparisonViewerModal } from './components/cad/ComparisonViewerModal';
 import { useGCodeVisualizer } from './hooks/useGCodeVisualizer';
 import { useSuggestionExplorer } from './hooks/useSuggestionExplorer';
-import { SuggestionExplorerModal } from './components/SuggestionExplorerModal';
-import { ToolpathVisualizerModal } from './components/ToolpathVisualizerModal';
 import { useBomSourcing } from './hooks/useBomSourcing';
 import { usePromptValidator } from './hooks/usePromptValidator';
 import { useLiveCosting } from './hooks/useLiveCosting';
 import { useNextStepAssistant } from './hooks/useNextStepAssistant';
 import { useVoiceCommander } from './hooks/useVoiceCommander';
-import { VoiceCommanderWidget } from './components/VoiceCommanderWidget';
 import { useAppVoice } from './hooks/useAppVoice';
 import { createDrawingsZip } from './services/zipService';
 import { useAiChat } from './hooks/useAiChat';
 import { AiChatModal } from './components/AiChatModal';
 import { ToolSuite } from './components/suite/ToolSuite';
 import { VideoImportModal } from './components/VideoImportModal';
-import { useGoogleDriveStorage } from './hooks/useGoogleDriveStorage';
-import { GoogleDrivePickerModal } from './components/GoogleDrivePickerModal';
 import { usePatentGenerator } from './hooks/usePatentGenerator';
+import { PricingPage } from './components/PricingPage';
+import { OnboardingFlow } from './components/OnboardingFlow';
+import { AccountPage } from './components/AccountPage';
+import { LegalGuard } from './components/LegalGuard';
+import { Footer } from './components/Footer';
+import { PartnerIndemnityModal } from './components/PartnerIndemnityModal';
 
-// A hook to manage the Ross analysis web worker
 const useRossAnalysis = (addLog: (level: LogEntry['level'], message: string) => void) => {
     const workerRef = useRef<Worker | null>(null);
     const [isRossReady, setIsRossReady] = useState(false);
@@ -292,15 +280,10 @@ export function App() {
     onSelectProject,
     saveNewVersion,
     revertToVersion,
-    updateVersion,
-    loadProject,
-    addImageToHistory,
-    deleteImageFromHistory,
     addIngestedDocument,
     removeIngestedDocument,
   } = useProjects();
   
-  // State for the "editor" or current working area
   const [projectName, setProjectName] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [activeVersionIndex, setActiveVersionIndex] = useState(0);
@@ -318,13 +301,12 @@ export function App() {
   } = useUndoRedo<EditorState>({ prompt: '', selectedFaction: null, tags: [] });
   const { prompt, selectedFaction, tags } = editorState;
   
-  // --- Auth, Admin & User State ---
   const [authenticatedUser, setAuthenticatedUser] = useState<User | null>(null);
-  const [viewMode, setViewMode] = useState<'app' | 'admin' | 'suite'>('app');
+  const [isOnboarding, setIsOnboarding] = useState(false);
+  const [viewMode, setViewMode] = useState<'app' | 'admin' | 'suite' | 'pricing' | 'account'>('app');
   const [users, setUsers] = useState<User[]>(MOCK_USERS);
   const [logs, setLogs] = useState<LogEntry[]>([]);
 
-  // --- Modal States ---
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [projectToEdit, setProjectToEdit] = useState<Project | null>(null);
   const [initialProjectData, setInitialProjectData] = useState<ExtractedProjectDetails | null>(null);
@@ -339,7 +321,7 @@ export function App() {
   const [isIdentifierModalOpen, setIsIdentifierModalOpen] = useState(false);
   const [isAiChatOpen, setIsAiChatOpen] = useState(false);
   const [isVideoImportModalOpen, setIsVideoImportModalOpen] = useState(false);
-  const [isDrivePickerOpen, setIsDrivePickerOpen] = useState(false);
+  const [isPartnerModalOpen, setIsPartnerModalOpen] = useState(false);
 
   const addLog = useCallback((level: LogEntry['level'], message: string, overrideContext?: { user?: string, project?: string }) => {
     const user = overrideContext?.user || authenticatedUser?.name || 'System';
@@ -347,8 +329,6 @@ export function App() {
     setLogs(prev => [...prev, { id: Date.now(), timestamp: new Date().toISOString(), level, message, user, context: project }]);
   }, [authenticatedUser, activeProject]);
 
-  // --- AI State ---
-  const brainstormingDeVinci = useDeVinci();
   const creationDeVinci = useDeVinci();
   const [deVinciMode, setDeVinciMode] = useState<'creation' | 'brainstorm' | null>(null);
   const [isParsingPdf, setIsParsingPdf] = useState(false);
@@ -369,7 +349,6 @@ export function App() {
   const liveCosting = useLiveCosting(addLog);
   const nextStepAssistant = useNextStepAssistant(addLog);
   const aiChat = useAiChat(addLog, activeProject?.knowledgeBase || []);
-  const googleDriveStorage = useGoogleDriveStorage(addLog);
   const patentGenerator = usePatentGenerator(addLog);
 
   const { drawings, requestDrawing, requestDrawingFromImage, removeDrawing, setDrawings, clearAllDrawings, toggleDrawingReportInclusion } = useDrawingGenerator(addLog);
@@ -424,12 +403,12 @@ export function App() {
 
   const googleExporter = useGoogleExporter(addLog);
 
-  const { result, isLoading, error, generateAnalysis, clearAnalysis, setResult } = useAnalysis(addLog);
+  const { result, isLoading, error, generateAnalysis: performAnalysis, clearAnalysis, setResult } = useAnalysis(addLog);
   const { saveInProgressAnalysis, loadInProgressAnalysis, clearInProgressAnalysis } = useAnalysisPersistence();
   
   const activeVersion: ProjectVersion | null = useMemo(() => {
     if (!activeProject) return null;
-    return activeProject.history[activeVersionIndex] || activeProject.history[0];
+    return (activeProject.history || [])[activeVersionIndex] || (activeProject.history || [])[0];
   }, [activeProject, activeVersionIndex]);
   
   const displayedResult = result || activeVersion?.result || null;
@@ -437,70 +416,42 @@ export function App() {
   const { isSummaryLoading, generateSummary, clearSummary } = useSummaryGenerator(addLog);
   const { cadData, isCadLoading, cadError, generateCad, clearCad } = useCadGenerator(addLog);
 
-    const prevIsLoadingRef = useRef(false);
-    useEffect(() => {
-        if (prevIsLoadingRef.current && !isLoading && result) {
-            const feedbackMessages = [
-                "Analysis complete! Here are the results of my evaluation, Creator.",
-                "Excellent! The detailed analysis is ready for your review.",
-                "I've finished the analysis. Take a look at what I've discovered."
-            ];
-            const message = feedbackMessages[Math.floor(Math.random() * feedbackMessages.length)];
-            setTimeout(() => {
-                tts.speak(message, 'Zephyr');
-            }, 500);
+  useEffect(() => {
+    const restoreSession = async () => {
+        const savedState = await loadInProgressAnalysis();
+        if (savedState) {
+            setProjectName(savedState.projectName);
+            setEditorState({
+                prompt: savedState.prompt,
+                selectedFaction: ENGINEERING_PHILOSOPHIES.find(f => f.id === savedState.factionId) || null,
+                tags: savedState.tags || []
+            });
+            setResult(savedState.result);
+            setDrawings(savedState.drawings || []);
+            setInspirationalImages(savedState.inspirationalImages || []);
+            addLog('INFO', 'Recovery Layer: Restored previous work state from IndexedDB.');
         }
-        prevIsLoadingRef.current = isLoading;
-    }, [isLoading, result, tts]);
-
-
-  useEffect(() => {
-    if (prompt && prompt.length > 20) {
-      setupAssistant.fetchSuggestions(prompt);
-    }
-  }, [prompt]);
-
-  useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (hasUnsavedChanges) {
-        e.preventDefault();
-        e.returnValue = '';
-      }
     };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [hasUnsavedChanges]);
+    restoreSession();
+  }, [loadInProgressAnalysis, setEditorState, setResult, setDrawings, setInspirationalImages, addLog]);
 
   useEffect(() => {
-      const autoSaveInterval = setInterval(() => {
-          if (displayedResult && selectedFaction && (activeProject || projectName)) {
-              saveInProgressAnalysis({
-                  projectName: activeProject?.name || projectName,
-                  prompt,
-                  factionId: selectedFaction.id,
-                  result: displayedResult,
-                  drawings, 
-                  inspirationalImages,
-              });
-              addLog('INFO', 'Project auto-saved to local storage.');
-          }
-      }, 60000);
-
-      return () => {
-          clearInterval(autoSaveInterval);
-      };
-  }, [
-      saveInProgressAnalysis,
-      displayedResult,
-      selectedFaction,
-      activeProject,
-      projectName,
-      prompt,
-      drawings,
-      inspirationalImages,
-      addLog,
-  ]);
-
+    const autoSave = async () => {
+        if (displayedResult && selectedFaction) {
+            await saveInProgressAnalysis({
+                projectName,
+                prompt,
+                tags,
+                factionId: selectedFaction.id,
+                result: displayedResult,
+                drawings,
+                inspirationalImages
+            });
+        }
+    };
+    const interval = setInterval(autoSave, 30000); 
+    return () => clearInterval(interval);
+  }, [projectName, prompt, selectedFaction, displayedResult, drawings, inspirationalImages, tags, saveInProgressAnalysis]);
 
   const handleGoogleAuth = async () => {
     try {
@@ -510,44 +461,96 @@ export function App() {
         if (user) {
             user = { ...user, lastActive: new Date().toISOString(), picture: googleData.picture };
             setUsers(prev => prev.map(u => u.id === user!.id ? user! : u));
+            setAuthenticatedUser(user);
         } else {
-            user = {
+            // New user registration flow
+            const newUser: User = {
                 id: `user-${Date.now()}`,
                 name: googleData.name,
                 email: googleData.email,
                 picture: googleData.picture,
                 role: Role.Editor,
                 analysesRun: 0,
-                lastActive: new Date().toISOString()
+                lastActive: new Date().toISOString(),
+                subscriptionStatus: SubscriptionStatus.FREE,
+                hasAcceptedLegal: false,
+                hasSignedPartnerProtocol: false,
             };
-            setUsers(prev => [...prev, user!]);
-            addLog('INFO', `New user signed up via Google: ${user.name}`);
+            setUsers(prev => [...prev, newUser]);
+            setAuthenticatedUser(newUser);
+            setIsOnboarding(true);
         }
-        
-        setAuthenticatedUser(user);
-        addLog('INFO', `User logged in: ${user.name}`, { user: user.name });
+        addLog('INFO', `User logged in: ${googleData.name}`, { user: googleData.name });
     } catch (error) {
         console.error("Google Authentication failed:", error);
         addLog('ERROR', 'Google Sign-In failed.');
     }
   };
   
-  const handleDemoLogin = (userName: string) => {
-    const user = users.find(u => u.name === userName);
-    if (user) {
-        const updatedUser = { ...user, lastActive: new Date().toISOString() };
-        setUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
-        setAuthenticatedUser(updatedUser);
-        addLog('INFO', `User logged in as demo: ${user.name}`, { user: user.name });
-    }
+  const handleSignup = (name: string, email: string) => {
+    const newUser: User = {
+        id: `user-${Date.now()}`,
+        name: name,
+        email: email,
+        picture: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=06b6d4&color=fff`,
+        role: Role.Editor,
+        analysesRun: 0,
+        lastActive: new Date().toISOString(),
+        subscriptionStatus: SubscriptionStatus.FREE,
+        hasAcceptedLegal: false,
+        hasSignedPartnerProtocol: false,
+    };
+    
+    setUsers(prev => [...prev, newUser]);
+    setAuthenticatedUser(newUser);
+    setIsOnboarding(true);
+    addLog('INFO', `New account created for: ${name}`, { user: name });
   };
-  
+
+  const handleOnboardingComplete = (updatedUser: User) => {
+      handleUpdateProfile(updatedUser);
+      setIsOnboarding(false);
+      addLog('INFO', `Onboarding complete for: ${updatedUser.name}. Identity set to ${updatedUser.use_company_attribution ? updatedUser.company_name : updatedUser.legal_identity}.`);
+  };
+
+  const handleAcceptLegal = () => {
+    if (!authenticatedUser) return;
+    const updatedUser = { 
+        ...authenticatedUser, 
+        hasAcceptedLegal: true, 
+        lastAcceptedLegal: new Date().toISOString() 
+    };
+    handleUpdateProfile(updatedUser);
+    addLog('INFO', 'Legal protocols accepted. Vault initialized.');
+  };
+
+  const handleSignPartnerProtocol = (signature: string) => {
+      if (!authenticatedUser) return;
+      const updatedUser = { 
+          ...authenticatedUser, 
+          hasSignedPartnerProtocol: true 
+      };
+      handleUpdateProfile(updatedUser);
+      setIsPartnerModalOpen(false);
+      addLog('INFO', `Partner Protocol signed by ${signature}. Advanced fabrication tools enabled.`);
+  };
+
   const handleLogout = () => {
     addLog('INFO', `User logged out: ${authenticatedUser?.name}`);
     googleApiService.signOutFromGoogle();
     setAuthenticatedUser(null);
-     if (viewMode === 'admin') {
+     if (viewMode === 'admin' || viewMode === 'pricing' || viewMode === 'account') {
       setViewMode('app');
+    }
+  };
+
+  const handleDemoLogin = (userName: string) => {
+    const user = users.find(u => u.name === userName);
+    if (user) {
+        const updatedUser = { ...user, lastActive: new Date().toISOString() };
+        setAuthenticatedUser(updatedUser);
+        setUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
+        addLog('INFO', `Demo user logged in: ${userName}`, { user: userName });
     }
   };
   
@@ -557,61 +560,24 @@ export function App() {
     addLog('INFO', `User profile updated: ${updatedUser.name}`, { user: updatedUser.name });
   }
 
-  const handleRequestInspirationalImage = useCallback(async (prompt: string, aspectRatio: string) => {
-    const newImage = await requestInspirationalImage(prompt, aspectRatio);
-    if (newImage && !newImage.error) {
-        addImageToHistory(newImage);
-        setHasUnsavedChanges(true);
-    }
-  }, [requestInspirationalImage, addImageToHistory]);
-
-  const handleReinsertImageFromHistory = useCallback((image: GeneratedImage) => {
-    if (inspirationalImages.some(img => img.id === image.id)) return;
-    setInspirationalImages(prev => [...prev, image]);
-    addLog('INFO', `Re-inserted image "${image.prompt}" into current version.`);
-    setHasUnsavedChanges(true);
-  }, [inspirationalImages, setInspirationalImages, addLog]);
-
-  const handleDeleteImageFromHistory = useCallback((imageId: string) => {
-      deleteImageFromHistory(imageId);
-      addLog('WARN', `Permanently deleted image from project history.`);
-      setHasUnsavedChanges(true);
-  }, [deleteImageFromHistory, addLog]);
-  
-  const handleSetCover = useCallback((id: string, type: 'drawing' | 'image') => {
-    setDrawings(prev => prev.map(d => ({
-        ...d,
-        isCoverImage: type === 'drawing' && d.id === id,
-    })));
-    setInspirationalImages(prev => prev.map(img => ({
-        ...img,
-        isCoverImage: type === 'image' && img.id === id,
-    })));
-    setHasUnsavedChanges(true);
-  }, [setDrawings, setInspirationalImages]);
-
   const handleDeVinciProjectCreation = async (functionCall: { name: string, args: any, id: string }) => {
-      addLog('INFO', `DeVinci initiated project creation: ${functionCall.name}`, { project: functionCall.args.name });
       if (functionCall.name === 'create_project') {
           const { name, description, tags, factionId } = functionCall.args;
           if (name && description && factionId) {
               const newProjectId = onNewProject({ name, description, tags: tags || [] }, { factionId });
-              if (newProjectId) {
-                  onSelectProject(newProjectId);
-                  setHasUnsavedChanges(true);
-              }
+              onSelectProject(newProjectId);
               creationDeVinci.stopConversation();
               setDeVinciMode(null);
-              return { success: true, message: `Excellent! I've created the project "${name}" for you. Remember to save it.` };
+              return { success: true, message: `Excellent! I've created the project "${name}" for you.` };
           }
       }
-      return { success: false, message: 'Sorry, I was missing some information. Could you please provide all the details?' };
+      return { success: false, message: 'Missing some information.' };
   };
 
   const handleLaunchCreationDeVinci = () => {
       if (!authenticatedUser) return;
       creationDeVinci.startConversation({
-          systemInstruction: buildDeVinciCreationSystemInstruction(ENGINEERING_PHILOSOPHIES),
+          systemInstruction: "You are DeVinci. Help the user define a project. Call create_project when they have a name and goal.",
           voice: 'Zephyr',
           tools: [{ functionDeclarations: [createProjectFunctionDeclaration] }],
           onFunctionCall: handleDeVinciProjectCreation,
@@ -620,345 +586,49 @@ export function App() {
       setDeVinciMode('creation');
   };
 
-  const handleDeVinciFileUpload = (file: File) => {
-    if (deVinciMode === 'brainstorm') {
-        brainstormingDeVinci.sendFile(file);
-    }
-  };
-
-  const handleDeVinciBrainstormingFunctionCall = async (functionCall: { name: string, args: any, id: string }) => {
-    addLog('INFO', `DeVinci initiated function call: ${functionCall.name}`);
-    if (functionCall.name === 'generate_technical_drawing') {
-        const prompt = functionCall.args.specificPrompt;
-        if (prompt && displayedResult) {
-            requestDrawing(prompt, displayedResult, activeVersion?.fileUrls);
-            setHasUnsavedChanges(true);
-            return { success: true, message: `OK, I've started generating a drawing of "${prompt}". It will appear in the 'Visual Documentation' section shortly.` };
-        }
-        return { success: false, message: 'I cannot generate a drawing without an active analysis result or a specific prompt.' };
-    }
-    
-    if (functionCall.name === 'research_web') {
-        const query = functionCall.args.query;
-        if (query) {
-            return await performWebSearch(query);
-        }
-        return { success: false, message: 'Missing the query for the web search.' };
-    }
-
-    if (functionCall.name === 'run_analysis_with_faction') {
-        const factionId = functionCall.args.factionId;
-        const faction = ENGINEERING_PHILOSOPHIES.find(f => f.id === factionId);
-        if (faction && activeVersion && activeProject) {
-            try {
-                addLog('INFO', `DeVinci starting background analysis with faction "${faction.name}".`);
-                const newAnalysis = await runFullAnalysis(activeProject.name, activeVersion.prompt, faction, { files: [], fileUrls: activeVersion.fileUrls });
-                const summary = await generateSummary(newAnalysis);
-                addLog('INFO', `DeVinci background analysis with faction "${faction.name}" complete.`);
-                return { success: true, summary };
-            } catch (e) {
-                addLog('ERROR', `DeVinci background analysis failed: ${parseApiError(e)}`);
-                return { success: false, message: "The new analysis failed." };
-            }
-        }
-        return { success: false, message: "Invalid faction ID or no active project version." };
-    }
-
-    if (functionCall.name === 'generate_inspirational_image') {
-        const prompt = functionCall.args.prompt;
-        if (prompt) {
-            handleRequestInspirationalImage(prompt, '16:9');
-            setHasUnsavedChanges(true);
-            return { success: true, message: `Alright, I'm generating an inspirational image based on your idea. You'll see it appear in the 'Visual Documentation' section.` };
-        }
-        return { success: false, message: "I need a prompt to generate an image." };
-    }
-
-    return { success: false, message: `Unknown function call: ${functionCall.name}` };
-  };
-
-  const handleLaunchBrainstormingDeVinci = () => {
-     if (activeProject && activeVersion && selectedFaction && authenticatedUser) {
-        const contextString = `
-You have been primed with the full context of their current project, which is a reverse engineering analysis. This includes ALL generated documents like the Bill of Materials, Requirement Specifications, and Test Plans. Do not re-state the entire context. Instead, use it as your internal memory. Refer to it naturally as if you've already studied it together.
-
-Your current guiding engineering philosophy is "${selectedFaction.name}: ${selectedFaction.philosophy}".
-
-This is the project context you are working with:
-${JSON.stringify({
-    projectName: activeProject.name,
-    userPrompt: activeVersion.prompt,
-    analysisResult: activeVersion.result
-}, null, 2)}
-`;
-
-        const systemInstruction = buildDeVinciSystemInstruction(contextString, ENGINEERING_PHILOSOPHIES);
-
-        brainstormingDeVinci.startConversation({
-            systemInstruction: systemInstruction,
-            voice: 'Zephyr',
-            tools: [{ functionDeclarations: [
-                generateTechnicalDrawingFunctionDeclaration, 
-                researchWebFunctionDeclaration,
-                runAnalysisWithFactionFunctionDeclaration,
-                generateInspirationalImageFunctionDeclaration,
-            ] }],
-            onFunctionCall: handleDeVinciBrainstormingFunctionCall,
-            authenticatedUser,
-        });
-        setDeVinciMode('brainstorm');
-     }
-  };
-  
-  const handleLaunchAiChat = () => {
-    if (activeProject && activeVersion && selectedFaction) {
-        const contextString = `You are a helpful AI engineering assistant. You are having a text chat with a user about a project they are working on. You have been provided with the full context of their current analysis report. Use this context as your internal knowledge base to answer questions, brainstorm ideas, refine prompts, and explore design alternatives.
-
-Your current guiding engineering philosophy is "${selectedFaction.name}: ${selectedFaction.philosophy}".
-
-This is the project context you are working with:
-${JSON.stringify({
-    projectName: activeProject.name,
-    userPrompt: activeVersion.prompt,
-    analysisResult: activeVersion.result
-}, null, 2)}
-`;
-        aiChat.startChat(contextString);
-        setIsAiChatOpen(true);
-    }
-  };
-
-  const handleStartFromImage = async (file: File) => {
-    setIsParsingImage(true);
-    addLog('INFO', `Parsing image "${file.name}" to create a new project.`);
-    try {
-        const filePart = await fileToGenerativePart(file);
-        const details = await extractProjectDetailsFromImage(filePart);
-        
-        setInitialProjectData(details);
-        setProjectToEdit(null);
-        setIsProjectModalOpen(true);
-        addLog('INFO', `Successfully extracted project details from "${file.name}".`, { project: details.name });
-    } catch (e) {
-        const errorMessage = parseApiError(e);
-        addLog('ERROR', `Failed to parse image: ${errorMessage}`);
-        alert(`Failed to extract project details from image: ${errorMessage}`);
-    } finally {
-        setIsParsingImage(false);
-    }
-  };
-
-  const handleStartFromPdf = async (file: File) => {
-    setIsParsingPdf(true);
-    addLog('INFO', `Parsing PDF "${file.name}" to create a new project.`);
-    try {
-        const filePart = await fileToGenerativePart(file);
-        const details = await extractProjectDetailsFromPdf(filePart);
-        
-        setInitialProjectData(details);
-        setProjectToEdit(null);
-        setIsProjectModalOpen(true);
-        addLog('INFO', `Successfully extracted project details from "${file.name}".`, { project: details.name });
-    } catch (e) {
-        const errorMessage = parseApiError(e);
-        addLog('ERROR', `Failed to parse PDF: ${errorMessage}`);
-        alert(`Failed to extract project details from PDF: ${errorMessage}`);
-    } finally {
-        setIsParsingPdf(false);
-    }
-  };
-  
-  const handleStartFromVideoFile = async (file: File) => {
-      setIsParsingVideo(true);
-      setIsVideoImportModalOpen(false);
-      addLog('INFO', `Analyzing video "${file.name}" for project creation...`);
-      
-      try {
-          const filePart = await fileToGenerativePart(file);
-          const details = await extractProjectDetailsFromVideo(filePart);
-          
-          setInitialProjectData(details);
-          setProjectToEdit(null);
-          setIsProjectModalOpen(true);
-          setFiles([file]); 
-          
-          addLog('INFO', `Successfully extracted project details from video "${file.name}".`, { project: details.name });
-      } catch (e) {
-          const errorMessage = parseApiError(e);
-          addLog('ERROR', `Failed to analyze video file: ${errorMessage}`);
-          alert(`Failed to extract project details from video: ${errorMessage}`);
-      } finally {
-          setIsParsingVideo(false);
-      }
-  };
-
-  const handleStartFromVideoUrl = async (url: string) => {
-    setIsParsingVideo(true);
-    setIsVideoImportModalOpen(false);
-    addLog('INFO', `Analyzing video URL "${url}" for project creation...`);
-    
-    try {
-        const details = await extractProjectDetailsFromVideoUrl(url);
-        
-        setInitialProjectData(details);
-        setProjectToEdit(null);
-        setIsProjectModalOpen(true);
-        addLog('INFO', `Successfully extracted project details from video URL.`, { project: details.name });
-    } catch (e) {
-        const errorMessage = parseApiError(e);
-        addLog('ERROR', `Failed to analyze video URL: ${errorMessage}`);
-        alert(`Failed to extract project details from URL: ${errorMessage}`);
-    } finally {
-        setIsParsingVideo(false);
-    }
-  };
-  
-  const handleStartBrainstormFromPdf = async (file: File) => {
-    setIsParsingForBrainstorm(true);
-    addLog('INFO', `Parsing PDF "${file.name}" to start a brainstorming session.`);
-    try {
-        if (!authenticatedUser) throw new Error("Authentication required.");
-        const filePart = await fileToGenerativePart(file);
-        const summary = await summarizePdfForContext(filePart);
-        const contextString = `
-You have been primed with the context from a PDF document the user has uploaded. This document appears to be a previous engineering report. Use this summary as your internal memory to discuss and brainstorm with the user. Refer to it naturally as if you've already studied it together.
-
-This is the context from the PDF:
----
-${summary}
----
-`;
-        const systemInstruction = buildDeVinciSystemInstruction(contextString, ENGINEERING_PHILOSOPHIES);
-        
-        brainstormingDeVinci.startConversation({
-            systemInstruction: systemInstruction,
-            voice: 'Zephyr',
-            tools: [{ functionDeclarations: [
-                generateTechnicalDrawingFunctionDeclaration, 
-                researchWebFunctionDeclaration,
-                runAnalysisWithFactionFunctionDeclaration,
-                generateInspirationalImageFunctionDeclaration,
-            ] }],
-            onFunctionCall: handleDeVinciBrainstormingFunctionCall,
-            authenticatedUser,
-        });
-        setDeVinciMode('brainstorm');
-    } catch (e) {
-        const errorMessage = parseApiError(e);
-        addLog('ERROR', `Failed to parse PDF for brainstorming: ${errorMessage}`);
-        alert(`Failed to start brainstorm session from PDF: ${errorMessage}`);
-    } finally {
-        setIsParsingForBrainstorm(false);
-    }
-  };
-
-  const handleIdentifyImage = async (file: File) => {
-    setIsIdentifierModalOpen(true);
-    await imageIdentifier.identifyImage(file);
-  };
-
-  useEffect(() => {
-    if(activeVersion && (drawings.length > 0 || inspirationalImages.length > 0)) {
-      const drawingsChanged = JSON.stringify(drawings) !== JSON.stringify(activeVersion.drawings || []);
-      const inspirationalImagesChanged = JSON.stringify(inspirationalImages) !== JSON.stringify(activeVersion.inspirationalImages || []);
-
-      if (drawingsChanged || inspirationalImagesChanged) {
-        updateVersion(activeVersion.versionId, { drawings, inspirationalImages });
-        setHasUnsavedChanges(true);
-      }
-    }
-  }, [drawings, inspirationalImages, activeVersion, updateVersion]);
-
-  const isReady = useMemo(() => {
-      return !!selectedFaction && !!prompt.trim() && !!projectName.trim();
-  }, [selectedFaction, prompt, projectName]);
-
-  const handleApplyFactionSuggestion = (factionId: FactionId) => {
-    const faction = ENGINEERING_PHILOSOPHIES.find(f => f.id === factionId);
-    if (faction) {
-        setEditorState({ ...editorState, selectedFaction: faction });
-    }
-  };
-  
-  const handleReanalyzeWithFaction = () => {
-    if (activeProject && selectedFaction && prompt) {
-        handleEngage(true);
-    }
-  };
-  
-  const handleClearAnalysis = useCallback(() => {
-    if (hasUnsavedChanges && activeProject) {
-        if (!window.confirm("You have unsaved changes that will be lost. Are you sure you want to start a new analysis?")) {
-            return;
-        }
-    }
-    clearAnalysis();
-    clearAllDrawings();
-    clearAllInspirationalImages();
-    clearVideo();
-    clearCad();
-    clearSummary();
-    liveCosting.initialize(null);
-    bomSourcing.clearSourcing();
-    simulation.clearSimulation();
-    fabricationPlanner.clearPlanner();
-    patentGenerator.clearPatent();
-    
-    setFiles([]);
-    if (activeProject) {
-        const newProjectId = onNewProject({ name: `${activeProject.name} - New Analysis`, description: activeProject.description, tags: activeProject.tags });
-        onSelectProject(newProjectId);
-    } else {
-        setProjectName('New Project');
-        resetEditorState({ prompt: '', selectedFaction: null, tags: [] });
-    }
-
-    setHasUnsavedChanges(false);
-  }, [hasUnsavedChanges, activeProject, clearAnalysis, clearAllDrawings, clearAllInspirationalImages, clearVideo, clearCad, clearSummary, liveCosting, bomSourcing, simulation, fabricationPlanner, onNewProject, onSelectProject, resetEditorState, patentGenerator]);
-  
   const handleEngage = useCallback(async (isReanalysis = false) => {
     if (!selectedFaction || !prompt.trim() || !projectName.trim()) {
-      alert("Please select a faction, provide a project name, and write a prompt before engaging the AI.");
+      alert("Please select a lens, project name, and provide a prompt.");
       return;
     }
 
-    if (activeProject && !isReanalysis && hasUnsavedChanges) {
-        if (!window.confirm("You have unsaved changes. Engaging will start a new version based on your current inputs. Continue?")) {
-            return;
-        }
-    }
-
-    const technicalContext = activeProject?.knowledgeBase && activeProject.knowledgeBase.length > 0
-        ? activeProject.knowledgeBase.map(doc => `[SOURCE: ${doc.name}]\n${doc.content}`).join('\n\n---\n\n')
-        : undefined;
-
-    const newResult = await generateAnalysis(projectName, prompt, selectedFaction, { 
+    const newResult = await performAnalysis(projectName, prompt, selectedFaction, { 
         files, 
         fileUrls: activeVersion?.fileUrls,
-        technicalContext 
+        knowledgeBase: activeProject?.knowledgeBase || []
     });
 
     if (newResult) {
-      const commitMessage = isReanalysis ? `Re-analyzed with ${selectedFaction.name}` : 'New analysis from editor';
-      
+      const commitMessage = isReanalysis ? `Re-analyzed with ${selectedFaction.name}` : 'New analysis from workspace';
       const fileUrls = files.length > 0 ? await Promise.all(files.map(fileToDataUrl)) : activeVersion?.fileUrls || [];
 
+      const versionData: Omit<ProjectVersion, 'versionId' | 'createdAt' | 'commitMessage'> = {
+          prompt,
+          factionId: selectedFaction.id,
+          result: newResult,
+          fileUrls: fileUrls,
+          drawings: [],
+          inspirationalImages: [],
+      };
+
       if (!activeProject) {
-         onNewProject({ name: projectName, description: 'Created from analysis', tags }, { 
+         onNewProject({ name: projectName, description: 'New Analysis', tags }, { 
             prompt, 
             factionId: selectedFaction.id,
             result: newResult,
             fileUrls: fileUrls
          });
       } else {
-          saveNewVersion({
-              prompt,
-              factionId: selectedFaction.id,
-              result: newResult,
-              fileUrls: fileUrls,
-              drawings: [],
-              inspirationalImages: [],
-            }, commitMessage);
+          saveNewVersion(versionData, commitMessage);
+          // PRODUCTION SYNC
+          if (authenticatedUser) {
+              projectApi.commitVersion(authenticatedUser.id, {
+                  ...versionData,
+                  versionId: `ver-${Date.now()}`,
+                  createdAt: new Date().toISOString(),
+                  commitMessage
+              } as ProjectVersion);
+          }
       }
 
       setActiveVersionIndex(0);
@@ -973,98 +643,15 @@ ${summary}
       setHasUnsavedChanges(false);
       clearInProgressAnalysis();
     }
-  }, [selectedFaction, prompt, projectName, activeProject, hasUnsavedChanges, generateAnalysis, files, activeVersion, saveNewVersion, clearAllDrawings, clearAllInspirationalImages, clearVideo, clearCad, clearSummary, liveCosting, clearInProgressAnalysis, onNewProject, tags, patentGenerator]);
-
-  const handleIncorporateSuggestions = useCallback((suggestionTexts: string[]) => {
-    if (!activeVersion || !selectedFaction) return;
-    
-    const incorporatedPrompt = `${activeVersion.prompt}\n\n--- INCORPORATE SUGGESTIONS ---\nPlease refine the analysis by incorporating the following suggestions:\n- ${suggestionTexts.join('\n- ')}`;
-    
-    setEditorState({ ...editorState, prompt: incorporatedPrompt });
-
-    setTimeout(() => handleEngage(true), 0);
-    
-    updateVersion(activeVersion.versionId, {
-        incorporatedSuggestions: [...(activeVersion.incorporatedSuggestions || []), ...suggestionTexts]
-    });
-    setHasUnsavedChanges(true);
-
-  }, [activeVersion, selectedFaction, editorState, setEditorState, handleEngage, updateVersion]);
-  
-  const handleSaveProject = () => {
-      if (!activeProject) return;
-      const jsonString = JSON.stringify(activeProject, null, 2);
-      const blob = new Blob([jsonString], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${activeProject.name.replace(/\s/g, '_')}.sfp.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      setHasUnsavedChanges(false);
-      addLog('INFO', 'Project saved to file.');
-  };
-  
-  const handleLoadProjectFromFile = (file: File) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-          try {
-              const project = JSON.parse(e.target?.result as string) as Project;
-              loadProject(project);
-              addLog('INFO', `Project "${project.name}" loaded from file.`);
-          } catch (error) {
-              alert('Failed to parse project file.');
-              addLog('ERROR', 'Failed to parse project file.');
-          }
-      };
-      reader.readAsText(file);
-  };
-
-  const handleSaveToDrive = async () => {
-      if (!activeProject) return;
-      if (!googleDriveStorage.isAuthenticated) {
-          await googleDriveStorage.signIn();
-      }
-      await googleDriveStorage.saveProject(activeProject);
-      setHasUnsavedChanges(false);
-  };
-
-  const handleOpenFromDriveClick = () => {
-      setIsDrivePickerOpen(true);
-  };
-
-  const handleLoadFromDrive = async (fileId: string) => {
-      const project = await googleDriveStorage.loadProject(fileId);
-      if (project) {
-          loadProject(project);
-          setIsDrivePickerOpen(false);
-      }
-  };
-  
-  const handleProjectSelect = useCallback((projectId: string) => {
-    if (activeProject?.id === projectId) return;
-    if (hasUnsavedChanges) {
-        if (!window.confirm("You have unsaved changes. Switch projects without saving?")) {
-            return;
-        }
-    }
-    const projectToLoad = projects.find(p => p.id === projectId);
-    if(projectToLoad) {
-        alert(`Switching context to "${projectToLoad.name}". To see full history, please re-open the project file.`);
-        const stubProject: Project = { ...projectToLoad, history: [], inspirationalImageHistory: [] } as any;
-        loadProject(stubProject);
-    }
-  }, [activeProject, hasUnsavedChanges, projects, loadProject]);
+  }, [selectedFaction, prompt, projectName, activeProject, performAnalysis, files, activeVersion, saveNewVersion, clearAllDrawings, clearAllInspirationalImages, clearVideo, clearCad, clearSummary, liveCosting, clearInProgressAnalysis, onNewProject, tags, patentGenerator, authenticatedUser]);
 
   const handleLoadVersion = useCallback((index: number) => {
     if (!activeProject) return;
-    const version = activeProject.history[index];
+    const history = activeProject.history || [];
+    const version = history[index];
     if (!version) return;
 
     setActiveVersionIndex(index);
-    
     setResult(version.result);
     setDrawings(version.drawings || []);
     setInspirationalImages(version.inspirationalImages || []);
@@ -1081,13 +668,13 @@ ${summary}
     
     liveCosting.initialize(version.result);
     bomSourcing.clearSourcing();
-    simulation.clearSimulation();
     fabricationPlanner.clearPlanner();
     imageIdentifier.clearIdentification();
     versionComparer.clearComparison();
     gcodeVisualizer.closeModal();
     suggestionExplorer.clearExploration();
     patentGenerator.clearPatent();
+    clearCad strolling();
     clearCad();
     clearSummary();
     
@@ -1096,74 +683,201 @@ ${summary}
 
   }, [activeProject, resetEditorState, bomSourcing, fabricationPlanner, liveCosting, simulation, clearCad, imageIdentifier, versionComparer, gcodeVisualizer, suggestionExplorer, clearSummary, addLog, setResult, setDrawings, setInspirationalImages, patentGenerator]);
   
-  const handleRevertVersion = (index: number) => {
-    revertToVersion(index);
-    setTimeout(() => handleLoadVersion(0), 100);
-  };
-  
+  const handleProjectSelect = useCallback((projectId: string) => {
+    if (activeProject?.id === projectId) return;
+    onSelectProject(projectId);
+  }, [activeProject, onSelectProject]);
+
   const handleNewProjectClick = () => {
     setProjectToEdit(null);
     setInitialProjectData(null);
     setIsProjectModalOpen(true);
   };
 
-  const handleEditProjectClick = (project: Project) => {
-    setProjectToEdit(project);
-    setIsProjectModalOpen(true);
-  };
-  
   const handleSaveProjectDetails = (details: {name: string, description: string, tags: string[]}) => {
     if (projectToEdit) {
       updateProjectDetails(projectToEdit.id, details);
       setProjectName(details.name);
       setEditorState({ ...editorState, tags: details.tags });
-      addLog('INFO', `Project details updated for "${details.name}".`);
     } else {
       const newId = onNewProject(details, { prompt: initialProjectData?.initialPrompt, factionId: selectedFaction?.id });
       onSelectProject(newId);
-      addLog('INFO', `New project created: "${details.name}".`);
     }
     setIsProjectModalOpen(false);
     setProjectToEdit(null);
     setInitialProjectData(null);
   };
 
-  const handleCommitVersion = async (commitMessage: string) => {
-      if (!activeVersion || !selectedFaction) return;
+  const handleStartFromImage = async (file: File) => {
+      setIsParsingImage(true);
+      addLog('INFO', `Analyzing image "${file.name}" to extract project details...`);
+      try {
+          const imagePart = await fileToGenerativePart(file);
+          const details = await extractProjectDetailsFromImage(imagePart);
+          setInitialProjectData(details);
+          setIsProjectModalOpen(true);
+          addLog('INFO', `Extracted details for "${details.name}" from image.`);
+      } catch (e) {
+          addLog('ERROR', `Image parsing failed: ${parseApiError(e)}`);
+      } finally {
+          setIsParsingImage(false);
+      }
+  };
+
+  const handleStartFromPdf = async (file: File) => {
+      setIsParsingPdf(true);
+      addLog('INFO', `Analyzing PDF "${file.name}" to extract project details...`);
+      try {
+          const pdfPart = await fileToGenerativePart(file);
+          const details = await extractProjectDetailsFromPdf(pdfPart);
+          setInitialProjectData(details);
+          setIsProjectModalOpen(true);
+          addLog('INFO', `Extracted details for "${details.name}" from PDF.`);
+      } catch (e) {
+          addLog('ERROR', `PDF parsing failed: ${parseApiError(e)}`);
+      } finally {
+          setIsParsingPdf(false);
+      }
+  };
+
+  const handleStartBrainstormFromPdf = async (file: File) => {
+      setIsParsingForBrainstorm(true);
+      addLog('INFO', `Starting AI brainstorming session based on PDF "${file.name}"...`);
+      try {
+          const pdfPart = await fileToGenerativePart(file);
+          const details = await extractProjectDetailsFromPdf(pdfPart);
+          const newId = onNewProject(
+            { name: `Brainstorm: ${details.name}`, description: details.description, tags: [...details.tags, 'brainstorm'] },
+            { prompt: `System Brainstorm request based on technical manual: ${details.initialPrompt}`, factionId: FactionId.ADVANCED_MATERIALS }
+          );
+          onSelectProject(newId);
+          addLog('INFO', `Created brainstorming project for "${details.name}".`);
+      } catch (e) {
+          addLog('ERROR', `Brainstorming failed: ${parseApiError(e)}`);
+      } finally {
+          setIsParsingForBrainstorm(false);
+      }
+  };
+
+  const handleIdentifyUrl = async (url: string) => {
+      setIsParsingVideo(true);
+      addLog('INFO', `Searching web and identifying video content at ${url}...`);
+      try {
+          const details = await extractProjectDetailsFromVideoUrl(url);
+          setInitialProjectData(details);
+          setIsProjectModalOpen(true);
+          setIsVideoImportModalOpen(false);
+          addLog('INFO', `Identified video content for "${details.name}".`);
+      } catch (e) {
+          addLog('ERROR', `Video identification failed: ${parseApiError(e)}`);
+      } finally {
+          setIsParsingVideo(false);
+      }
+  };
+
+  const handleIdentifyFile = async (file: File) => {
+      setIsParsingVideo(true);
+      addLog('INFO', `Analyzing video file "${file.name}" frame-by-frame...`);
+      try {
+          const videoPart = await fileToGenerativePart(file);
+          const details = await extractProjectDetailsFromVideo(videoPart);
+          setInitialProjectData(details);
+          setIsProjectModalOpen(true);
+          setIsVideoImportModalOpen(false);
+          addLog('INFO', `Video file analysis complete for "${details.name}".`);
+      } catch (e) {
+          addLog('ERROR', `Video analysis failed: ${parseApiError(e)}`);
+      } finally {
+          setIsParsingVideo(false);
+      }
+  };
+
+  const handleSetCover = useCallback((id: string, type: 'drawing' | 'image') => {
+    setDrawings(prev => prev.map(d => ({
+        ...d,
+        isCoverImage: type === 'drawing' && d.id === id
+    })));
+    setInspirationalImages(prev => prev.map(img => ({
+        ...img,
+        isCoverImage: type === 'image' && img.id === id
+    })));
+    addLog('INFO', `Set new report cover image (${type}: ${id}).`);
+  }, [setDrawings, setInspirationalImages, addLog]);
+
+  const handlePlanSelect = async (status: SubscriptionStatus) => {
+      if (!authenticatedUser) return;
       
-      let newFileUrls = activeVersion.fileUrls;
-      if (files.length > 0) {
-         newFileUrls = await Promise.all(files.map(fileToDataUrl));
+      let updatedUser = { ...authenticatedUser, subscriptionStatus: status };
+      
+      if (status === SubscriptionStatus.PRO_TRIAL) {
+          const trialResult = await projectApi.activateTrial(authenticatedUser.id);
+          updatedUser = { ...updatedUser, subscriptionStatus: trialResult.status, trialEndsAt: trialResult.trialEndsAt };
+          addLog('INFO', `Started 1-week free trial for Professional plan.`);
+      } else {
+          addLog('INFO', `Upgraded to ${status} plan.`);
+      }
+      handleUpdateProfile(updatedUser);
+      setViewMode('app');
+  };
+
+  // High-fidelity gating logic for advanced features
+  // Fix: Generic handleGatedAction to allow returning values from actions (like Promises)
+  const handleGatedAction = <T,>(action: () => T): T | void => {
+      if (!authenticatedUser) return;
+      
+      // Free users are blocked from CAD/Fabrication export
+      if (authenticatedUser.subscriptionStatus === SubscriptionStatus.FREE) {
+          setViewMode('pricing');
+          addLog('WARN', 'Professional tier required for advanced engineering exports.');
+          return;
       }
 
-      saveNewVersion({
-          prompt,
-          factionId: selectedFaction.id,
-          result: displayedResult,
-          fileUrls: newFileUrls, 
-          drawings,
-          inspirationalImages,
-          rotorModel,
-          incorporatedSuggestions: activeVersion.incorporatedSuggestions,
-      }, commitMessage);
+      // Pro users must sign the partner protocol once
+      if (!authenticatedUser.hasSignedPartnerProtocol) {
+          setIsPartnerModalOpen(true);
+          return;
+      }
 
-      setHasUnsavedChanges(false);
-      setIsCommitModalOpen(false);
-      setActiveVersionIndex(0);
+      return action();
   };
-  
-  const handleCompareVersions = (project: Project, newVersionIndex: number) => {
-    versionComparer.runComparison(project, newVersionIndex);
-  };
-  
+
   useEffect(() => {
     if (activeProject) {
-        handleLoadVersion(activeVersionIndex);
+        handleLoadVersion(0);
     }
-  }, [activeProject]);
+  }, [activeProject, handleLoadVersion]);
 
   if (!authenticatedUser) {
-    return <AuthPage onGoogleAuth={handleGoogleAuth} onDemoLogin={handleDemoLogin} />;
+    return <AuthPage onGoogleAuth={handleGoogleAuth} onDemoLogin={handleDemoLogin} onSignup={handleSignup} />;
+  }
+
+  if (isOnboarding) {
+      return <OnboardingFlow user={authenticatedUser} onComplete={handleOnboardingComplete} />;
+  }
+
+  if (!authenticatedUser.hasAcceptedLegal) {
+      return <LegalGuard onAccept={handleAcceptLegal} />;
+  }
+
+  if (viewMode === 'pricing') {
+      return (
+        <PricingPage 
+            currentPlan={authenticatedUser.subscriptionStatus}
+            onSelectPlan={handlePlanSelect}
+            onBack={() => setViewMode('app')}
+        />
+      );
+  }
+
+  if (viewMode === 'account') {
+      return (
+        <AccountPage 
+            user={authenticatedUser}
+            onUpdate={handleUpdateProfile}
+            onNavigateToPricing={() => setViewMode('pricing')}
+            onBack={() => setViewMode('app')}
+        />
+      )
   }
 
   return (
@@ -1174,8 +888,8 @@ ${summary}
         authenticatedUser={authenticatedUser}
         onLogout={handleLogout}
         onOpenProfile={() => setIsProfileModalOpen(true)}
-        viewMode={viewMode}
-        onSwitchView={setViewMode}
+        viewMode={viewMode === 'app' || viewMode === 'pricing' || viewMode === 'account' ? 'app' : viewMode}
+        onSwitchView={(v) => setViewMode(v as any)}
       />
 
       <div className="flex-1 flex flex-col overflow-y-auto">
@@ -1188,32 +902,28 @@ ${summary}
                     activeVersionIndex={activeVersionIndex}
                     onSelectProject={handleProjectSelect}
                     onNewProject={handleNewProjectClick}
-                    onOpenFile={handleLoadProjectFromFile}
-                    onSaveProject={handleSaveProject}
+                    onOpenFile={() => {}}
+                    onSaveProject={() => {}}
                     hasUnsavedChanges={hasUnsavedChanges}
                     onCommitVersion={() => setIsCommitModalOpen(true)}
                     onStartWithDeVinci={handleLaunchCreationDeVinci}
-                    onStartFromImage={handleStartFromImage}
+                    onStartFromImage={handleStartFromImage} 
                     isParsingImage={isParsingImage}
                     onStartFromPdf={handleStartFromPdf}
                     isParsingPdf={isParsingPdf}
                     onStartBrainstormFromPdf={handleStartBrainstormFromPdf}
                     isParsingForBrainstorm={isParsingForBrainstorm}
-                    onIdentifyImage={handleIdentifyImage}
+                    onIdentifyImage={(file) => { imageIdentifier.identifyImage(file); setIsIdentifierModalOpen(true); }}
                     isIdentifyingImage={imageIdentifier.isLoading}
                     onOpenVideoImport={() => setIsVideoImportModalOpen(true)}
                     isParsingVideo={isParsingVideo}
-                    onEditProject={(p) => handleEditProjectClick(p as Project)}
+                    onEditProject={(p) => { setProjectToEdit(p); setIsProjectModalOpen(true); }}
                     onDeleteProject={onDeleteProject}
                     onLoadVersion={handleLoadVersion}
-                    onRevertVersion={handleRevertVersion}
-                    onCompareVersions={(p, idx) => handleCompareVersions(p, idx)}
+                    onRevertVersion={revertToVersion}
+                    onCompareVersions={(p, idx) => versionComparer.runComparison(p, idx)}
                     disabled={isLoading}
                     authenticatedUser={authenticatedUser}
-                    onSaveToDrive={handleSaveToDrive}
-                    onOpenFromDrive={handleOpenFromDriveClick}
-                    isSavingToDrive={googleDriveStorage.isSaving}
-                    isDriveAuthenticated={googleDriveStorage.isAuthenticated}
                     onAddDocument={addIngestedDocument}
                     onRemoveDocument={removeIngestedDocument}
                     addLog={addLog}
@@ -1240,11 +950,11 @@ ${summary}
                   onEngage={() => handleEngage()}
                   isLoading={isLoading}
                   onClearFiles={() => { setFiles([]); setHasUnsavedChanges(true); }}
-                  isReady={isReady}
+                  isReady={!!selectedFaction && !!prompt && !!projectName}
                   authenticatedUser={authenticatedUser}
                   setupAssistant={setupAssistant}
-                  onApplyFactionSuggestion={handleApplyFactionSuggestion}
-                  onReanalyzeWithFaction={handleReanalyzeWithFaction}
+                  onApplyFactionSuggestion={() => {}}
+                  onReanalyzeWithFaction={() => handleEngage(true)}
                   selectedFaction={selectedFaction}
                   activeVersionFactionId={activeVersion?.factionId}
                   promptValidator={promptValidator}
@@ -1263,7 +973,7 @@ ${summary}
                 isLoading={isLoading}
                 error={error}
                 selectedFaction={selectedFaction}
-                onClear={handleClearAnalysis}
+                onClear={clearAnalysis}
                 onGenerateVideo={generateVideo}
                 isVideoLoading={isVideoLoading}
                 videoUrl={videoUrl}
@@ -1271,15 +981,15 @@ ${summary}
                 drawings={drawings}
                 onRequestDrawing={requestDrawing}
                 onRequestDrawingFromImage={requestDrawingFromImage}
-                onRemoveDrawing={(id) => { removeDrawing(id); setHasUnsavedChanges(true); }}
-                onToggleDrawingReportInclusion={(id) => { toggleDrawingReportInclusion(id); setHasUnsavedChanges(true); }}
+                onRemoveDrawing={(id) => removeDrawing(id)}
+                onToggleDrawingReportInclusion={(id) => toggleDrawingReportInclusion(id)}
                 onSetCover={handleSetCover}
                 inspirationalImages={inspirationalImages}
-                onRequestInspirationalImage={handleRequestInspirationalImage}
-                onRemoveInspirationalImage={(id) => { removeInspirationalImage(id); setHasUnsavedChanges(true); }}
-                onToggleImageReportInclusion={(id) => { toggleImageReportInclusion(id); setHasUnsavedChanges(true); }}
-                onIncorporateSuggestions={handleIncorporateSuggestions}
-                onLaunchDeVinci={handleLaunchBrainstormingDeVinci}
+                onRequestInspirationalImage={requestInspirationalImage}
+                onRemoveInspirationalImage={(id) => removeInspirationalImage(id)}
+                onToggleImageReportInclusion={(id) => toggleImageReportInclusion(id)}
+                onIncorporateSuggestions={() => {}}
+                onLaunchDeVinci={() => {}}
                 activeProject={activeProject}
                 activeVersion={activeVersion}
                 authenticatedUser={authenticatedUser}
@@ -1287,10 +997,11 @@ ${summary}
                 isSummaryLoading={isSummaryLoading}
                 summaryError={null}
                 cadData={cadData}
-                onGenerateCad={generateCad}
+                // Fix: Return a Promise.resolve(null) if the action is gated to match expected Promise type
+                onGenerateCad={(d, r) => handleGatedAction(() => generateCad(d, r)) || Promise.resolve(null)}
                 isCadLoading={isCadLoading}
                 cadError={cadError}
-                onOpenCadViewer={() => setIsCadViewerOpen(true)}
+                onOpenCadViewer={() => handleGatedAction(() => setIsCadViewerOpen(true))}
                 isGoogleExporterAuthenticated={googleExporter.isAuthenticated}
                 googleExporterUser={googleExporter.authenticatedUser}
                 isGoogleAuthLoading={googleExporter.isAuthLoading}
@@ -1303,12 +1014,12 @@ ${summary}
                 onOpenGoogleDocPreview={() => setIsGoogleDocPreviewOpen(true)}
                 onExportToGoogle={() => { if(activeProject) googleExporter.exportToGoogle(activeProject, drawings, authenticatedUser!)}}
                 rotorModel={rotorModel}
-                onRotorModelChange={(m) => { setRotorModel(m); setHasUnsavedChanges(true); }}
+                onRotorModelChange={setRotorModel}
                 rossAnalysis={rossAnalysis}
                 tts={tts}
                 inspirationalImageHistory={activeProject?.inspirationalImageHistory || []}
-                onReinsertInspirationalImage={handleReinsertImageFromHistory}
-                onDeleteInspirationalImageFromHistory={handleDeleteImageFromHistory}
+                onReinsertInspirationalImage={() => {}}
+                onDeleteInspirationalImageFromHistory={() => {}}
                 simulation={simulation}
                 fabricationPlanner={fabricationPlanner}
                 gcodeVisualizer={gcodeVisualizer}
@@ -1331,10 +1042,12 @@ ${summary}
                 onOpenTechDoc={() => setIsTechDocOpen(true)}
               />
             </div>
-          ) : (
+          ) : viewMode === 'suite' ? (
             <ToolSuite />
-          )}
+          ) : null}
         </main>
+        
+        <Footer />
       </div>
 
       <Tour isOpen={isTourOpen} stepIndex={tourStep} steps={TOUR_STEPS} onClose={() => setIsTourOpen(false)} onNext={() => setTourStep(s => s + 1)} onPrev={() => setTourStep(s => s - 1)} tts={tts} />
@@ -1342,7 +1055,7 @@ ${summary}
       <TechnicalDocumentModal isOpen={isTechDocOpen} onClose={() => setIsTechDocOpen(false)} />
       <ProjectModal 
         isOpen={isProjectModalOpen}
-        onClose={() => { setIsProjectModalOpen(false); setInitialProjectData(null); setProjectToEdit(null); }}
+        onClose={() => setIsProjectModalOpen(false)}
         onSave={handleSaveProjectDetails}
         project={projectToEdit}
         initialData={initialProjectData || undefined}
@@ -1350,116 +1063,57 @@ ${summary}
        <ProfileModal
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
-        user={authenticatedUser}
+        user={authenticatedUser!}
         onSave={handleUpdateProfile}
+        onNavigateToPricing={() => { setIsProfileModalOpen(false); setViewMode('pricing'); }}
+        onNavigateToAccount={() => { setIsProfileModalOpen(false); setViewMode('account'); }}
       />
-      {deVinciMode && (
-          <DeVinciModal
-            isOpen={deVinciMode !== null}
-            isCreating={deVinciMode === 'creation'}
-            onClose={() => {
-                if (deVinciMode === 'creation') creationDeVinci.stopConversation();
-                else brainstormingDeVinci.stopConversation();
-                setDeVinciMode(null);
-            }}
-            startConversation={() => {
-                if (deVinciMode === 'creation') handleLaunchCreationDeVinci();
-                else handleLaunchBrainstormingDeVinci();
-            }}
-            stopConversation={deVinciMode === 'creation' ? creationDeVinci.stopConversation : brainstormingDeVinci.stopConversation}
-            pauseConversation={deVinciMode === 'creation' ? creationDeVinci.pauseConversation : brainstormingDeVinci.pauseConversation}
-            resumeConversation={deVinciMode === 'creation' ? creationDeVinci.resumeConversation : brainstormingDeVinci.resumeConversation}
-            state={deVinciMode === 'creation' ? creationDeVinci.state : brainstormingDeVinci.state}
-            transcript={deVinciMode === 'creation' ? creationDeVinci.transcript : brainstormingDeVinci.transcript}
-            onFileUpload={handleDeVinciFileUpload}
-            analyzableFile={brainstormingDeVinci.analyzableFile}
-            sendImageRegion={brainstormingDeVinci.sendImageRegion}
-            simulateNewSpeaker={brainstormingDeVinci.simulateNewSpeaker}
-            manualRetry={deVinciMode === 'creation' ? creationDeVinci.manualRetry : brainstormingDeVinci.manualRetry}
-            retryCount={deVinciMode === 'creation' ? creationDeVinci.retryCount : brainstormingDeVinci.retryCount}
-          />
-      )}
-      <GoogleDocPreviewModal 
-        isOpen={isGoogleDocPreviewOpen}
-        onClose={() => setIsGoogleDocPreviewOpen(false)}
-        content={googleExporter.exportedDocContent}
-        projectName={activeProject?.name || ''}
-      />
-      {cadData && <CadViewerModal isOpen={isCadViewerOpen} onClose={() => setIsCadViewerOpen(false)} cadData={cadData} />}
-      <CommitModal 
-        isOpen={isCommitModalOpen}
-        onClose={() => setIsCommitModalOpen(false)}
-        onConfirm={handleCommitVersion}
-      />
-      <ImageIdentifierModal
-        isOpen={isIdentifierModalOpen}
-        onClose={() => { setIsIdentifierModalOpen(false); imageIdentifier.clearIdentification(); }}
-        isLoading={imageIdentifier.isLoading}
-        error={imageIdentifier.error}
-        result={imageIdentifier.result}
-      />
-      <ComparisonViewerModal
-        isOpen={versionComparer.comparisonData !== null || versionComparer.isComparing || !!versionComparer.comparisonError}
-        onClose={versionComparer.clearComparison}
-        isLoading={versionComparer.isComparing}
-        error={versionComparer.comparisonError}
-        comparisonData={versionComparer.comparisonData}
-      />
-      <SuggestionExplorerModal
-        isOpen={suggestionExplorer.isModalOpen}
-        onClose={suggestionExplorer.clearExploration}
-        isLoading={suggestionExplorer.isExploring}
-        error={suggestionExplorer.explorationError}
-        result={suggestionExplorer.explorationResult}
-      />
-      <ToolpathVisualizerModal 
-        isOpen={gcodeVisualizer.isModalOpen}
-        onClose={gcodeVisualizer.closeModal}
-        gcode={gcodeVisualizer.gcodeToVisualize}
-        summary={gcodeVisualizer.summary}
-        isLoading={gcodeVisualizer.isLoading}
-        error={gcodeVisualizer.error}
-      />
-      <VideoImportModal
-        isOpen={isVideoImportModalOpen}
-        onClose={() => setIsVideoImportModalOpen(false)}
-        onImportFile={handleStartFromVideoFile}
-        onImportUrl={handleStartFromVideoUrl}
-        isLoading={isParsingVideo}
-      />
-      <GoogleDrivePickerModal
-        isOpen={isDrivePickerOpen}
-        onClose={() => setIsDrivePickerOpen(false)}
-        isLoading={googleDriveStorage.isLoadingList || googleDriveStorage.isLoadingFile}
-        files={googleDriveStorage.fileList}
-        onSelect={handleLoadFromDrive}
-        onRefresh={googleDriveStorage.refreshFileList}
-        error={googleDriveStorage.error}
-        isAuthenticated={googleDriveStorage.isAuthenticated}
-        onSignIn={googleDriveStorage.signIn}
-      />
-      { displayedResult && !isViewer && <VoiceCommanderWidget 
-        state={voiceCommander.state}
-        startListening={voiceCommander.startListening}
-        stopListening={voiceCommander.stopListening}
-      />}
-      { displayedResult && <button 
-          onClick={handleLaunchAiChat} 
-          className="fixed bottom-6 left-6 z-30 bg-purple-600 text-white font-semibold py-3 px-5 rounded-full shadow-lg flex items-center gap-3 transition-transform hover:scale-105 active:scale-100"
-          title="Open AI Chat for brainstorming and refinement"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6"><path strokeLinecap="round" strokeLinejoin="round" d="M8.625 9.75a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375m-13.5 3.01c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.184-4.183a.375.375 0 0 1 .265-.108h3.284a3.375 3.375 0 0 0 3.375-3.375V9.75a3.375 3.375 0 0 0-3.375 3.375H5.25a3.375 3.375 0 0 0-3.375 3.375v3.01Z" /></svg>
-          AI Chat
-        </button>}
       <AiChatModal
         isOpen={isAiChatOpen}
-        onClose={() => { aiChat.endChat(); setIsAiChatOpen(false); }}
+        onClose={() => setIsAiChatOpen(false)}
         state={aiChat.state}
         history={aiChat.history}
         sendMessage={aiChat.sendMessage}
         error={aiChat.error}
       />
-
+      <ImageIdentifierModal 
+        isOpen={isIdentifierModalOpen}
+        onClose={() => setIsIdentifierModalOpen(false)}
+        isLoading={imageIdentifier.isLoading}
+        error={imageIdentifier.error}
+        result={imageIdentifier.result}
+      />
+      <VideoImportModal 
+        isOpen={isVideoImportModalOpen}
+        onClose={() => setIsVideoImportModalOpen(false)}
+        onImportFile={handleIdentifyFile}
+        onImportUrl={handleIdentifyUrl}
+        isLoading={isParsingVideo}
+      />
+      {isPartnerModalOpen && (
+          <PartnerIndemnityModal 
+              onSign={handleSignPartnerProtocol} 
+              onCancel={() => setIsPartnerModalOpen(false)} 
+          />
+      )}
+      <VoiceCommanderWidget state={voiceCommander.state} startListening={voiceCommander.startListening} stopListening={voiceCommander.stopListening} />
+      <DeVinciModal 
+        isOpen={deVinciMode === 'creation'}
+        onClose={() => { creationDeVinci.stopConversation(); setDeVinciMode(null); }}
+        startConversation={() => {}} 
+        stopConversation={creationDeVinci.stopConversation}
+        pauseConversation={creationDeVinci.pauseConversation}
+        resumeConversation={creationDeVinci.resumeConversation}
+        state={creationDeVinci.state}
+        transcript={creationDeVinci.transcript}
+        isCreating={true}
+        onFileUpload={creationDeVinci.sendFile}
+        analyzableFile={creationDeVinci.analyzableFile}
+        sendImageRegion={creationDeVinci.sendImageRegion}
+        simulateNewSpeaker={creationDeVinci.simulateNewSpeaker}
+        manualRetry={creationDeVinci.manualRetry}
+        retryCount={creationDeVinci.retryCount}
+      />
     </div>
   );
 }

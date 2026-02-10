@@ -1,6 +1,5 @@
-
 import React from 'react';
-import { Faction, FactionId, User, Role, Comment, Material, StandardComponent, Standard, ProjectArtifact, FmeaItem, SpcDataPoint, Requirement, RequirementStatus, RcaData, SimulationRun, Script, ChartData } from './types';
+import { Faction, FactionId, User, Role, Comment, Material, StandardComponent, Standard, ProjectArtifact, FmeaItem, SpcDataPoint, Requirement, RequirementStatus, RcaData, SimulationRun, Script, ChartData, SubscriptionStatus } from './types';
 import { AetheriumIcon } from './components/icons/AetheriumIcon';
 import { TerraFirmaIcon } from './components/icons/TerraFirmaIcon';
 import { SyntheticaIcon } from './components/icons/SyntheticaIcon';
@@ -46,11 +45,11 @@ export const ENGINEERING_PHILOSOPHIES: Faction[] = [
 
 const now = new Date();
 export const MOCK_USERS: User[] = [
-    { id: 'user-1', name: 'Alex (Admin)', email: 'alex@example.com', picture: `https://i.pravatar.cc/150?u=alex@example.com`, role: Role.Admin, analysesRun: 12, lastActive: now.toISOString() },
-    { id: 'user-5', name: 'Devin (Manager)', email: 'devin@example.com', picture: `https://i.pravatar.cc/150?u=devin@example.com`, role: Role.Manager, analysesRun: 18, lastActive: new Date(now.getTime() - 1 * 60 * 60 * 1000).toISOString() },
-    { id: 'user-2', name: 'Blake (Demo User)', email: 'blake@example.com', picture: `https://i.pravatar.cc/150?u=blake@example.com`, role: Role.Editor, analysesRun: 25, lastActive: new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString() },
-    { id: 'user-4', name: 'Dana (Editor)', email: 'dana@example.com', picture: `https://i.pravatar.cc/150?u=dana@example.com`, role: Role.Editor, analysesRun: 8, lastActive: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString() },
-    { id: 'user-3', name: 'Casey (Viewer)', email: 'casey@example.com', picture: `https://i.pravatar.cc/150?u=casey@example.com`, role: Role.Viewer, analysesRun: 3, lastActive: new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString() },
+    { id: 'user-1', name: 'Alex (Admin)', email: 'alex@example.com', picture: `https://i.pravatar.cc/150?u=alex@example.com`, role: Role.Admin, analysesRun: 12, lastActive: now.toISOString(), company_name: 'Forge Labs Global', legal_identity: 'Alex Forge', use_company_attribution: true, subscriptionStatus: SubscriptionStatus.ENTERPRISE },
+    { id: 'user-5', name: 'Devin (Manager)', email: 'devin@example.com', picture: `https://i.pravatar.cc/150?u=devin@example.com`, role: Role.Manager, analysesRun: 18, lastActive: new Date(now.getTime() - 1 * 60 * 60 * 1000).toISOString(), company_name: 'Aegis Engineering', legal_identity: 'Devin Vance', use_company_attribution: true, subscriptionStatus: SubscriptionStatus.PRO_ACTIVE },
+    { id: 'user-2', name: 'Blake (Demo User)', email: 'blake@example.com', picture: `https://i.pravatar.cc/150?u=blake@example.com`, role: Role.Editor, analysesRun: 25, lastActive: new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString(), company_name: 'Uniquity Tech', legal_identity: 'Blake Waters', use_company_attribution: false, subscriptionStatus: SubscriptionStatus.FREE },
+    { id: 'user-4', name: 'Dana (Editor)', email: 'dana@example.com', picture: `https://i.pravatar.cc/150?u=dana@example.com`, role: Role.Editor, analysesRun: 8, lastActive: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString(), subscriptionStatus: SubscriptionStatus.FREE },
+    { id: 'user-3', name: 'Casey (Viewer)', email: 'casey@example.com', picture: `https://i.pravatar.cc/150?u=casey@example.com`, role: Role.Viewer, analysesRun: 3, lastActive: new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString(), subscriptionStatus: SubscriptionStatus.FREE },
 ];
 
 export const MOCK_COMMENTS: Comment[] = [
@@ -164,7 +163,6 @@ export const SUITE_NAVIGATION = [
 
 export const MOCK_MATERIALS: Material[] = [
   { id: 'mat-1', name: 'Aluminum 6061-T6', category: 'Non-Ferrous Metal', properties: { 'Density': '2.7 g/cm³', 'Yield Strength': '276 MPa', 'Ultimate Tensile Strength': '310 MPa', 'Young\'s Modulus': '68.9 GPa', 'Thermal Conductivity': '167 W/m·K' } },
-  // FIX: Converted 'Poisson\'s Ratio' value from number to string to match the Material type definition.
   { id: 'mat-2', name: 'Steel, AISI 1020', category: 'Ferrous Metal', properties: { 'Density': '7.87 g/cm³', 'Yield Strength': '350 MPa', 'Poisson\'s Ratio': '0.29', 'Melting Point': '1420-1500 °C' } },
   { id: 'mat-3', name: 'ABS Plastic', category: 'Polymer', properties: { 'Density': '1.06 g/cm³', 'Yield Strength': '40 MPa', 'Young\'s Modulus': '2 GPa' } },
   { id: 'mat-4', name: 'Carbon Fiber (Standard Modulus)', category: 'Composite', properties: { 'Density': '1.75 g/cm³', 'Ultimate Tensile Strength': '3.5 GPa', 'Young\'s Modulus': '230 GPa' } },
@@ -189,15 +187,14 @@ export const MOCK_ARTIFACTS: ProjectArtifact[] = [
   { id: 'art-4', name: 'Main Assembly.sldasm', type: 'CAD Link', version: 'v4.0', modifiedBy: 'Dana (Editor)', modifiedAt: new Date(now.getTime() - 12 * 60 * 60 * 1000).toISOString() },
 ];
 
-// --- CM-2 MOCK DATA ---
 export const MOCK_FMEA_ITEMS: FmeaItem[] = [
   { id: 1, processStep: 'Torque Fastener', failureMode: 'Insufficient Torque', failureEffects: 'Vibrational loosening, component failure', severity: 8, potentialCauses: 'Operator error, tool malfunction', occurrence: 3, currentControls: 'Torque wrench calibration', detection: 4, rpn: 96, recommendedAction: 'Implement digital torque wrench with logging', actionStatus: 'Pending' },
-  { id: 2, processStep: 'Adhesive Bonding', failureMode: 'Improper Curing', failureEffects: 'Weak bond, delamination', severity: 7, potentialCauses: 'Incorrect temperature, expired adhesive', occurrence: 2, currentControls: 'Visual inspection', detection: 6, rpn: 84, recommendedAction: 'Add temperature sensors to curing oven', actionStatus: 'In Progress' },
+  { id: 2, processStep: 'Adhesive Bonding', failureMode: 'Improper Curing', failureEffects: 'Weak bond, delamination', severity: 7, potentialCauses: 'Incorrect temperature, expired adhesive', occurrence: 2, currentControls: 'Visual inspection', detection: 6, rpn: 84, recommendedAction: 'Add temperature sensors to caring oven', actionStatus: 'In Progress' },
   { id: 3, processStep: 'PCB Soldering', failureMode: 'Solder Bridge', failureEffects: 'Electrical short, board failure', severity: 9, potentialCauses: 'Excess solder paste', occurrence: 4, currentControls: 'Automated Optical Inspection (AOI)', detection: 2, rpn: 72, recommendedAction: 'Refine solder paste stencil aperture', actionStatus: 'Complete' },
 ];
 
 export const MOCK_SPC_DATA: SpcDataPoint[][] = Array.from({ length: 25 }, (_, i) =>
-  Array.from({ length: 5 }, () => ({ sample: i + 1, value: 10 + (Math.random() - 0.5) * 1.5 + (i > 18 ? 0.8 : 0) })) // Introduce a shift for the last few samples
+  Array.from({ length: 5 }, () => ({ sample: i + 1, value: 10 + (Math.random() - 0.5) * 1.5 + (i > 18 ? 0.8 : 0) })) 
 );
 
 export const MOCK_REQUIREMENTS: Requirement[] = [
@@ -226,7 +223,6 @@ export const MOCK_RCA_DATA: RcaData = {
   },
 };
 
-// --- CM-3 MOCK DATA ---
 const generateSurface = (peak: number, center: [number, number], width: number): number[][] => {
     const size = 50;
     const z = [];
@@ -307,7 +303,6 @@ export const MOCK_CHART_DATA: ChartData[] = [
         name: 'Bode Plot (Frequency Response)',
         type: 'bode',
         data: {
-            // Sample data for a simple low-pass filter
             freq: Array.from({ length: 100 }, (_, i) => 10 ** (i / 20)),
             magnitude: Array.from({ length: 100 }, (_, i) => 20 * Math.log10(1 / Math.sqrt(1 + (10 ** (i / 20) / 100) ** 2))),
             phase: Array.from({ length: 100 }, (_, i) => -Math.atan(10 ** (i / 20) / 100) * (180 / Math.PI))

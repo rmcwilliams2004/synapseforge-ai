@@ -1,5 +1,6 @@
+
 import { useState, useCallback } from 'react';
-import { sourceBomItem, parseApiError } from '../services/geminiService';
+import { sourceBomItemWithValidation, parseApiError } from '../services/geminiService';
 import { BillOfMaterialsItem, ProcurementInfo, LogEntry } from '../types';
 
 export const useBomSourcing = (addLog: (level: LogEntry['level'], message: string) => void) => {
@@ -16,16 +17,16 @@ export const useBomSourcing = (addLog: (level: LogEntry['level'], message: strin
             newMap.delete(partNumber);
             return newMap;
         });
-        addLog('INFO', `Sourcing component: "${item.name}"`);
+        addLog('INFO', `Deep-sourcing part: "${item.name}". querying aggregator and validating with AI...`);
 
         try {
-            const results = await sourceBomItem(item);
+            const results = await sourceBomItemWithValidation(item);
             setSourcingResults(prev => new Map(prev).set(partNumber, results));
-            addLog('INFO', `Successfully sourced component: "${item.name}"`);
+            addLog('INFO', `Sourcing complete for "${item.name}". AI validated credibility.`);
         } catch (e) {
             const errorMessage = parseApiError(e);
             setErrorStates(prev => new Map(prev).set(partNumber, errorMessage));
-            addLog('ERROR', `Failed to source component "${item.name}": ${errorMessage}`);
+            addLog('ERROR', `Sourcing failed for "${item.name}": ${errorMessage}`);
         } finally {
             setLoadingStates(prev => new Map(prev).set(partNumber, false));
         }

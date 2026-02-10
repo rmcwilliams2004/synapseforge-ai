@@ -1,4 +1,3 @@
-
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { GoogleGenAI, LiveServerMessage, Modality, Blob, FunctionDeclaration } from '@google/genai';
 import { Faction, ProjectVersion, DeVinciState, TranscriptEntry, DeVinciVoice, User } from '../types';
@@ -239,7 +238,6 @@ export const useDeVinci = () => {
         
         configRef.current = config;
         
-        // Initialize AI client inside function to pick up latest API key
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
 
         const connect = async (currentConfig: StartConversationConfig, attempt: number) => {
@@ -278,15 +276,14 @@ export const useDeVinci = () => {
                 }
             }
 
-            // Using gemini-2.0-flash-exp as requested for Live functionality
-            sessionPromise.current = ai.live.connect({
-                model: 'gemini-2.0-flash-exp', 
+            const livePromise = ai.live.connect({
+                model: 'gemini-2.5-flash-native-audio-preview-12-2025', 
                 config: {
-                    responseModalities: [Modality.AUDIO],
+                    responseModalities: ['AUDIO'],
                     speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: currentConfig.voice } } },
                     systemInstruction: currentConfig.systemInstruction,
-                    inputAudioTranscription: {},
-                    outputAudioTranscription: {},
+                    // Note: Combinations of tools and transcription are gated in some preview models.
+                    // Prioritizing tools for this disciplinary workspace.
                     tools: currentConfig.tools,
                 },
                 callbacks: {
@@ -300,7 +297,7 @@ export const useDeVinci = () => {
                         scriptProcessor.onaudioprocess = (audioProcessingEvent) => {
                             const inputData = audioProcessingEvent.inputBuffer.getChannelData(0);
                             const pcmBlob = createBlob(inputData);
-                            sessionPromise.current?.then((session) => {
+                            livePromise.then((session) => {
                                session.sendRealtimeInput({ media: pcmBlob });
                             });
                         };
@@ -313,7 +310,7 @@ export const useDeVinci = () => {
                             setState('thinking');
                             for (const fc of message.toolCall.functionCalls) {
                                 const result = await currentConfig.onFunctionCall(fc);
-                                sessionPromise.current?.then(session => {
+                                livePromise.then(session => {
                                     if (session) {
                                         session.sendToolResponse({
                                             functionResponses: { id: fc.id, name: fc.name, response: { result: JSON.stringify(result) } }
@@ -322,6 +319,7 @@ export const useDeVinci = () => {
                                 });
                             }
                         }
+                        // Transcription handling is fallback for models that support it without gating conflicts
                         if (message.serverContent?.inputTranscription) {
                             const { text } = message.serverContent.inputTranscription;
                             setTranscript(prev => {
@@ -390,7 +388,7 @@ export const useDeVinci = () => {
                                     return;
                                 }
                                 const transcriptHistory = transcriptRef.current.map(t => `${t.speakerName || (t.source === 'user' ? originalConfig.authenticatedUser.name.split(' ')[0] : 'DeVinci')}: ${t.text}`).join('\n');
-                                const augmentedSystemInstruction = `${originalConfig.systemInstruction}\n\n--- CONVERSATION RECOVERY ---\nYour previous session was interrupted. You are now reconnected. Please continue the conversation based on the history provided below. Do not mention the interruption.\n\nTRANSCRIPT:\n${transcriptHistory}`;
+                                const augmentedSystemInstruction = `${originalConfig.systemInstruction}\n\n--- CONVERSATION RECOVERY ---\nYour previous session was interrupted. Reconnected based on history: ${transcriptHistory}`;
                                 connect({ ...originalConfig, systemInstruction: augmentedSystemInstruction }, attempt + 1);
                             }, delay);
                         } else {
@@ -410,6 +408,7 @@ export const useDeVinci = () => {
                     },
                 },
             });
+            sessionPromise.current = livePromise;
         };
         
         connect(config, 1);

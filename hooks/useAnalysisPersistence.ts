@@ -1,58 +1,50 @@
 import { useCallback } from 'react';
+import { openDB, IDBPDatabase } from 'idb';
 import { InProgressState } from '../types';
 
-const LOCAL_STORAGE_KEY = 'synapseforge-in-progress-analysis';
+const DB_NAME = 'SynapseForge_SessionDB';
+const STORE_NAME = 'analysis_state';
+const KEY = 'current_session';
+
+const initDB = async (): Promise<IDBPDatabase> => {
+  return openDB(DB_NAME, 1, {
+    upgrade(db) {
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME);
+      }
+    },
+  });
+};
 
 export const useAnalysisPersistence = () => {
-  const saveInProgressAnalysis = useCallback((state: InProgressState) => {
+  const saveInProgressAnalysis = useCallback(async (state: InProgressState) => {
     try {
-      // Create a lightweight version of the state for localStorage by omitting
-      // the large base64 data from drawings and inspirational images.
-      // The core analysis result is the most important part to save for session recovery.
-      const { drawings, inspirationalImages, ...lightweightState } = state;
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(lightweightState));
+      const db = await initDB();
+      // IndexedDB handles large objects (including large base64 visuals) 
+      // without the strict size limits of localStorage.
+      await db.put(STORE_NAME, state, KEY);
     } catch (error) {
-      // This catch block is important to handle the quota exceeded error gracefully.
-      // We will log it, but the app will continue to function.
-      console.error("Failed to save in-progress analysis to localStorage:", error);
+      console.error("Critical Persistence Failure: Could not save session to IndexedDB.", error);
     }
   }, []);
 
-  const loadInProgressAnalysis = useCallback((): InProgressState | null => {
+  const loadInProgressAnalysis = useCallback(async (): Promise<InProgressState | null> => {
     try {
-      const savedStateJSON = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (!savedStateJSON) {
-        return null;
-      }
-      
-      const savedState = JSON.parse(savedStateJSON);
-
-      // Rehydrate the state with empty arrays for drawings and images,
-      // as they were not saved. This ensures the app state is consistent.
-      const rehydratedState: InProgressState = {
-        ...savedState,
-        drawings: [],
-        inspirationalImages: [],
-      };
-
-      return rehydratedState;
+      const db = await initDB();
+      const savedState = await db.get(STORE_NAME, KEY);
+      return (savedState as InProgressState) || null;
     } catch (error) {
-      console.error("Failed to load in-progress analysis from localStorage:", error);
-      // If loading fails (e.g., corrupted data), clear it to prevent future errors on load.
-      try {
-        localStorage.removeItem(LOCAL_STORAGE_KEY);
-      } catch (removeError) {
-        console.error("Failed to clear corrupted localStorage data:", removeError);
-      }
+      console.error("Critical Persistence Failure: Could not load session from IndexedDB.", error);
       return null;
     }
   }, []);
 
-  const clearInProgressAnalysis = useCallback(() => {
+  const clearInProgressAnalysis = useCallback(async () => {
     try {
-      localStorage.removeItem(LOCAL_STORAGE_KEY);
+      const db = await initDB();
+      await db.delete(STORE_NAME, KEY);
     } catch (error) {
-      console.error("Failed to clear in-progress analysis from localStorage:", error);
+      console.error("Critical Persistence Failure: Could not clear session in IndexedDB.", error);
     }
   }, []);
 

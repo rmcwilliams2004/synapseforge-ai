@@ -1,3 +1,4 @@
+
 import { useState, useCallback } from 'react';
 import { generateCadData, compareCadData, parseApiError } from '../services/geminiService';
 import { Project, CadData, CadComparisonResult, LogEntry } from '../types';
@@ -16,34 +17,33 @@ export const useVersionComparer = (addLog: (level: LogEntry['level'], message: s
     const [comparisonError, setComparisonError] = useState<string | null>(null);
 
     const runComparison = useCallback(async (project: Project, newVersionIndex: number) => {
+        // Safe check for history availability
+        const history = project.history || [];
         const baseVersionIndex = newVersionIndex + 1;
-        if (!project.history[newVersionIndex] || !project.history[baseVersionIndex]) {
-            setComparisonError("Cannot compare; a base version is missing.");
+        
+        if (!history[newVersionIndex] || !history[baseVersionIndex]) {
+            setComparisonError("Insufficient history for comparison.");
             return;
         }
 
-        const newVersion = project.history[newVersionIndex];
-        const baseVersion = project.history[baseVersionIndex];
+        const newVersion = history[newVersionIndex];
+        const baseVersion = history[baseVersionIndex];
 
         setIsComparing(true);
         setComparisonError(null);
         setComparisonData(null);
-        addLog('INFO', `Starting CAD comparison between "${newVersion.commitMessage}" and "${baseVersion.commitMessage}".`);
+        addLog('INFO', `Comparing versions: "${newVersion.commitMessage}" vs "${baseVersion.commitMessage}".`);
 
         try {
             if (!newVersion.result || !baseVersion.result) {
-                throw new Error("One or both versions are missing analysis results needed to generate CAD data.");
+                throw new Error("One or both versions are missing analysis results.");
             }
             
-            // Generate CAD data for both versions in parallel
-            addLog('INFO', 'Generating CAD data for comparison...');
-            // FIX: Pass both the drawings and the result to the generateCadData function.
             const [baseCad, newCad] = await Promise.all([
                 generateCadData(baseVersion.drawings || [], baseVersion.result),
                 generateCadData(newVersion.drawings || [], newVersion.result)
             ]);
 
-            addLog('INFO', 'Comparing CAD data using AI...');
             const diff = await compareCadData(baseCad, newCad);
 
             setComparisonData({
@@ -53,12 +53,12 @@ export const useVersionComparer = (addLog: (level: LogEntry['level'], message: s
                 baseVersionCommit: baseVersion.commitMessage,
                 newVersionCommit: newVersion.commitMessage,
             });
-            addLog('INFO', 'CAD comparison successful.');
+            addLog('INFO', 'Geometric difference calculation complete.');
 
         } catch (e) {
             const errorMessage = parseApiError(e);
             setComparisonError(errorMessage);
-            addLog('ERROR', `CAD comparison failed: ${errorMessage}`);
+            addLog('ERROR', `Comparison failed: ${errorMessage}`);
         } finally {
             setIsComparing(false);
         }

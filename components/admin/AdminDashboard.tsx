@@ -1,16 +1,14 @@
+
 import React, { useState } from 'react';
-// FIX: Changed Project to ProjectIndexEntry to match the data passed from App.tsx.
 import { User, ProjectIndexEntry, LogEntry, Role } from '../../types';
 import { Sidebar } from './Sidebar';
 import { DashboardView } from './DashboardView';
 import { UserManagementView } from './UserManagementView';
 import { AnalyticsView } from './AnalyticsView';
 
-
 interface AdminDashboardProps {
     authenticatedUser: User;
     users: User[];
-    // FIX: Changed projects prop to use ProjectIndexEntry to resolve type mismatch from App.tsx.
     projects: ProjectIndexEntry[];
     logs: LogEntry[];
     onUpdateUser: (user: User) => void;
@@ -24,7 +22,6 @@ export const AdminDashboard = (props: AdminDashboardProps) => {
     );
 
     const renderActiveView = () => {
-        // Enforce role permissions. If a manager tries to access a different view, force them to analytics.
         if (props.authenticatedUser.role === Role.Manager && activeView !== 'analytics') {
             setActiveView('analytics');
             return <AnalyticsView logs={props.logs} projects={props.projects} />;

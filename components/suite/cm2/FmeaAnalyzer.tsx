@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { FmeaItem } from '../../../types';
 import { MOCK_FMEA_ITEMS } from '../../../constants';
@@ -36,7 +37,8 @@ export const FmeaAnalyzer: React.FC<FmeaAnalyzerProps> = ({ items: propItems }) 
         setLocalItems(prev => prev.map(item => {
             if (item.id === id) {
                 const updatedItem = { ...item, [field]: value };
-                if (['severity', 'occurrence', 'detection'].includes(field)) {
+                // Fix: Cast 'field' to string to satisfy Array.includes type requirement
+                if (['severity', 'occurrence', 'detection'].includes(field as string)) {
                     updatedItem.rpn = updatedItem.severity * updatedItem.occurrence * updatedItem.detection;
                 }
                 return updatedItem;

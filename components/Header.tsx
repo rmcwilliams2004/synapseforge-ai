@@ -8,11 +8,11 @@ interface HeaderProps {
     authenticatedUser: User | null;
     onLogout: () => void;
     onOpenProfile: () => void;
-    viewMode: 'app' | 'admin' | 'suite';
-    onSwitchView: (view: 'app' | 'admin' | 'suite') => void;
+    viewMode: 'app' | 'admin' | 'suite' | 'pricing' | 'account';
+    onSwitchView: (view: 'app' | 'admin' | 'suite' | 'pricing' | 'account') => void;
 }
 
-const ViewToggle = ({ mode, currentMode, onSwitch, icon, label }: { mode: 'app' | 'admin' | 'suite', currentMode: string, onSwitch: (v: any) => void, icon: React.ReactNode, label: string }) => {
+const ViewToggle = ({ mode, currentMode, onSwitch, icon, label }: { mode: 'app' | 'admin' | 'suite' | 'pricing' | 'account', currentMode: string, onSwitch: (v: any) => void, icon: React.ReactNode, label: string }) => {
     const isActive = mode === currentMode;
     return (
         <button
@@ -46,7 +46,6 @@ export const Header = ({ onStartTour, onOpenUserManual, authenticatedUser, onLog
     const handleSelectKey = async () => {
         if (typeof (window as any).aistudio !== 'undefined') {
             await (window as any).aistudio.openSelectKey();
-            // Assume success as per race condition mitigation rule
             setHasKey(true);
         }
     };
@@ -73,8 +72,10 @@ export const Header = ({ onStartTour, onOpenUserManual, authenticatedUser, onLog
         switch(viewMode) {
             case 'admin': return 'Administration Dashboard';
             case 'suite': return 'Engineering Tool Suite';
+            case 'pricing': return 'Sovereign Licensing';
+            case 'account': return 'Identity Settings';
             case 'app':
-            default: return 'Reverse Engineering & Analysis Workspace';
+            default: return 'Reverse Engineering Workspace';
         }
     }
 
@@ -90,25 +91,23 @@ export const Header = ({ onStartTour, onOpenUserManual, authenticatedUser, onLog
             <circle cx="12" cy="12" r="3.5" fill="currentColor"/>
           </svg>
           <div>
-            <h1 className="text-2xl font-black text-gray-900 dark:text-brand-light tracking-tight leading-none">
-              Synapse<span className="text-brand-cyan">Forge</span> AI
+            <h1 className="text-2xl font-black text-gray-900 dark:text-brand-light tracking-tight leading-none italic">
+              SYNAPSE<span className="text-brand-cyan">FORGE</span>
             </h1>
-            <p className="text-[10px] uppercase tracking-widest text-gray-400 dark:text-gray-500 font-bold mt-1">{getSubtitle()}</p>
+            <p className="text-[10px] uppercase tracking-[0.2em] text-gray-400 dark:text-gray-500 font-bold mt-1">{getSubtitle()}</p>
           </div>
         </div>
 
-        {/* Dynamic View Switcher with Pill Indicator */}
         <div className="flex items-center gap-1 p-1 bg-gray-100/50 dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700 relative">
-            {/* Active Highlight Pill */}
             <div className={`absolute top-1 left-1 bottom-1 w-[calc(33.333%-2.666px)] bg-brand-cyan rounded-lg shadow-lg transition-transform duration-300 ease-out z-0 ${
-                viewMode === 'app' ? 'translate-x-0' : 
+                viewMode === 'app' || viewMode === 'pricing' || viewMode === 'account' ? 'translate-x-0' : 
                 viewMode === 'suite' ? 'translate-x-full' : 
                 'translate-x-[200%]'
             }`} />
 
             <ViewToggle 
                 mode="app" 
-                currentMode={viewMode} 
+                currentMode={viewMode === 'pricing' || viewMode === 'account' ? 'app' : viewMode} 
                 onSwitch={onSwitchView} 
                 label="Workspace"
                 icon={<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" /></svg>}
@@ -160,24 +159,29 @@ export const Header = ({ onStartTour, onOpenUserManual, authenticatedUser, onLog
 
             <div className="relative" ref={profileRef}>
                 <button onClick={() => setIsProfileOpen(!isProfileOpen)} className="flex items-center gap-2.5 p-1 pr-2.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-all border border-transparent hover:border-gray-200 dark:hover:border-gray-700">
-                    <img src={authenticatedUser.picture} alt={authenticatedUser.name} className="w-8 h-8 rounded-full border-2 border-brand-cyan" />
+                    <img src={authenticatedUser.picture} alt={authenticatedUser.name} className="w-8 h-8 rounded-full border-2 border-brand-cyan shadow-[0_0_10px_rgba(6,182,212,0.3)]" />
                     <span className="hidden sm:inline font-bold text-gray-700 dark:text-brand-light text-sm">{authenticatedUser.name.split(' ')[0]}</span>
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className={`w-3.5 h-3.5 text-gray-400 transition-transform ${isProfileOpen ? 'rotate-180' : ''}`}><path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
                 </button>
                 {isProfileOpen && (
                     <div className="absolute right-0 mt-3 w-56 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in origin-top-right">
                         <div className="px-4 py-3 bg-gray-50 dark:bg-gray-700/30 border-b border-gray-200 dark:border-gray-700">
-                            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Account</p>
-                            <p className="text-sm font-bold text-gray-800 dark:text-white truncate">{authenticatedUser.email}</p>
+                            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Vault Status</p>
+                            <p className="text-sm font-bold text-gray-800 dark:text-white truncate">{authenticatedUser.subscriptionStatus}</p>
                         </div>
                         <div className="p-1">
                             <button onClick={() => { onOpenProfile(); setIsProfileOpen(false); }} className="flex items-center gap-3 w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-brand-cyan hover:text-white rounded-lg transition-colors">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" /></svg>
-                                Profile Details
+                                Identity Settings
                             </button>
+                            <button onClick={() => { onSwitchView('pricing'); setIsProfileOpen(false); }} className="flex items-center gap-3 w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-brand-cyan hover:text-white rounded-lg transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                                Manage Licensing
+                            </button>
+                            <div className="border-t border-gray-100 dark:border-gray-700 my-1" />
                             <button onClick={onLogout} className="flex items-center gap-3 w-full text-left px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" /></svg>
-                                Sign Out
+                                Secure Log Out
                             </button>
                         </div>
                     </div>

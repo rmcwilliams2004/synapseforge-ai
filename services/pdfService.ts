@@ -1,4 +1,4 @@
-import { AnalysisResult, GeneratedDrawing, GeneratedImage, Project } from '../types';
+import { AnalysisResult, GeneratedDrawing, GeneratedImage, Project, InnovationCertificate, User } from '../types';
 
 // This is a global variable from the script tag in index.html
 declare const jspdf: any;
@@ -20,6 +20,84 @@ const addHeaderFooter = (doc: any, projectName: string, pageNumber: number, tota
     // Line above footer
     doc.setDrawColor(200);
     doc.line(15, pageHeight - 15, pageWidth - 15, pageHeight - 15);
+};
+
+export const generateInnovationCertificatePDF = (cert: InnovationCertificate, project: Project) => {
+    const doc = new jsPDF({ orientation: 'l', unit: 'mm', format: 'a4' });
+    const pageWidth = doc.internal.pageSize.width;
+    const pageHeight = doc.internal.pageSize.height;
+
+    // --- Background/Border ---
+    doc.setDrawColor(6, 182, 212); // brand-cyan
+    doc.setLineWidth(2);
+    doc.rect(10, 10, pageWidth - 20, pageHeight - 20);
+    doc.setLineWidth(0.5);
+    doc.rect(12, 12, pageWidth - 24, pageHeight - 24);
+
+    // --- Content ---
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(32);
+    doc.setTextColor(15, 23, 42); // brand-dark
+    doc.text('CERTIFICATE OF INNOVATION', pageWidth / 2, 40, { align: 'center' });
+
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100);
+    doc.text('This document verifies the recorded authorship and intellectual property status of:', pageWidth / 2, 55, { align: 'center' });
+
+    doc.setFontSize(24);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(6, 182, 212);
+    doc.text(project.name, pageWidth / 2, 70, { align: 'center' });
+
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(60);
+    doc.text('LEGALLY ATTRIBUTED TO', pageWidth / 2, 85, { align: 'center' });
+    
+    doc.setFontSize(22);
+    doc.setFont('times', 'italic');
+    doc.setTextColor(15, 23, 42);
+    doc.text(cert.legalOwner, pageWidth / 2, 98, { align: 'center' });
+
+    // --- Metadata Row ---
+    doc.setDrawColor(200);
+    doc.line(40, 110, pageWidth - 40, 110);
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(120);
+    doc.text('TIMESTAMP', 50, 120);
+    doc.text('INNOVATION TYPE', pageWidth / 2, 120, { align: 'center' });
+    doc.text('LEDGER ID', pageWidth - 50, 120, { align: 'right' });
+
+    doc.setFont('courier', 'normal');
+    doc.setTextColor(40);
+    doc.text(new Date(cert.timestamp).toLocaleString(), 50, 128);
+    doc.text(cert.innovationType, pageWidth / 2, 128, { align: 'center' });
+    doc.text(cert.id, pageWidth - 50, 128, { align: 'right' });
+
+    // --- SHA-256 Hash ---
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(120);
+    doc.text('VERIFICATION HASH (SHA-256)', pageWidth / 2, 145, { align: 'center' });
+    doc.setFont('courier', 'normal');
+    doc.setFontSize(8);
+    doc.text(cert.hash, pageWidth / 2, 152, { align: 'center' });
+
+    // --- Footer ---
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(9);
+    doc.setTextColor(150);
+    doc.text('SynapseForge AI acts as a facilitating registrar for IP documentation. Richard McWilliams Consulting LLC claims no ownership over user creations.', pageWidth / 2, 180, { align: 'center' });
+    
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(6, 182, 212);
+    doc.text('PROPRIETARY INTELLECTUAL PROPERTY', pageWidth / 2, 190, { align: 'center' });
+
+    doc.save(`Innovation_Certificate_${project.name.replace(/\s+/g, '_')}.pdf`);
 };
 
 export const exportFullReportPDF = (project: Project, drawings: GeneratedDrawing[], inspirationalImages: GeneratedImage[]) => {
@@ -97,8 +175,6 @@ export const exportFullReportPDF = (project: Project, drawings: GeneratedDrawing
 
     if (coverImage) {
         try {
-            // FIX: Safely handle aspect ratio for both GeneratedDrawing (no aspectRatio property)
-            // and GeneratedImage (has aspectRatio property).
             let aspect;
             if ('aspectRatio' in coverImage && coverImage.aspectRatio) {
                 switch (coverImage.aspectRatio) {
@@ -109,7 +185,6 @@ export const exportFullReportPDF = (project: Project, drawings: GeneratedDrawing
                     case '16:9': default: aspect = 16 / 9; break;
                 }
             } else {
-                // GeneratedDrawing is assumed to be 16:9
                 aspect = 16 / 9;
             }
             const imgWidth = 160;
@@ -204,7 +279,6 @@ export const exportFullReportPDF = (project: Project, drawings: GeneratedDrawing
         addText(`Rationale: ${sys.rationale}`);
     });
     
-    // --- New Documentation Suite ---
     addSectionTitle('Requirement Specification');
     addText(result.requirementSpecification.introduction);
     addSubTitle('Functional Requirements');
@@ -306,7 +380,7 @@ export const exportFullReportPDF = (project: Project, drawings: GeneratedDrawing
         checkPageBreak(20);
         addSectionTitle('Visual Documentation: Technical Drawings');
         drawingsToInclude.forEach((drawing, index) => {
-            if (y > 40) { // Add page break if there isn't enough space for a new drawing
+            if (y > 40) { 
                 doc.addPage();
                 y = 20;
             }
@@ -348,19 +422,13 @@ export const exportFullReportPDF = (project: Project, drawings: GeneratedDrawing
         });
     }
     
-    // Add headers and footers to all content pages
     const pageCount = doc.internal.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
-        if (i > 1) { // Don't add header/footer to title page
+        if (i > 1) { 
             addHeaderFooter(doc, projectName, i - 1, pageCount - 1);
         }
     }
     
     doc.save(`${projectName.replace(/\s/g, '_')}_Analysis_Report.pdf`);
 };
-
-// Placeholder for individual exports if they are re-added
-export const exportCostEstimatePDF = (result: AnalysisResult, projectName: string) => { /* ... */ };
-export const exportRiskAssessmentPDF = (result: AnalysisResult, projectName: string) => { /* ... */ };
-export const exportDrawingSpecPDF = (result: AnalysisResult, projectName: string) => { /* ... */ };

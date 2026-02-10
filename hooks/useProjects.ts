@@ -1,6 +1,6 @@
 
-import { useState, useEffect, useCallback } from 'react';
-import { Project, ProjectVersion, FactionId, ProjectIndexEntry, GeneratedImage, AnalysisResult, IngestedDocument } from '../types';
+import { useState, useCallback } from 'react';
+import { Project, ProjectVersion, FactionId, ProjectIndexEntry, AnalysisResult, IngestedDocument } from '../types';
 
 const getProjectKeywords = (projectHistory: ProjectVersion[]): string => {
     const keywords: (string | undefined)[] = [];
@@ -13,13 +13,10 @@ const getProjectKeywords = (projectHistory: ProjectVersion[]): string => {
             ...(result.material_suggestions || []).flatMap(m => [m.name, m.rationale]),
             ...(result.manufacturing_analysis || []).flatMap(m => [m.name, m.description]),
             ...(result.suggested_systems || []).flatMap(s => [s.name, s.description, s.rationale]),
-            ...(result.complianceAndSafety?.safety_risks || []).flatMap(r => [r.risk, r.mitigation]),
-            ...(result.billOfMaterials || []).flatMap(b => [b.name, b.material, b.description]),
         );
     });
     return keywords.filter(Boolean).join(' ').toLowerCase();
 };
-
 
 const createNewProject = (details: {name: string; description: string; tags: string[]}, initialVersionData?: { prompt?: string; factionId?: FactionId; result?: AnalysisResult | null; fileUrls?: string[] }): Project => {
     const timestamp = new Date().toISOString();
@@ -49,77 +46,62 @@ const createNewProject = (details: {name: string; description: string; tags: str
 };
 
 export const useProjects = () => {
-    const [projects, setProjects] = useState<ProjectIndexEntry[]>([]);
+    // Index for the sidebar/list
+    const [projectsIndex, setProjectsIndex] = useState<ProjectIndexEntry[]>([]);
+    // Full project data storage (simulated DB)
+    const [fullProjectStore, setFullProjectStore] = useState<Map<string, Project>>(new Map());
     const [activeProject, setActiveProject] = useState<Project | null>(null);
+
+    const updateProjectInStores = useCallback((project: Project) => {
+        setFullProjectStore(prev => new Map(prev).set(project.id, project));
+        
+        const { history, inspirationalImageHistory, knowledgeBase, ...indexEntry } = project;
+        const searchKeywords = getProjectKeywords(history);
+        const newIndexEntry: ProjectIndexEntry = { ...indexEntry, searchKeywords };
+
+        setProjectsIndex(prev => {
+            const exists = prev.some(p => p.id === project.id);
+            if (exists) {
+                return prev.map(p => p.id === project.id ? newIndexEntry : p);
+            }
+            return [newIndexEntry, ...prev];
+        });
+
+        // Always update active project if it matches
+        setActiveProject(prev => prev?.id === project.id ? project : prev);
+    }, []);
 
     const onNewProject = (details: {name: string; description: string; tags: string[]}, initialVersionData?: { prompt?: string; factionId?: FactionId; result?: AnalysisResult | null; fileUrls?: string[] }): string => {
         const newProject = createNewProject(details, initialVersionData);
-        
-        const { history, ...indexEntry } = newProject;
-        const newIndexEntry: ProjectIndexEntry = { ...indexEntry, searchKeywords: '' };
-
-        setProjects(prev => [newIndexEntry, ...prev]);
+        updateProjectInStores(newProject);
         setActiveProject(newProject);
         return newProject.id;
     };
     
     const loadProject = useCallback((project: Project) => {
+        updateProjectInStores(project);
         setActiveProject(project);
-        
-        const { history, ...indexEntry } = project;
-        const searchKeywords = getProjectKeywords(history);
-        const newIndexEntry: ProjectIndexEntry = { ...indexEntry, searchKeywords };
-
-        setProjects(prev => {
-            if (prev.some(p => p.id === newIndexEntry.id)) {
-                return prev.map(p => p.id === newIndexEntry.id ? newIndexEntry : p);
-            }
-            return [newIndexEntry, ...prev];
-        });
-    }, []);
+    }, [updateProjectInStores]);
 
     const onDeleteProject = (projectId: string) => {
-        setProjects(prev => prev.filter(p => p.id !== projectId));
+        setFullProjectStore(prev => {
+            const next = new Map(prev);
+            next.delete(projectId);
+            return next;
+        });
+        setProjectsIndex(prev => prev.filter(p => p.id !== projectId));
 
         if (activeProject?.id === projectId) {
-            if (projects.length > 1) {
-                const nextProjectIndex = projects.findIndex(p => p.id !== projectId);
-                const nextProject = projects[nextProjectIndex];
-                setActiveProject(nextProject ? { ...nextProject, history: [] } : null);
-            } else {
-                setActiveProject(null);
-            }
+            setActiveProject(null);
         }
     };
     
     const onSelectProject = (projectId: string) => {
-        if (activeProject?.id !== projectId) {
-             const projectIndex = projects.find(p => p.id === projectId);
-             if (projectIndex) {
-                 setActiveProject({ ...projectIndex, history: [] });
-                 console.warn("To view the full history of another project, please open its file.");
-             }
+        const fullProject = fullProjectStore.get(projectId);
+        if (fullProject) {
+            setActiveProject(fullProject);
         }
     };
-    
-    const updateProjectAndIndex = useCallback((updatedProject: Project) => {
-        setActiveProject(updatedProject);
-
-        const { history, ...indexData } = updatedProject;
-        const searchKeywords = getProjectKeywords(history);
-        const newIndexEntry: ProjectIndexEntry = { ...indexData, searchKeywords };
-
-        setProjects(prev => {
-            const updatedIndex = prev.map(p => p.id === updatedProject.id ? newIndexEntry : p)
-            const projectIndex = updatedIndex.findIndex(p => p.id === updatedProject.id);
-            if (projectIndex > 0) {
-                const [item] = updatedIndex.splice(projectIndex, 1);
-                updatedIndex.unshift(item);
-            }
-            return updatedIndex;
-        });
-    }, []);
-    
 
     const saveNewVersion = useCallback((versionData: Omit<ProjectVersion, 'versionId' | 'createdAt' | 'commitMessage'>, commitMessage: string) => {
         if (!activeProject) return;
@@ -130,12 +112,6 @@ export const useProjects = () => {
             commitMessage,
             versionId: `ver-${Date.now()}`,
             createdAt: timestamp,
-            drawings: versionData.drawings ? JSON.parse(JSON.stringify(versionData.drawings)) : [],
-            inspirationalImages: versionData.inspirationalImages ? JSON.parse(JSON.stringify(versionData.inspirationalImages)) : [],
-            fileUrls: [...(versionData.fileUrls || [])],
-            incorporatedSuggestions: [...(versionData.incorporatedSuggestions || [])],
-            result: versionData.result ? JSON.parse(JSON.stringify(versionData.result)) : null,
-            rotorModel: versionData.rotorModel ? JSON.parse(JSON.stringify(versionData.rotorModel)) : undefined,
         };
 
         const updatedProject: Project = {
@@ -143,9 +119,8 @@ export const useProjects = () => {
             updatedAt: timestamp,
             history: [newVersion, ...activeProject.history],
         };
-        updateProjectAndIndex(updatedProject);
-
-    }, [activeProject, updateProjectAndIndex]);
+        updateProjectInStores(updatedProject);
+    }, [activeProject, updateProjectInStores]);
     
     const updateVersion = useCallback((versionId: string, updates: Partial<ProjectVersion>) => {
         if (!activeProject) return;
@@ -154,9 +129,8 @@ export const useProjects = () => {
             v.versionId === versionId ? { ...v, ...updates } : v
         );
         const updatedProject = { ...activeProject, history: newHistory };
-        setActiveProject(updatedProject);
-
-    }, [activeProject]);
+        updateProjectInStores(updatedProject);
+    }, [activeProject, updateProjectInStores]);
 
     const revertToVersion = useCallback((versionIndex: number) => {
         if (!activeProject || !activeProject.history[versionIndex]) return;
@@ -169,12 +143,6 @@ export const useProjects = () => {
             versionId: `ver-${Date.now()}`,
             createdAt: timestamp,
             commitMessage: `Reverted to: "${oldVersion.commitMessage}"`,
-            drawings: oldVersion.drawings ? JSON.parse(JSON.stringify(oldVersion.drawings)) : [],
-            inspirationalImages: oldVersion.inspirationalImages ? JSON.parse(JSON.stringify(oldVersion.inspirationalImages)) : [],
-            fileUrls: [...(oldVersion.fileUrls || [])],
-            incorporatedSuggestions: [...(oldVersion.incorporatedSuggestions || [])],
-            result: oldVersion.result ? JSON.parse(JSON.stringify(oldVersion.result)) : null,
-            rotorModel: oldVersion.rotorModel ? JSON.parse(JSON.stringify(oldVersion.rotorModel)) : undefined,
         };
 
         const updatedProject: Project = {
@@ -182,68 +150,45 @@ export const useProjects = () => {
             updatedAt: timestamp,
             history: [newVersion, ...activeProject.history],
         };
-        updateProjectAndIndex(updatedProject);
-
-    }, [activeProject, updateProjectAndIndex]);
+        updateProjectInStores(updatedProject);
+    }, [activeProject, updateProjectInStores]);
 
     const updateProjectDetails = useCallback((projectId: string, details: Partial<{ name: string; description: string; tags: string[] }>) => {
-         if (!activeProject || activeProject.id !== projectId) return;
+         const project = fullProjectStore.get(projectId);
+         if (!project) return;
 
          const updatedProject = {
-             ...activeProject,
+             ...project,
              ...details,
              updatedAt: new Date().toISOString()
          };
-         updateProjectAndIndex(updatedProject);
+         updateProjectInStores(updatedProject);
+    }, [fullProjectStore, updateProjectInStores]);
 
-    }, [activeProject, updateProjectAndIndex]);
-
-    const addImageToHistory = useCallback((image: GeneratedImage) => {
-        if (!activeProject) return;
-        
-        const history = activeProject.inspirationalImageHistory || [];
-        if (history.some(h => h.id === image.id)) return;
-        
-        const updatedProject = {
-            ...activeProject,
-            inspirationalImageHistory: [image, ...history]
-        };
-        updateProjectAndIndex(updatedProject);
-    }, [activeProject, updateProjectAndIndex]);
-    
-    const deleteImageFromHistory = useCallback((imageId: string) => {
-        if (!activeProject) return;
-        
-        const history = activeProject.inspirationalImageHistory || [];
-        const updatedHistory = history.filter(h => h.id !== imageId);
-        
-        const updatedProject = {
-            ...activeProject,
-            inspirationalImageHistory: updatedHistory
-        };
-        updateProjectAndIndex(updatedProject);
-    }, [activeProject, updateProjectAndIndex]);
-
+    // Added missing function to handle knowledge base ingestion
     const addIngestedDocument = useCallback((doc: IngestedDocument) => {
         if (!activeProject) return;
-        const updatedProject = {
+        const updatedProject: Project = {
             ...activeProject,
-            knowledgeBase: [doc, ...(activeProject.knowledgeBase || [])]
+            knowledgeBase: [...(activeProject.knowledgeBase || []), doc],
+            updatedAt: new Date().toISOString()
         };
-        updateProjectAndIndex(updatedProject);
-    }, [activeProject, updateProjectAndIndex]);
+        updateProjectInStores(updatedProject);
+    }, [activeProject, updateProjectInStores]);
 
+    // Added missing function to remove items from knowledge base
     const removeIngestedDocument = useCallback((docId: string) => {
         if (!activeProject) return;
-        const updatedProject = {
+        const updatedProject: Project = {
             ...activeProject,
-            knowledgeBase: (activeProject.knowledgeBase || []).filter(d => d.id !== docId)
+            knowledgeBase: (activeProject.knowledgeBase || []).filter(d => d.id !== docId),
+            updatedAt: new Date().toISOString()
         };
-        updateProjectAndIndex(updatedProject);
-    }, [activeProject, updateProjectAndIndex]);
+        updateProjectInStores(updatedProject);
+    }, [activeProject, updateProjectInStores]);
 
     return {
-        projects,
+        projects: projectsIndex,
         activeProject,
         onNewProject,
         onDeleteProject,
@@ -253,8 +198,6 @@ export const useProjects = () => {
         updateProjectDetails,
         updateVersion,
         loadProject,
-        addImageToHistory,
-        deleteImageFromHistory,
         addIngestedDocument,
         removeIngestedDocument,
     };

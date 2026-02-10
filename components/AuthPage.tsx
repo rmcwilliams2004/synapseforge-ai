@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 interface AuthPageProps {
     onGoogleAuth: () => Promise<void>;
     onDemoLogin: (userName: string) => void;
+    onSignup: (name: string, email: string) => void;
 }
 
 const GoogleIcon = () => (
@@ -16,81 +17,165 @@ const GoogleIcon = () => (
 );
 
 
-export const AuthPage = ({ onGoogleAuth, onDemoLogin }: AuthPageProps) => {
+export const AuthPage = ({ onGoogleAuth, onDemoLogin, onSignup }: AuthPageProps) => {
     const [isLoading, setIsLoading] = useState(false);
+    const [isSignup, setIsSignup] = useState(false);
+    const [email, setEmail] = useState('');
+    const [name, setName] = useState('');
+    const [isEmailFocused, setIsEmailFocused] = useState(false);
+    const [isNameFocused, setIsNameFocused] = useState(false);
     
     const handleGoogleAuth = async () => {
         setIsLoading(true);
-        await onGoogleAuth();
-        // isLoading will be implicitly false if the component unmounts on successful auth
-        setIsLoading(false);
+        try {
+            await onGoogleAuth();
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleSignupSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (email.trim() && name.trim()) {
+            onSignup(name.trim(), email.trim());
+        }
     };
 
     return (
-        <div className="min-h-screen bg-brand-dark flex flex-col items-center justify-center p-4">
-            <div className="flex items-center gap-3 mb-8">
-                <svg className="w-12 h-12 text-brand-cyan" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <div className="min-h-screen bg-brand-dark flex flex-col items-center justify-center p-4 relative overflow-hidden">
+            {/* Background elements */}
+            <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
+                <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-brand-cyan/10 blur-[120px] rounded-full"></div>
+                <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-600/10 blur-[120px] rounded-full"></div>
+            </div>
+
+            <div className="flex items-center gap-3 mb-8 z-10">
+                <svg className="w-14 h-14 text-brand-cyan drop-shadow-[0_0_15px_rgba(6,182,212,0.5)]" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M12 2L2 7l10 5 10-5-10-5z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                     <path d="M2 17l10 5 10-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                     <path d="M2 12l10 5 10-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                     <circle cx="12" cy="12" r="3" fill="currentColor"/>
                 </svg>
                 <div>
-                    <h1 className="text-4xl font-bold text-brand-light tracking-wider">
+                    <h1 className="text-5xl font-black text-brand-light tracking-wider leading-none">
                         Synapse<span className="text-brand-cyan">Forge</span> AI
                     </h1>
-                    <p className="text-sm text-gray-400 -mt-1">AI-Powered Reverse Engineering & Product Analysis</p>
+                    <p className="text-xs text-gray-500 uppercase font-black tracking-[0.3em] mt-1 ml-1">PLaaS Infrastructure v12.1</p>
                 </div>
             </div>
 
-            <div className="w-full max-w-sm bg-gray-800 border border-gray-700 rounded-lg shadow-2xl p-8 animate-fade-in">
-                <h2 className="text-2xl font-bold text-center text-brand-light mb-6">
-                    Welcome
-                </h2>
+            <div className="w-full max-w-sm bg-gray-900/40 backdrop-blur-2xl border border-gray-700/50 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] p-10 animate-fade-in z-10">
+                <div className="mb-8">
+                    <h2 className="text-3xl font-black text-brand-light tracking-tight text-center leading-none">
+                        {isSignup ? 'Join the Forge' : 'Welcome back'}
+                    </h2>
+                    <p className="text-sm text-gray-500 mt-2 text-center">
+                        {isSignup 
+                            ? 'Establish your identity and begin innovation.' 
+                            : 'Access your sovereign engineering vault.'}
+                    </p>
+                </div>
                 
-                <button
-                    onClick={handleGoogleAuth}
-                    disabled={isLoading}
-                    className="w-full flex justify-center items-center gap-3 py-3 px-4 border border-transparent rounded-md shadow-sm text-md font-medium text-gray-800 bg-white hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-white transition active:scale-95 disabled:opacity-60"
-                >
-                    {isLoading ? (
-                        <>
-                         <svg className="animate-spin h-5 w-5 text-gray-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                         </svg>
-                         Signing In...
-                        </>
-                    ) : (
-                        <>
-                        <GoogleIcon />
-                        Sign in with Google
-                        </>
-                    )}
-                </button>
+                {isSignup ? (
+                    <form onSubmit={handleSignupSubmit} className="space-y-6">
+                        <div className="relative group">
+                            <label className={`absolute left-4 transition-all duration-200 pointer-events-none ${isNameFocused || name ? 'top-[-10px] text-[10px] bg-gray-900 px-2 text-brand-cyan font-black tracking-widest uppercase' : 'top-4 text-gray-500 text-sm'}`}>
+                                Full Legal Name
+                            </label>
+                            <input 
+                                type="text" 
+                                className="w-full p-4 bg-transparent text-white rounded-xl border border-gray-700 focus:border-brand-cyan outline-none transition-all duration-300 ring-0 focus:ring-2 focus:ring-brand-cyan/20"
+                                value={name}
+                                onFocus={() => setIsNameFocused(true)}
+                                onBlur={() => setIsNameFocused(false)}
+                                onChange={(e) => setName(e.target.value)}
+                                required
+                            />
+                        </div>
+                        <div className="relative group">
+                            <label className={`absolute left-4 transition-all duration-200 pointer-events-none ${isEmailFocused || email ? 'top-[-10px] text-[10px] bg-gray-900 px-2 text-brand-cyan font-black tracking-widest uppercase' : 'top-4 text-gray-500 text-sm'}`}>
+                                Work Email
+                            </label>
+                            <input 
+                                type="email" 
+                                className="w-full p-4 bg-transparent text-white rounded-xl border border-gray-700 focus:border-brand-cyan outline-none transition-all duration-300 ring-0 focus:ring-2 focus:ring-brand-cyan/20"
+                                value={email}
+                                onFocus={() => setIsEmailFocused(true)}
+                                onBlur={() => setIsEmailFocused(false)}
+                                onChange={(e) => setEmail(e.target.value)}
+                                required
+                            />
+                        </div>
+                        <button type="submit" className="w-full bg-brand-cyan text-gray-900 font-black uppercase tracking-widest py-4 rounded-xl hover:bg-cyan-400 transition-all duration-300 transform active:scale-95 shadow-xl shadow-cyan-900/30">
+                            Create Account
+                        </button>
+                    </form>
+                ) : (
+                    <div className="space-y-4">
+                        <button
+                            onClick={handleGoogleAuth}
+                            disabled={isLoading}
+                            className="w-full flex justify-center items-center gap-3 py-4 px-4 border border-gray-700 rounded-xl shadow-sm text-md font-bold text-gray-800 bg-white hover:bg-gray-100 transition-all duration-300 active:scale-95 disabled:opacity-60"
+                        >
+                            {isLoading ? (
+                                <>
+                                <svg className="animate-spin h-5 w-5 text-gray-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Authenticating...
+                                </>
+                            ) : (
+                                <>
+                                <GoogleIcon />
+                                Sign in with Google
+                                </>
+                            )}
+                        </button>
+                    </div>
+                )}
 
-                <div className="relative my-6">
+                <div className="text-center mt-10 pt-6 border-t border-gray-800">
+                    <button 
+                        onClick={() => setIsSignup(!isSignup)} 
+                        className="text-brand-cyan text-sm font-bold hover:text-cyan-300 transition-colors"
+                    >
+                        {isSignup ? 'Already have an account? Sign In' : "Don't have an account? Join Now"}
+                    </button>
+                </div>
+
+                <div className="relative my-8">
                     <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                        <div className="w-full border-t border-gray-600" />
+                        <div className="w-full border-t border-gray-800" />
                     </div>
                     <div className="relative flex justify-center">
-                        <span className="px-2 bg-gray-800 text-sm text-gray-400">Or use a demo account</span>
+                        <span className="px-3 bg-gray-900 text-[10px] font-black uppercase tracking-[0.3em] text-gray-600">Simulated Access</span>
                     </div>
                 </div>
 
-                <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
                     <button
                         onClick={() => onDemoLogin('Alex (Admin)')}
-                        className="w-full flex justify-center items-center gap-2 py-2 px-4 border border-purple-500 rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-500 transition active:scale-95"
+                        className="flex justify-center items-center py-3 px-2 border border-purple-500/30 rounded-xl text-[10px] font-black uppercase tracking-widest text-purple-300 bg-purple-900/10 hover:bg-purple-900/20 transition-all active:scale-95"
                     >
-                        Sign in as Demo Admin
+                        Alex (Admin)
                     </button>
                      <button
                         onClick={() => onDemoLogin('Blake (Demo User)')}
-                        className="w-full flex justify-center items-center gap-2 py-2 px-4 border border-gray-600 rounded-md shadow-sm text-sm font-medium text-white bg-gray-700 hover:bg-gray-600 transition active:scale-95"
+                        className="flex justify-center items-center py-3 px-2 border border-gray-700 rounded-xl text-[10px] font-black uppercase tracking-widest text-gray-500 bg-gray-800/10 hover:bg-gray-800/20 transition-all active:scale-95"
                     >
-                        Sign in as Demo User
+                        Demo User
                     </button>
+                </div>
+            </div>
+            
+            <div className="mt-12 flex flex-col items-center gap-4 z-10">
+                <p className="text-gray-600 text-[10px] font-bold uppercase tracking-[0.3em] text-center max-w-sm leading-relaxed px-6">
+                    Identity-verified IP sovereignty enforced via AES-256 encrypted ledger.
+                </p>
+                <div className="flex gap-6 grayscale opacity-30">
+                   <img src="https://upload.wikimedia.org/wikipedia/commons/b/ba/Stripe_Logo%2C_revised_2016.svg" alt="Stripe" className="h-4" />
+                   <img src="https://upload.wikimedia.org/wikipedia/commons/c/cb/Google_Pay_Logo.svg" alt="Google Pay" className="h-4" />
                 </div>
             </div>
         </div>
