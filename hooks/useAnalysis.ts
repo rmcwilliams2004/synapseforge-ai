@@ -1,6 +1,7 @@
+
 import { useState } from 'react';
 import { generateAnalysis as performAnalysis, parseApiError } from '../services/geminiService';
-import { AnalysisResult, Faction, LogEntry, InnovatorId } from '../types';
+import { AnalysisResult, Faction, LogEntry } from '../types';
 
 const fileToGenerativePart = async (file: File) => {
   const base64 = await new Promise<string>((resolve, reject) => {
@@ -9,17 +10,10 @@ const fileToGenerativePart = async (file: File) => {
     reader.onload = () => resolve((reader.result as string).split(',')[1]);
     reader.onerror = (error) => reject(error);
   });
-
-  let mimeType = file.type;
-  // Handle video understanding model's accepted mime types
-  if (file.name.endsWith('.mp4')) mimeType = 'video/mp4';
-  if (file.name.endsWith('.webm')) mimeType = 'video/webm';
-  if (file.name.endsWith('.pdf')) mimeType = 'application/pdf';
-
   return {
     inlineData: {
       data: base64,
-      mimeType: mimeType,
+      mimeType: file.type,
     },
   };
 };
@@ -48,17 +42,15 @@ interface FileSource {
     fileUrls?: string[];
 }
 
-export const runFullAnalysis = async (
-    projectName: string, 
-    prompt: string, 
-    faction: Faction, 
-    source: FileSource, 
-    preferredInnovatorId?: InnovatorId,
-    isDeepThought: boolean = false
-): Promise<AnalysisResult> => {
+export const runFullAnalysis = async (projectName: string, prompt: string, faction: Faction, source: FileSource): Promise<AnalysisResult> => {
     const fileParts = [];
+    // Prioritize newly uploaded files over saved project files
     if (source.files.length > 0) {
       for(const file of source.files) {
+          // Allow images, PDFs (application/pdf), and videos
+          if (!file.type.startsWith('image/') && file.type !== 'application/pdf' && !file.type.startsWith('video/')) {
+              throw new Error('Only image, PDF, and video files are supported for analysis.');
+          }
           fileParts.push(await fileToGenerativePart(file));
       }
     } else if (source.fileUrls && source.fileUrls.length > 0) {
@@ -67,7 +59,7 @@ export const runFullAnalysis = async (
       }
     }
     
-    const analysisResult = await performAnalysis(projectName, prompt, faction, fileParts.length > 0 ? fileParts : null, preferredInnovatorId, isDeepThought);
+    const analysisResult = await performAnalysis(projectName, prompt, faction, fileParts.length > 0 ? fileParts : null);
     return analysisResult;
 };
 
@@ -77,20 +69,13 @@ export const useAnalysis = (addLog: (level: LogEntry['level'], message: string) 
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  const generateAnalysis = async (
-    projectName: string, 
-    prompt: string, 
-    faction: Faction, 
-    source: FileSource, 
-    preferredInnovatorId?: InnovatorId,
-    isDeepThought: boolean = false
-  ): Promise<AnalysisResult | null> => {
+  const generateAnalysis = async (projectName: string, prompt: string, faction: Faction, source: FileSource): Promise<AnalysisResult | null> => {
     setIsLoading(true);
     setError(null);
     setResult(null);
 
     try {
-      const analysisResult = await runFullAnalysis(projectName, prompt, faction, source, preferredInnovatorId, isDeepThought);
+      const analysisResult = await runFullAnalysis(projectName, prompt, faction, source);
       setResult(analysisResult);
       return analysisResult;
     } catch (e) {

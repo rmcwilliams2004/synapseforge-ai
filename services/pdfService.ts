@@ -97,9 +97,8 @@ export const exportFullReportPDF = (project: Project, drawings: GeneratedDrawing
 
     if (coverImage) {
         try {
-            // FIX: Property 'aspectRatio' does not exist on type 'GeneratedDrawing'.
-            // The cover image can be a GeneratedDrawing (no aspectRatio, defaults to 16:9) or
-            // a GeneratedImage (has aspectRatio). This logic correctly handles both cases.
+            // FIX: Safely handle aspect ratio for both GeneratedDrawing (no aspectRatio property)
+            // and GeneratedImage (has aspectRatio property).
             let aspect;
             if ('aspectRatio' in coverImage && coverImage.aspectRatio) {
                 switch (coverImage.aspectRatio) {
@@ -110,7 +109,7 @@ export const exportFullReportPDF = (project: Project, drawings: GeneratedDrawing
                     case '16:9': default: aspect = 16 / 9; break;
                 }
             } else {
-                // GeneratedDrawing is always 16:9
+                // GeneratedDrawing is assumed to be 16:9
                 aspect = 16 / 9;
             }
             const imgWidth = 160;

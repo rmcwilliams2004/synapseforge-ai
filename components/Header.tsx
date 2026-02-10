@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Role, User } from '../types';
 import { MOCK_USERS } from '../constants';
+import { ThemeToggle } from './ThemeToggle';
 
 interface HeaderProps {
     onStartTour: () => void;
@@ -8,11 +9,11 @@ interface HeaderProps {
     authenticatedUser: User | null;
     onLogout: () => void;
     onOpenProfile: () => void;
-    viewMode: 'app' | 'admin';
-    onToggleViewMode: () => void;
+    viewMode: 'app' | 'admin' | 'suite';
+    onSwitchView: (view: 'app' | 'admin' | 'suite') => void;
 }
 
-export const Header = ({ onStartTour, onOpenUserManual, authenticatedUser, onLogout, onOpenProfile, viewMode, onToggleViewMode }: HeaderProps) => {
+export const Header = ({ onStartTour, onOpenUserManual, authenticatedUser, onLogout, onOpenProfile, viewMode, onSwitchView }: HeaderProps) => {
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const profileRef = useRef<HTMLDivElement>(null);
 
@@ -28,8 +29,17 @@ export const Header = ({ onStartTour, onOpenUserManual, authenticatedUser, onLog
 
     if (!authenticatedUser) return null;
 
+    const getSubtitle = () => {
+        switch(viewMode) {
+            case 'admin': return 'Administration Dashboard';
+            case 'suite': return 'Engineering Tool Suite';
+            case 'app':
+            default: return 'AI-Powered Reverse Engineering & Product Analysis';
+        }
+    }
+
     return (
-      <header className="py-4 px-6 bg-gray-900/80 backdrop-blur-sm border-b border-gray-700 sticky top-0 z-20 flex justify-between items-center">
+      <header className="py-4 px-6 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 sticky top-0 z-20 flex justify-between items-center transition-colors duration-300">
         <div className="flex items-center gap-3">
           <svg className="w-8 h-8 text-brand-cyan" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M12 2L2 7l10 5 10-5-10-5z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -38,59 +48,72 @@ export const Header = ({ onStartTour, onOpenUserManual, authenticatedUser, onLog
             <circle cx="12" cy="12" r="3" fill="currentColor"/>
           </svg>
           <div>
-            <h1 className="text-2xl font-bold text-brand-light tracking-wider">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-brand-light tracking-wider">
               Synapse<span className="text-brand-cyan">Forge</span> AI
             </h1>
-            <p className="text-xs text-gray-400 -mt-1">{viewMode === 'app' ? 'AI-Powered Reverse Engineering & Product Analysis' : 'Administration Dashboard'}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 -mt-1">{getSubtitle()}</p>
           </div>
         </div>
         <div className="flex items-center gap-4">
            {authenticatedUser && (
                 <div className="flex items-center gap-4">
                     {[Role.Admin, Role.Manager].includes(authenticatedUser.role) && (
-                        <button
-                            onClick={onToggleViewMode}
-                            className="py-2 px-4 bg-purple-600 text-white font-semibold rounded-lg border border-purple-500 hover:bg-purple-500 transition active:scale-95 text-sm flex items-center gap-2"
-                        >
-                            {viewMode === 'app' ? (
-                                <>
+                        viewMode === 'app' ? (
+                        <>
+                            <button
+                                onClick={() => onSwitchView('suite')}
+                                className="py-2 px-4 bg-teal-600 text-white font-semibold rounded-lg border border-teal-500 hover:bg-teal-500 transition active:scale-95 text-sm flex items-center gap-2"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" /></svg>
+                                Tool Suite
+                            </button>
+                            <button
+                                onClick={() => onSwitchView('admin')}
+                                className="py-2 px-4 bg-purple-600 text-white font-semibold rounded-lg border border-purple-500 hover:bg-purple-500 transition active:scale-95 text-sm flex items-center gap-2"
+                            >
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75" /></svg>
                                 Admin Dashboard
-                                </>
-                            ) : (
-                                <>
+                            </button>
+                        </>
+                        ) : (
+                            <button
+                                onClick={() => onSwitchView('app')}
+                                className="py-2 px-4 bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-white font-semibold rounded-lg border border-gray-300 dark:border-gray-500 hover:bg-gray-300 dark:hover:bg-gray-500 transition active:scale-95 text-sm flex items-center gap-2"
+                            >
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="m15 15-6 6m0 0-6-6m6 6V9a6 6 0 0 1 12 0v3" /></svg>
                                  Back to App
-                                </>
-                            )}
-                        </button>
+                            </button>
+                        )
                     )}
+                    
+                    <ThemeToggle />
+
                    <button
                     onClick={onOpenUserManual}
-                    className="py-2 px-4 bg-gray-700 text-white font-semibold rounded-lg border border-gray-600 hover:bg-gray-600 transition active:scale-95 text-sm flex items-center gap-2"
+                    className="py-2 px-4 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white font-semibold rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-300 dark:hover:bg-gray-600 transition active:scale-95 text-sm flex items-center gap-2"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" />
                       </svg>
-                      User Manual
+                      Manual
                   </button>
                   <button
                     onClick={onStartTour}
-                    className="py-2 px-4 bg-gray-700 text-white font-semibold rounded-lg border border-gray-600 hover:bg-gray-600 transition active:scale-95 text-sm flex items-center gap-2"
+                    className="py-2 px-4 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white font-semibold rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-300 dark:hover:bg-gray-600 transition active:scale-95 text-sm flex items-center gap-2"
                   >
                       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
                           <path strokeLinecap="round" strokeLinejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
                       </svg>
                     Tour
                   </button>
-                   <div className="h-8 border-l border-gray-600"></div>
+                   <div className="h-8 border-l border-gray-300 dark:border-gray-600"></div>
 
                     {/* Presence indicator for collaboration */}
                     <div className="flex items-center -space-x-2" title="Alex, Dana and Casey are also viewing this project">
                         {MOCK_USERS.filter(u => u.id !== authenticatedUser.id && ['user-1', 'user-4', 'user-3'].includes(u.id)).map(user => (
                             <img 
                                 key={user.id}
-                                className="inline-block h-8 w-8 rounded-full ring-2 ring-gray-900"
+                                className="inline-block h-8 w-8 rounded-full ring-2 ring-white dark:ring-gray-900"
                                 src={user.picture}
                                 alt={user.name}
                             />
@@ -98,15 +121,15 @@ export const Header = ({ onStartTour, onOpenUserManual, authenticatedUser, onLog
                     </div>
 
                    <div className="relative" ref={profileRef}>
-                        <button onClick={() => setIsProfileOpen(!isProfileOpen)} className="flex items-center gap-2 text-white font-semibold transition-colors duration-200 hover:text-cyan-300">
-                            <img src={authenticatedUser.picture} alt={authenticatedUser.name} className="w-8 h-8 rounded-full border-2 border-gray-600" />
+                        <button onClick={() => setIsProfileOpen(!isProfileOpen)} className="flex items-center gap-2 text-gray-800 dark:text-white font-semibold transition-colors duration-200 hover:text-brand-cyan dark:hover:text-cyan-300">
+                            <img src={authenticatedUser.picture} alt={authenticatedUser.name} className="w-8 h-8 rounded-full border-2 border-gray-300 dark:border-gray-600" />
                             {authenticatedUser.name}
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className={`w-4 h-4 transition-transform ${isProfileOpen ? 'rotate-180' : ''}`}><path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
                         </button>
                         {isProfileOpen && (
-                            <div className="absolute right-0 mt-2 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-30 animate-fade-in" style={{animationDuration: '0.15s'}}>
-                                <button onClick={() => { onOpenProfile(); setIsProfileOpen(false); }} className="block w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700">Profile</button>
-                                <button onClick={() => { onLogout(); setIsProfileOpen(false); }} className="block w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700">Sign Out</button>
+                            <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-30 animate-fade-in" style={{animationDuration: '0.15s'}}>
+                                <button onClick={() => { onOpenProfile(); setIsProfileOpen(false); }} className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Profile</button>
+                                <button onClick={() => { onLogout(); }} className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Sign Out</button>
                             </div>
                         )}
                    </div>

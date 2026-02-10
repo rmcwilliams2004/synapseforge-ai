@@ -1,3 +1,4 @@
+
 import { Project, GeneratedDrawing, GoogleDocContent } from '../types';
 
 // Mock/Simulated Google API Service
@@ -6,6 +7,7 @@ import { Project, GeneratedDrawing, GoogleDocContent } from '../types';
 // the behavior and responses.
 
 const GOOGLE_AUTH_STORAGE_KEY = 'synapseforge_google_exporter_auth';
+const GOOGLE_DRIVE_FILES_KEY = 'synapseforge_mock_drive_files';
 
 /**
  * Simulates checking for an existing, valid auth token from sessionStorage.
@@ -139,4 +141,75 @@ export const convertAnalysisToDocContent = (project: Project, uploadedDrawings: 
     // This is a truncated example for brevity. A full implementation would map all report sections.
 
     return content;
+};
+
+// --- PROJECT PERSISTENCE (MOCK DRIVE) ---
+
+interface DriveFile {
+    id: string;
+    name: string;
+    modifiedTime: string;
+    content: string; // JSON string of the project
+}
+
+const getMockDriveFiles = (): DriveFile[] => {
+    const stored = localStorage.getItem(GOOGLE_DRIVE_FILES_KEY);
+    return stored ? JSON.parse(stored) : [];
+};
+
+const saveMockDriveFiles = (files: DriveFile[]) => {
+    localStorage.setItem(GOOGLE_DRIVE_FILES_KEY, JSON.stringify(files));
+};
+
+export const saveProjectToDrive = async (project: Project): Promise<string> => {
+    console.log(`(Simulated) Saving project "${project.name}" to Google Drive`);
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network delay
+
+    const files = getMockDriveFiles();
+    const existingIndex = files.findIndex(f => f.id === project.id); // Use project ID as file ID for simplicity in mock
+    
+    const fileEntry: DriveFile = {
+        id: project.id, // Persist ID
+        name: `${project.name}.sfp.json`,
+        modifiedTime: new Date().toISOString(),
+        content: JSON.stringify(project),
+    };
+
+    if (existingIndex >= 0) {
+        files[existingIndex] = fileEntry;
+    } else {
+        files.push(fileEntry);
+    }
+
+    saveMockDriveFiles(files);
+    return fileEntry.id;
+};
+
+export const listProjectFiles = async (): Promise<{ id: string, name: string, modifiedTime: string }[]> => {
+    console.log(`(Simulated) Listing project files from Google Drive`);
+    await new Promise(resolve => setTimeout(resolve, 800));
+    
+    const files = getMockDriveFiles();
+    // Filter for .sfp.json files (simulating a mimetype filter)
+    return files
+        .filter(f => f.name.endsWith('.sfp.json'))
+        .map(({ id, name, modifiedTime }) => ({ id, name, modifiedTime }));
+};
+
+export const downloadProjectFile = async (fileId: string): Promise<Project> => {
+    console.log(`(Simulated) Downloading file "${fileId}" from Google Drive`);
+    await new Promise(resolve => setTimeout(resolve, 1200));
+
+    const files = getMockDriveFiles();
+    const file = files.find(f => f.id === fileId);
+
+    if (!file) {
+        throw new Error("File not found in simulated Drive.");
+    }
+
+    try {
+        return JSON.parse(file.content) as Project;
+    } catch (e) {
+        throw new Error("Failed to parse project file.");
+    }
 };

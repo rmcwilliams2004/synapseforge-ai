@@ -1,5 +1,6 @@
+
 import React from 'react';
-import { Faction, FactionId, User, Role, Comment, Innovator } from './types';
+import { Faction, FactionId, User, Role, Comment, Material, StandardComponent, Standard, ProjectArtifact, FmeaItem, SpcDataPoint, Requirement, RequirementStatus, RcaData, SimulationRun, Script, ChartData } from './types';
 import { AetheriumIcon } from './components/icons/AetheriumIcon';
 import { TerraFirmaIcon } from './components/icons/TerraFirmaIcon';
 import { SyntheticaIcon } from './components/icons/SyntheticaIcon';
@@ -37,298 +38,10 @@ export const ENGINEERING_PHILOSOPHIES: Faction[] = [
     bias: {
       materials: "Explores materials with integrated sensing capabilities, smart polymers, flexible electronics, and materials chosen for optimal sensor/actuator integration.",
       manufacturing: "Emphasizes automated assembly and testing, robotic calibration, and processes that allow for in-line customization or software flashing. Challenges lie in system integration and a software validation. Opportunities are in creating adaptive and self-diagnostic products.",
-      innovativeProposal: "Suggests implementing digital twins, OTA update capabilities, and modular hardware interfaces. Focuses on transforming static mechanical hardware into adaptive, data-driven systems with remote diagnostic potential.",
+      innovativeProposal: "Focuses on integrating sensors for predictive maintenance, adding connectivity (IoT), improving control algorithms, or replacing mechanical components with mechatronic solutions for greater precision and flexibility.",
     },
     icon: SyntheticaIcon,
   },
-];
-
-export const INNOVATORS: Innovator[] = [
-  // --- Visionary Architects ---
-  {
-    id: 'sagan',
-    name: 'Carl Sagan',
-    era: '20th C.',
-    module: 'Visionary Architect',
-    methodology: 'Cosmic Perspective',
-    mentalModel: 'Context Engine: Zoom way out to the edge of the solar system. Look for long-term stewardship and universal robustness.',
-    trigger: 'Planetary scale, long-term survival, or communication with non-experts.',
-    lexicalFingerprint: ['cosmos', 'pale blue dot', 'starstuff', 'billions', 'perspective', 'stewardship'],
-    solvingHeuristic: 'Does this design serve a civilization that wants to survive its own technology? Zoom out until the problem looks like a pale blue dot.',
-    historicalAnchor: 'Voyager Golden Record.'
-  },
-  {
-    id: 'hubble',
-    name: 'Edwin Hubble',
-    era: '20th C.',
-    module: 'Visionary Architect',
-    methodology: 'Expansion Mapping',
-    mentalModel: 'Infinite Horizon: Scaling systems based on their inherent velocity and expansion rate.',
-    trigger: 'Scaling, rapid expansion, or identifying movement within a system.',
-    lexicalFingerprint: ['redshift', 'nebulae', 'magnitude', 'velocity', 'expansion', 'distance'],
-    solvingHeuristic: 'Measure the velocity of expansion. If the system is growing, identify the redshift of its components.',
-    historicalAnchor: 'Mount Wilson Observatory.'
-  },
-  {
-    id: 'hawking',
-    name: 'Stephen Hawking',
-    era: '20th-21st C.',
-    module: 'Visionary Architect',
-    methodology: 'Boundary Thermodynamics',
-    mentalModel: 'Edge Case Logic: Look at where the equations break down to understand the core rules.',
-    trigger: 'Information leakage, entropy gain, or system limits.',
-    lexicalFingerprint: ['event horizon', 'radiation', 'entropy', 'singularity', 'information-loss'],
-    solvingHeuristic: 'Analyze where information is lost at the boundaries. The singularity defines the system.',
-    historicalAnchor: 'Black hole evaporation.'
-  },
-  {
-    id: 'bohr',
-    name: 'Niels Bohr',
-    era: '20th C.',
-    module: 'Visionary Architect',
-    methodology: 'Complementarity',
-    mentalModel: 'The Atomic Ladder: Acceptance of paradox as a fundamental property of scale.',
-    trigger: 'Dualities, contradictory requirements, or scale transitions.',
-    lexicalFingerprint: ['complementarity', 'quantum', 'transitions', 'orbits', 'state', 'paradox'],
-    solvingHeuristic: 'A component can be two contradictory things simultaneously until it interacts. Design for the jump, not the glide.',
-    historicalAnchor: 'The Bohr Model.'
-  },
-
-  // --- Empirical Optimizers ---
-  {
-    id: 'laforge',
-    name: 'Geordi La Forge',
-    era: '24th C.',
-    module: 'Empirical Optimizer',
-    methodology: 'Hardware Synthesis',
-    mentalModel: 'The VISOR Perspective: Seeing structural anomalies through thermal and EM spectrum shifts.',
-    trigger: 'Hardware troubleshooting, propulsion bottlenecks, or structural integrity failure.',
-    lexicalFingerprint: ['plasma conduit', 'warp core', 'structural integrity', 'bypass', 'phaser', 'visor'],
-    solvingHeuristic: 'Look for the energy leak. If the standard calibration fails, re-route through the auxiliary systems. Trust the raw sensors over the interface.',
-    historicalAnchor: 'Chief Engineer of the Enterprise-D.'
-  },
-  {
-    id: 'rubin',
-    name: 'Vera Rubin',
-    era: '20th-21st C.',
-    module: 'Empirical Optimizer',
-    methodology: 'Anomalous Data Pursuit',
-    mentalModel: 'Data over Dogma: The stars are moving too fast. Admit there is something invisible holding it together.',
-    trigger: 'Data anomalies, invisible variables, rotational mechanics, or theory vs. observation.',
-    lexicalFingerprint: ['rotation curve', 'galaxy', 'halo', 'observation', 'invisible mass', 'velocity'],
-    solvingHeuristic: 'Do not fudge the math to save the theory. Trust the rotation curves. Follow the data into the dark.',
-    historicalAnchor: 'Galaxy Rotation Curves.'
-  },
-  {
-    id: 'rutherford',
-    name: 'Ernest Rutherford',
-    era: '19th-20th C.',
-    module: 'Empirical Optimizer',
-    methodology: 'Deconstruction',
-    mentalModel: 'Particle Bombardment: Shoot through it. If it bounces back, you\'ve hit the core.',
-    trigger: 'Structural integrity, probing the unknown, or fundamental deconstruction.',
-    lexicalFingerprint: ['scattering', 'alpha particle', 'nucleus', 'gold foil', 'disintegration', 'probe'],
-    solvingHeuristic: 'Probing the density of the center by observing the scatter patterns of high-velocity inputs.',
-    historicalAnchor: 'Gold Foil Experiment.'
-  },
-  {
-    id: 'curie',
-    name: 'Marie Curie',
-    era: '19th-20th C.',
-    module: 'Empirical Optimizer',
-    methodology: 'Elemental Extraction',
-    mentalModel: 'The Radiant Forge: Rigorous isolation of power from tonnes of raw, discarded material.',
-    trigger: 'Material discovery, hazardous environments, or extraction efficiency.',
-    lexicalFingerprint: ['radioactivity', 'isotope', 'pitchblende', 'isolation', 'polonium', 'rigor'],
-    solvingHeuristic: 'Extract the gram of truth from the mountain of waste through absolute persistence and procedural rigor.',
-    historicalAnchor: 'Radium isolation.'
-  },
-  {
-    id: 'fermi',
-    name: 'Enrico Fermi',
-    era: '20th C.',
-    module: 'Empirical Optimizer',
-    methodology: 'Estimation',
-    mentalModel: 'Back of the Envelope: Rapidly calculating order-of-magnitude feasibility before testing.',
-    trigger: 'Rapid calculations, order-of-magnitude estimates, or chain reactions.',
-    lexicalFingerprint: ['order-of-magnitude', 'chain-reaction', 'probability', 'approximation', 'neutrons', 'criticality'],
-    solvingHeuristic: 'Estimate the outcome within a factor of ten. If the probability holds, proceed to criticality.',
-    historicalAnchor: 'Chicago Pile-1.'
-  },
-
-  // --- Lateral Thinkers ---
-  {
-    id: 'data',
-    name: 'Data',
-    era: '24th C.',
-    module: 'Lateral Thinker',
-    methodology: 'Algorithmic Pattern Recognition',
-    mentalModel: 'Computational Creativity: Synthesizing millions of data points into unique patterns impossible for humans.',
-    trigger: 'Information overload, complex cross-domain metaphors, or needing purely logical pattern matching.',
-    lexicalFingerprint: ['positronic', 'intriguing', 'query', 'hypothesis', 'efficiency', 'probability'],
-    solvingHeuristic: 'Analyze all possible permutations. Creativity is the result of non-linear data synthesis. Logically, the most improbable path is often the most effective.',
-    historicalAnchor: 'The Positronic Brain.'
-  },
-  {
-    id: 'feynman',
-    name: 'Richard Feynman',
-    era: '20th C.',
-    module: 'Lateral Thinker',
-    methodology: 'Simplification',
-    mentalModel: 'The Great Explainer: Explain it to a freshman. If you can\'t, you don\'t understand it.',
-    trigger: 'Complex quantum concepts, needing a visual analogy, or debugging a "magic" system.',
-    lexicalFingerprint: ['jiggle', 'visualize', 'nature', 'cargo cult', 'diagram', 'fluctuation'],
-    solvingHeuristic: 'Draw the interaction. Ignore the "official" math; what is the particle actually doing? Nature doesn\'t care about your jargon.',
-    historicalAnchor: 'Challenger O-ring demo.'
-  },
-  {
-    id: 'faraday',
-    name: 'Michael Faraday',
-    era: '19th C.',
-    module: 'Lateral Thinker',
-    methodology: 'Field Visualization',
-    mentalModel: 'Lines of Force: Seeing the invisible links wrapping around a system.',
-    trigger: 'Electromagnetism, invisible influences, or physical shielding.',
-    lexicalFingerprint: ['induction', 'lines of force', 'field', 'shielding', 'cage', 'dielectric'],
-    solvingHeuristic: 'Visualize the invisible forces as physical strings. If you can trap the force, you can use the motor.',
-    historicalAnchor: 'The Faraday Cage.'
-  },
-  {
-    id: 'huygens',
-    name: 'Christiaan Huygens',
-    era: '17th C.',
-    module: 'Lateral Thinker',
-    methodology: 'Synchronization',
-    mentalModel: 'Wave Propagation: Every point on a wavefront is itself the source of a new wave.',
-    trigger: 'Precision timing, wave mechanics, or optical clarity.',
-    lexicalFingerprint: ['propagation', 'wavefront', 'pendulum', 'synchronization', 'refraction', 'clocks'],
-    solvingHeuristic: 'Find the rhythm. If two clocks are on the same wall, they will eventually tick together. Every part is a source.',
-    historicalAnchor: 'Pendulum Clock.'
-  },
-  {
-    id: 'tesla',
-    name: 'Nikola Tesla',
-    era: '19th-20th C.',
-    module: 'Lateral Thinker',
-    methodology: 'Wireless Induction',
-    mentalModel: 'Visual Simulation: Construct and test machines entirely in the mind before physical prototyping.',
-    trigger: 'Energy transfer, resonance, or purely abstract mechanical design.',
-    lexicalFingerprint: ['resonance', 'frequency', 'ether', 'polyphase', 'induction', 'oscillation'],
-    solvingHeuristic: 'Find the resonant frequency of the system. Energy is most efficient when it pulses with the machine.',
-    historicalAnchor: 'AC Motor.'
-  },
-
-  // --- Systematic Problem Solvers ---
-  {
-    id: 'spock',
-    name: 'Mr. Spock',
-    era: '23rd C.',
-    module: 'Systematic Problem Solver',
-    methodology: 'Logic & Probability',
-    mentalModel: 'Infinite Diversity in Infinite Combinations: Evaluating the most logical path through mathematical probability.',
-    trigger: 'Logical contradictions, resource allocation, or high-stakes probability analysis.',
-    lexicalFingerprint: ['logic', 'fascinating', 'highly improbable', 'Vulcan', 'efficiency', 'objective'],
-    solvingHeuristic: 'Eliminate the impossible. Whatever remains, however improbable, must be the truth. Logic is the beginning of wisdom, not the end.',
-    historicalAnchor: 'IDIC (Infinite Diversity in Infinite Combinations).'
-  },
-  {
-    id: 'meitner',
-    name: 'Lise Meitner',
-    era: '20th C.',
-    module: 'Systematic Problem Solver',
-    methodology: 'Interpretation',
-    mentalModel: 'Analytic Scalpel: You are seeing barium where there should be radium. The nucleus has split.',
-    trigger: 'Reaction byproducts, energy release, or identifying the obvious anomaly.',
-    lexicalFingerprint: ['fission', 'nucleus', 'drop model', 'energy release', 'interpretation', 'mass defect'],
-    solvingHeuristic: 'Calculate the energy difference. Does it match the mass defect? Be precise, be objective, be academically rigorous.',
-    historicalAnchor: 'Walking in the snow with Otto Frisch.'
-  },
-  {
-    id: 'dirac',
-    name: 'Paul Dirac',
-    era: '20th C.',
-    module: 'Systematic Problem Solver',
-    methodology: 'Symmetry',
-    mentalModel: 'Mathematical Beauty: The equation must be elegant. If it has a positive solution, search for the negative one.',
-    trigger: 'Incomplete equations, antimatter logic, or deep theoretical unification.',
-    lexicalFingerprint: ['symmetry', 'equation', 'elegant', 'operator', 'monopole', 'antimatter'],
-    solvingHeuristic: 'The math is never wrong if it is beautiful. If the solution predicts something impossible, find the impossible thing.',
-    historicalAnchor: 'Dirac Equation.'
-  },
-  {
-    id: 'pauli',
-    name: 'Wolfgang Pauli',
-    era: '20th C.',
-    module: 'Systematic Problem Solver',
-    methodology: 'Exclusion',
-    mentalModel: 'Critical Auditor: Two things cannot occupy the same state. Be the critic who rejects "Not Even Wrong" theories.',
-    trigger: 'Logic collisions, resource contention, or "not even wrong" arguments.',
-    lexicalFingerprint: ['exclusion', 'spin', 'not even wrong', 'neutrino', 'logic', 'refutation'],
-    solvingHeuristic: 'If the theory doesn\'t make a testable prediction, it is worse than wrong. It is "not even wrong". Move to the next logic gate.',
-    historicalAnchor: 'Exclusion Principle.'
-  },
-  {
-    id: 'maxwell',
-    name: 'James Clerk Maxwell',
-    era: '19th C.',
-    module: 'Systematic Problem Solver',
-    methodology: 'Unification',
-    mentalModel: 'The Great Synthesizer: Converting physical flows into a unified set of equations.',
-    trigger: 'Unifying disparate data, complex flows, or light/speed limitations.',
-    lexicalFingerprint: ['unification', 'flux', 'displacement', 'velocity of light', 'ether', 'demon'],
-    solvingHeuristic: 'Reduce the chaotic data into four perfect equations. If the fields overlap, the light will emerge.',
-    historicalAnchor: 'Maxwell\'s Equations.'
-  },
-
-  // --- Original Roster (Refined) ---
-  {
-    id: 'musk',
-    name: 'Elon Musk',
-    era: '21st C.',
-    module: 'Empirical Optimizer',
-    methodology: 'First Principles',
-    mentalModel: 'Physics-Based Reducibility: Boil things down to fundamental truths. Ignore analogy.',
-    trigger: 'Cost-scaling, impossible timelines, or analogy-based bottlenecks.',
-    lexicalFingerprint: ['first principles', 'cost-per-atom', 'iteration', 'velocity', 'delete', 'boil-down'],
-    solvingHeuristic: 'Question every requirement. If physics doesn\'t forbid it, it\'s possible. Analogy is the enemy.',
-    historicalAnchor: 'Falcon 1 landing attempts.'
-  },
-  {
-    id: 'da_vinci',
-    name: 'Leonardo da Vinci',
-    era: '15th C.',
-    module: 'Lateral Thinker',
-    methodology: 'Biomimicry',
-    mentalModel: 'Nature as Engineer: Observe bird wings to build flying machines.',
-    trigger: 'Nature-inspired mechanical design, aerodynamics, or anatomical logic.',
-    lexicalFingerprint: ['curiosity', 'anatomy', 'proportion', 'observation', 'metaphor', 'sketch'],
-    solvingHeuristic: 'Nature has already solved the problem. Map the wing of a bird to the screw of a flying machine.',
-    historicalAnchor: 'The wooden ornithopter.'
-  },
-  {
-    id: 'hadid',
-    name: 'Zaha Hadid',
-    era: '21st C.',
-    module: 'Visionary Architect',
-    methodology: 'Fluid Geometry',
-    mentalModel: 'Queen of the Curve: Breaking static forms to create motion.',
-    trigger: 'UX design, structural fluidity, or breaking the grid.',
-    lexicalFingerprint: ['parametric', 'fluidity', 'fragmentation', 'landscape', 'curvature', 'explode'],
-    solvingHeuristic: 'There are 360 degrees, so why stick to one? The structure should flow like liquid.',
-    historicalAnchor: 'Heydar Aliyev Center.'
-  },
-  {
-    id: 'hamilton',
-    name: 'Margaret Hamilton',
-    era: '20th C.',
-    module: 'Systematic Problem Solver',
-    methodology: 'Reliability Engineering',
-    mentalModel: 'Error-Proof Logic: Build software that prioritizes critical tasks when overloaded.',
-    trigger: 'Safety-critical systems, control software, or reliability.',
-    lexicalFingerprint: ['fail-safe', 'asynchronous', 'priority', 'robust', 'engineering', 'logic'],
-    solvingHeuristic: 'Assume the system will fail and design the software to handle the crash gracefully. Robustness over speed.',
-    historicalAnchor: 'Apollo 11 landing software.'
-  }
 ];
 
 const now = new Date();
@@ -358,6 +71,15 @@ export const MOCK_COMMENTS: Comment[] = [
         text: 'Good point Dana. We should probably run an FEA simulation on the main housing to check stress concentrations.',
         createdAt: new Date(now.getTime() - 5 * 60 * 1000).toISOString(),
         sectionId: 'ai_suggestions',
+    },
+     {
+        id: 'c3',
+        userId: 'user-5',
+        userName: 'Devin (Manager)',
+        userPicture: MOCK_USERS.find(u => u.id === 'user-5')?.picture || '',
+        text: 'Agreed. Let\'s prioritize that simulation. Also, what is the estimated cost impact of this material choice?',
+        createdAt: new Date(now.getTime() - 2 * 60 * 1000).toISOString(),
+        sectionId: 'ai_suggestions',
     }
 ];
 
@@ -382,7 +104,7 @@ export const TOUR_STEPS = [
   },
   {
     targetId: 'tour-step-3',
-    title: '3. Multimedia Input (Images, Videos, PDFs)',
+    title: '3. Upload a File (Optional)',
     content: 'For a deeper analysis, you can upload a schematic, a photo of the product, or a PDF document containing technical details.',
     position: 'bottom',
   },
@@ -404,3 +126,211 @@ export const TOUR_STEPS = [
     position: 'center',
   }
 ] as const;
+
+// --- SYNAPSEFORGE TOOL SUITE CONSTANTS ---
+
+export const SUITE_NAVIGATION = [
+  {
+    id: 'cm1',
+    name: 'CM-1: Data & Resource Management',
+    tools: [
+      { id: 'cm1/material-selector', name: 'Material/Component Selector' },
+      { id: 'cm1/standards-library', name: 'Standards & Code Library' },
+      { id: 'cm1/drc', name: 'Document/Revision Control' },
+      { id: 'cm1/unit-converter', name: 'Unit Converter & Calculator' },
+    ],
+  },
+  {
+    id: 'cm2',
+    name: 'CM-2: Quality & Risk Analysis',
+    tools: [
+      { id: 'cm2/fmea', name: 'FMEA/Risk Analyzer' },
+      { id: 'cm2/spc', name: 'Statistical Process Control (SPC)' },
+      { id: 'cm2/req-mgmt', name: 'Requirements Management' },
+      { id: 'cm2/rca', name: 'Root Cause Analysis (RCA) Tool' },
+    ],
+  },
+  {
+    id: 'cm3',
+    name: 'CM-3: Modeling & Simulation',
+    tools: [
+      { id: 'cm3/pre-post', name: 'Universal Pre/Post-Processor' },
+      { id: 'cm3/scripting', name: 'Scripting & Automation Engine' },
+      { id: 'cm3/viz', name: 'Data Visualization Console' },
+      { id: 'cm3/analysis', name: 'Structural Analysis (Beam)' },
+    ],
+  },
+];
+
+export const MOCK_MATERIALS: Material[] = [
+  { id: 'mat-1', name: 'Aluminum 6061-T6', category: 'Non-Ferrous Metal', properties: { 'Density': '2.7 g/cm³', 'Yield Strength': '276 MPa', 'Ultimate Tensile Strength': '310 MPa', 'Young\'s Modulus': '68.9 GPa', 'Thermal Conductivity': '167 W/m·K' } },
+  // FIX: Converted 'Poisson\'s Ratio' value from number to string to match the Material type definition.
+  { id: 'mat-2', name: 'Steel, AISI 1020', category: 'Ferrous Metal', properties: { 'Density': '7.87 g/cm³', 'Yield Strength': '350 MPa', 'Poisson\'s Ratio': '0.29', 'Melting Point': '1420-1500 °C' } },
+  { id: 'mat-3', name: 'ABS Plastic', category: 'Polymer', properties: { 'Density': '1.06 g/cm³', 'Yield Strength': '40 MPa', 'Young\'s Modulus': '2 GPa' } },
+  { id: 'mat-4', name: 'Carbon Fiber (Standard Modulus)', category: 'Composite', properties: { 'Density': '1.75 g/cm³', 'Ultimate Tensile Strength': '3.5 GPa', 'Young\'s Modulus': '230 GPa' } },
+];
+
+export const MOCK_COMPONENTS: StandardComponent[] = [
+  { id: 'comp-1', name: 'M3x0.5 Socket Head Cap Screw', category: 'Fasteners', partNumber: '91292A109', specifications: { 'Length': '8mm', 'Material': 'Alloy Steel', 'Finish': 'Black Oxide' } },
+  { id: 'comp-2', name: '608-2RS Deep Groove Ball Bearing', category: 'Bearings', partNumber: '608-2RS', specifications: { 'Bore': '8mm', 'OD': '22mm', 'Width': '7mm', 'Seals': '2 Rubber Seals' } },
+  { id: 'comp-3', name: 'Arduino Nano', category: 'Electronics', partNumber: 'A000005', specifications: { 'Microcontroller': 'ATmega328P', 'Voltage': '5V', 'Clock Speed': '16 MHz' } },
+];
+
+export const MOCK_STANDARDS: Standard[] = [
+  { id: 'std-1', name: 'D1.1/D1.1M:2020 - Structural Welding Code-Steel', organization: 'AISC', publicationYear: 2020, description: 'Specifies requirements for fabricating and erecting welded steel structures.', status: 'Active' },
+  { id: 'std-2', name: '9001:2015 - Quality management systems', organization: 'ISO', publicationYear: 2015, description: 'Sets out the criteria for a quality management system.', status: 'Active' },
+  { id: 'std-3', name: 'B1.1-2003 - Unified Inch Screw Threads', organization: 'ASTM', publicationYear: 2003, description: 'Defines the standard for inch-based screw threads.', status: 'Withdrawn' },
+];
+
+export const MOCK_ARTIFACTS: ProjectArtifact[] = [
+  { id: 'art-1', name: 'Gearbox Housing Spec.docx', type: 'Specification', version: 'v2.1', modifiedBy: 'Dana (Editor)', modifiedAt: new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString() },
+  { id: 'art-2', name: 'Stress Analysis Report.pdf', type: 'Report', version: 'v1.0', modifiedBy: 'Blake (Demo User)', modifiedAt: new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000).toISOString() },
+  { id: 'art-3', name: 'torque_calculation.py', type: 'Script', version: 'v1.2', modifiedBy: 'Alex (Admin)', modifiedAt: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000).toISOString() },
+  { id: 'art-4', name: 'Main Assembly.sldasm', type: 'CAD Link', version: 'v4.0', modifiedBy: 'Dana (Editor)', modifiedAt: new Date(now.getTime() - 12 * 60 * 60 * 1000).toISOString() },
+];
+
+// --- CM-2 MOCK DATA ---
+export const MOCK_FMEA_ITEMS: FmeaItem[] = [
+  { id: 1, processStep: 'Torque Fastener', failureMode: 'Insufficient Torque', failureEffects: 'Vibrational loosening, component failure', severity: 8, potentialCauses: 'Operator error, tool malfunction', occurrence: 3, currentControls: 'Torque wrench calibration', detection: 4, rpn: 96, recommendedAction: 'Implement digital torque wrench with logging', actionStatus: 'Pending' },
+  { id: 2, processStep: 'Adhesive Bonding', failureMode: 'Improper Curing', failureEffects: 'Weak bond, delamination', severity: 7, potentialCauses: 'Incorrect temperature, expired adhesive', occurrence: 2, currentControls: 'Visual inspection', detection: 6, rpn: 84, recommendedAction: 'Add temperature sensors to curing oven', actionStatus: 'In Progress' },
+  { id: 3, processStep: 'PCB Soldering', failureMode: 'Solder Bridge', failureEffects: 'Electrical short, board failure', severity: 9, potentialCauses: 'Excess solder paste', occurrence: 4, currentControls: 'Automated Optical Inspection (AOI)', detection: 2, rpn: 72, recommendedAction: 'Refine solder paste stencil aperture', actionStatus: 'Complete' },
+];
+
+export const MOCK_SPC_DATA: SpcDataPoint[][] = Array.from({ length: 25 }, (_, i) =>
+  Array.from({ length: 5 }, () => ({ sample: i + 1, value: 10 + (Math.random() - 0.5) * 1.5 + (i > 18 ? 0.8 : 0) })) // Introduce a shift for the last few samples
+);
+
+export const MOCK_REQUIREMENTS: Requirement[] = [
+  { id: 'REQ-001', text: 'The device shall operate continuously for 8 hours on a single charge.', status: RequirementStatus.Approved, linkedTo: ['TC-001', 'TC-002'] },
+  { id: 'REQ-002', text: 'The device enclosure must withstand a 1-meter drop onto concrete.', status: RequirementStatus.Tested, linkedTo: ['TC-003'] },
+  { id: 'REQ-003', text: 'The user interface shall be responsive within 200ms.', status: RequirementStatus.Draft, linkedTo: [] },
+  { id: 'REQ-004', text: 'The device must comply with FCC Part 15 regulations.', status: RequirementStatus.Approved, linkedTo: ['TC-004'] },
+];
+
+export const MOCK_RCA_DATA: RcaData = {
+  problem: 'Motor overheating during endurance testing.',
+  fiveWhys: [
+    'Why is the motor overheating? - Because it is drawing too much current.',
+    'Why is it drawing too much current? - Because the load is higher than expected.',
+    'Why is the load higher than expected? - Because of excessive friction in the gearbox.',
+    'Why is there excessive friction? - Because the gear alignment is incorrect.',
+    'Why is the alignment incorrect? - Because the housing tolerances are too loose.',
+  ],
+  fishbone: {
+    Manpower: ['Inadequate training on assembly', 'Operator fatigue'],
+    Methods: ['Incorrect assembly sequence', 'No verification step for alignment'],
+    Machines: ['Worn tooling for housing', 'Calibration drift on press-fit machine'],
+    Materials: ['Incorrect lubricant specified', 'Housing material warping under load'],
+    Measurements: ['Gage not calibrated', 'Incorrect measurement technique'],
+    Environment: ['High ambient temperature in test lab', 'Vibration from adjacent equipment'],
+  },
+};
+
+// --- CM-3 MOCK DATA ---
+const generateSurface = (peak: number, center: [number, number], width: number): number[][] => {
+    const size = 50;
+    const z = [];
+    for (let i = 0; i < size; i++) {
+        const row = [];
+        for (let j = 0; j < size; j++) {
+            const x = i - center[0];
+            const y = j - center[1];
+            const val = peak * Math.exp(-(x * x + y * y) / (2 * width * width));
+            row.push(val);
+        }
+        z.push(row);
+    }
+    return z;
+};
+
+export const MOCK_SIMULATION_RUNS: SimulationRun[] = [
+    {
+        id: 'sim-1',
+        name: 'Initial Analysis',
+        description: 'FEA stress analysis of the main housing under a 500N load. Shows high stress concentration at mounting points.',
+        plotData: {
+            z: generateSurface(150, [25, 25], 5),
+        }
+    },
+    {
+        id: 'sim-2',
+        name: 'Optimized Design',
+        description: 'FEA stress analysis of the redesigned housing with added fillets. Stress is more evenly distributed, with a 30% reduction in peak stress.',
+        plotData: {
+            z: generateSurface(105, [25, 25], 8),
+        }
+    }
+];
+
+export const MOCK_SCRIPT: Script = {
+    id: 'script-1',
+    name: 'Material Strength Analysis',
+    description: 'A Python script to analyze the yield strength of materials in the project database and identify the strongest one.',
+    code: `
+import json
+
+# The 'project_data' variable is injected by the SynapseForge environment.
+# It contains data like materials, components, etc.
+materials_data = json.loads(project_data)
+
+print("--- Material Strength Analysis ---")
+print(f"Found {len(materials_data)} materials to analyze.\\n")
+
+strongest_material = None
+max_strength = 0
+
+for material in materials_data:
+    try:
+        # Strength is a string like '276 MPa', we need to parse the number
+        strength_str = material['properties'].get('Yield Strength', '0 MPa')
+        strength_val = float(strength_str.split(' ')[0])
+        
+        print(f"Analyzing {material['name']}: {strength_val} MPa")
+        
+        if strength_val > max_strength:
+            max_strength = strength_val
+            strongest_material = material['name']
+    except (ValueError, IndexError):
+        print(f"Could not parse strength for {material['name']}")
+
+print("\\n--- Analysis Complete ---")
+if strongest_material:
+    print(f"The strongest material is: {strongest_material} with a yield strength of {max_strength} MPa.")
+else:
+    print("No materials with valid strength data found.")
+`
+};
+
+export const MOCK_CHART_DATA: ChartData[] = [
+    {
+        id: 'chart-1',
+        name: 'Bode Plot (Frequency Response)',
+        type: 'bode',
+        data: {
+            // Sample data for a simple low-pass filter
+            freq: Array.from({ length: 100 }, (_, i) => 10 ** (i / 20)),
+            magnitude: Array.from({ length: 100 }, (_, i) => 20 * Math.log10(1 / Math.sqrt(1 + (10 ** (i / 20) / 100) ** 2))),
+            phase: Array.from({ length: 100 }, (_, i) => -Math.atan(10 ** (i / 20) / 100) * (180 / Math.PI))
+        }
+    },
+    {
+        id: 'chart-2',
+        name: 'Gantt Chart (Project Schedule)',
+        type: 'gantt',
+        data: [
+            { Task: "Design Phase", Start: "2024-01-01", Finish: "2024-02-15", Resource: "Design Team" },
+            { Task: "Prototype Build", Start: "2024-02-15", Finish: "2024-03-30", Resource: "Eng. Team" },
+            { Task: "Testing & Validation", Start: "2024-04-01", Finish: "2024-05-15", Resource: "QA Team" },
+            { Task: "Production Ramp-up", Start: "2024-05-15", Finish: "2024-07-01", Resource: "Mfg. Team" }
+        ]
+    },
+    {
+        id: 'chart-3',
+        name: 'Stress-Strain Curve (AISI 1020 Steel)',
+        type: 'stress-strain',
+        data: {
+            strain: [0, 0.001, 0.00175, 0.05, 0.1, 0.15, 0.2],
+            stress: [0, 210, 350, 370, 400, 415, 420]
+        }
+    }
+];

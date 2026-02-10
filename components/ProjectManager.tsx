@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useRef } from 'react';
 import { Project, User, Role, ProjectIndexEntry } from '../types';
 import { Modal } from './Modal';
@@ -21,6 +22,8 @@ interface ProjectManagerProps {
     isParsingForBrainstorm: boolean;
     onIdentifyImage: (file: File) => void;
     isIdentifyingImage: boolean;
+    onOpenVideoImport: () => void;
+    isParsingVideo: boolean;
     onEditProject: (project: Project) => void;
     onDeleteProject: (projectId: string) => void;
     onLoadVersion: (index: number) => void;
@@ -28,6 +31,11 @@ interface ProjectManagerProps {
     onCompareVersions: (project: Project, newVersionIndex: number) => void;
     disabled: boolean;
     authenticatedUser: User;
+    // Google Drive Props
+    onSaveToDrive?: () => void;
+    onOpenFromDrive?: () => void;
+    isSavingToDrive?: boolean;
+    isDriveAuthenticated?: boolean;
 }
 
 const formatDate = (isoString: string) => {
@@ -40,10 +48,18 @@ const Icons = {
     Search: () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"><path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" /></svg>,
     Edit: () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" /></svg>,
     Commit: () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>,
+    SaveFile: () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" /></svg>,
+    Drive: () => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor"><path d="M12.01 1.485c2.082 0 3.754.025 4.568.06C18.722 1.636 20.343 2.138 21.556 3.351c1.213 1.213 1.715 2.834 1.806 4.976.035.814.06 2.486.06 4.568 0 2.057-.025 3.696-.058 4.502-.09 2.14-.592 3.759-1.803 4.97-1.211 1.211-2.829 1.713-4.964 1.803-.807.034-2.448.06-4.508.06s-3.77-.025-4.587-.06c-2.133-.09-3.751-.592-4.963-1.803-1.21-1.211-1.712-2.83-1.802-4.965C.705 15.337.68 13.637.68 11.493c0-2.082.025-3.754.06-4.568C.832 4.783 1.333 3.162 2.546 1.95 3.759.737 5.38.235 7.522.143 8.336.108 10.008.083 12.01.083v1.402zm-1.95 16.09h8.736l-2.812-4.888h-5.88l-2.865 4.888H10.06zm-2.288-1.613l2.848-4.905L7.85 6.3H2.19l5.582 9.662zM9.518 9.23h6.428L13.12 4.3H9.518v4.93zM14.95 11.15h5.896l-2.864-4.888H12.1l2.85 4.888z" /></svg>
 };
 
 
-export const ProjectManager = ({ projects, activeProject, activeVersionIndex, onSelectProject, onNewProject, onOpenFile, onSaveProject, hasUnsavedChanges, onCommitVersion, onStartWithDeVinci, onStartFromImage, isParsingImage, onStartFromPdf, isParsingPdf, onStartBrainstormFromPdf, isParsingForBrainstorm, onIdentifyImage, isIdentifyingImage, onEditProject, onDeleteProject, onLoadVersion, onRevertVersion, onCompareVersions, disabled, authenticatedUser }: ProjectManagerProps) => {
+export const ProjectManager = ({ 
+    projects, activeProject, activeVersionIndex, onSelectProject, onNewProject, onOpenFile, onSaveProject, 
+    hasUnsavedChanges, onCommitVersion, onStartWithDeVinci, onStartFromImage, isParsingImage, onStartFromPdf, isParsingPdf, 
+    onStartBrainstormFromPdf, isParsingForBrainstorm, onIdentifyImage, isIdentifyingImage, onOpenVideoImport, isParsingVideo, 
+    onEditProject, onDeleteProject, onLoadVersion, onRevertVersion, onCompareVersions, disabled, authenticatedUser,
+    onSaveToDrive, onOpenFromDrive, isSavingToDrive, isDriveAuthenticated
+}: ProjectManagerProps) => {
     const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [sortOption, setSortOption] = useState<'last-updated' | 'name-asc' | 'name-desc' | 'date-created-desc' | 'date-created-asc'>('last-updated');
@@ -88,7 +104,6 @@ export const ProjectManager = ({ projects, activeProject, activeVersionIndex, on
         const filtered = searchTerm
             ? projects.filter(project => {
                 const lowercasedFilter = searchTerm.toLowerCase();
-                // Expanded search corpus to include all relevant fields
                 const searchCorpus = [
                     project.name,
                     project.description,
@@ -137,77 +152,97 @@ export const ProjectManager = ({ projects, activeProject, activeVersionIndex, on
         <div className="space-y-4">
             <div>
                 <div className="flex justify-between items-center mb-3">
-                    <h2 className="text-xl font-semibold text-brand-light">Project Management</h2>
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-brand-light">Project Management</h2>
                 </div>
                 {!isViewer && (
-                    <div className="grid grid-cols-2 gap-2 mb-2">
-                        <input type="file" ref={openFileInputRef} onChange={handleOpenFileSelected} accept=".sfp.json" className="hidden" disabled={disabled} />
-                        <button onClick={() => openFileInputRef.current?.click()} disabled={disabled} className="py-2 px-3 bg-gray-700 text-white font-semibold rounded-lg border border-gray-600 hover:bg-gray-600 transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center justify-center gap-2">
-                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 9.75h16.5m-16.5 4.5h16.5m-16.5 4.5h16.5m-16.5-1.5a1.5 1.5 0 0 1-1.5-1.5V6.75a1.5 1.5 0 0 1 1.5-1.5h16.5a1.5 1.5 0 0 1 1.5 1.5v10.5a1.5 1.5 0 0 1-1.5 1.5H3.75Z" /></svg>
-                          Open Project...
-                        </button>
-                         <button onClick={onNewProject} disabled={disabled} className="py-2 px-3 bg-gray-700 text-white font-semibold rounded-lg border border-gray-600 hover:bg-gray-600 transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-sm">
-                            + New Project
-                        </button>
+                    <div className="space-y-2 mb-4">
+                         <div className="grid grid-cols-2 gap-2">
+                            <input type="file" ref={openFileInputRef} onChange={handleOpenFileSelected} accept=".sfp.json" className="hidden" disabled={disabled} />
+                            <button onClick={() => openFileInputRef.current?.click()} disabled={disabled} className="py-2 px-3 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white font-semibold rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-300 dark:hover:bg-gray-600 transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center justify-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 9.75h16.5m-16.5 4.5h16.5m-16.5 4.5h16.5m-16.5-1.5a1.5 1.5 0 0 1-1.5-1.5V6.75a1.5 1.5 0 0 1 1.5-1.5h16.5a1.5 1.5 0 0 1 1.5 1.5v10.5a1.5 1.5 0 0 1-1.5 1.5H3.75Z" /></svg>
+                            Open File
+                            </button>
+                            <button onClick={onNewProject} disabled={disabled} className="py-2 px-3 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white font-semibold rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-300 dark:hover:bg-gray-600 transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-sm">
+                                + New Project
+                            </button>
+                        </div>
+                        {/* Google Drive Integration */}
+                        <div className="grid grid-cols-2 gap-2">
+                            <button 
+                                onClick={onOpenFromDrive} 
+                                disabled={disabled} 
+                                className="py-2 px-3 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white font-semibold rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-300 dark:hover:bg-gray-600 transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center justify-center gap-2"
+                            >
+                                <Icons.Drive />
+                                Open from Drive
+                            </button>
+                             {activeProject && (
+                                <button 
+                                    onClick={onSaveToDrive} 
+                                    disabled={disabled || isSavingToDrive} 
+                                    className="py-2 px-3 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white font-semibold rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-300 dark:hover:bg-gray-600 transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center justify-center gap-2"
+                                >
+                                    <Icons.Drive />
+                                    {isSavingToDrive ? 'Saving...' : (isDriveAuthenticated ? 'Save to Drive' : 'Sign In & Save')}
+                                </button>
+                             )}
+                        </div>
                     </div>
                  )}
                  {activeProject && !isViewer && (
-                    <button onClick={onSaveProject} disabled={disabled} className={`w-full py-2 px-3 text-white font-bold rounded-lg border transition-all active:scale-95 disabled:opacity-50 text-sm flex items-center justify-center gap-2 mb-3 ${hasUnsavedChanges ? 'bg-cyan-600 border-cyan-500 hover:bg-cyan-500 animate-pulse' : 'bg-gray-700 border-gray-600 hover:bg-gray-600'}`}>
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
-                        Save & Export Project
-                        {hasUnsavedChanges && <span className="w-2 h-2 bg-yellow-400 rounded-full"></span>}
+                    <button 
+                        onClick={onSaveProject} 
+                        disabled={disabled} 
+                        className={`w-full py-2 px-3 rounded-lg border transition active:scale-95 disabled:opacity-50 text-sm flex items-center justify-center gap-2 mb-3 ${hasUnsavedChanges ? 'bg-green-600 text-white font-bold border-green-500 hover:bg-green-500 animate-pulse' : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white font-semibold border-gray-300 dark:border-gray-600 hover:bg-gray-300 dark:hover:bg-gray-600'}`}
+                        title="Save current project to a local JSON file"
+                    >
+                        <Icons.SaveFile />
+                        Save Project to File
                     </button>
                  )}
-                <h3 className="text-lg font-semibold text-brand-light mb-2">Session Projects</h3>
+                 
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-brand-light mb-2">Session Projects</h3>
                 <div className="flex gap-2 mb-2">
                     <div className="relative flex-grow">
                         <Icons.Search />
                         <input
                             type="text"
-                            placeholder="Search projects..."
+                            placeholder="Search..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full bg-gray-800 border-2 border-gray-700 rounded-lg pl-10 pr-4 py-2 text-gray-300 focus:ring-brand-cyan focus:border-brand-cyan"
+                            className="w-full bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-lg pl-10 pr-4 py-2 text-gray-800 dark:text-gray-300 focus:ring-brand-cyan focus:border-brand-cyan"
                         />
                     </div>
                     <select
                         value={sortOption}
                         onChange={(e) => setSortOption(e.target.value as any)}
-                        className="bg-gray-800 border-2 border-gray-700 text-gray-300 text-sm rounded-lg focus:ring-brand-cyan focus:border-brand-cyan"
+                        className="bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-300 text-sm rounded-lg focus:ring-brand-cyan focus:border-brand-cyan"
                         aria-label="Sort projects by"
                     >
-                        <option value="last-updated">Sort: Updated</option>
-                        <option value="name-asc">Sort: Name (A-Z)</option>
-                        <option value="name-desc">Sort: Name (Z-A)</option>
-                        <option value="date-created-desc">Sort: Created (Newest)</option>
-                        <option value="date-created-asc">Sort: Created (Oldest)</option>
+                        <option value="last-updated">Updated</option>
+                        <option value="name-asc">Name (A-Z)</option>
+                        <option value="date-created-desc">Newest</option>
                     </select>
                 </div>
-                <div className="bg-gray-800 border-2 border-gray-700 rounded-lg p-2">
+                <div className="bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-lg p-2 max-h-48 overflow-y-auto">
                     {processedProjects.length === 0 ? (
-                        <p className="text-gray-500 text-center p-4">{searchTerm ? 'No projects match your search.' : 'No projects opened in this session. Create or open a project file.'}</p>
+                        <p className="text-gray-500 text-center p-4 text-xs">{searchTerm ? 'No matches found.' : 'No projects in session.'}</p>
                     ) : (
                         <ul className="space-y-1">
                             {processedProjects.map((project, index) => (
                                 <li
                                     key={project.id}
                                     onClick={() => !disabled && onSelectProject(project.id)}
-                                    className={`p-2 rounded-md transition-all duration-200 animate-stagger-in ${activeProject?.id === project.id ? 'bg-brand-cyan/20' : 'hover:bg-gray-700/50'}`}
+                                    className={`p-2 rounded-md transition-all duration-200 animate-stagger-in cursor-pointer ${activeProject?.id === project.id ? 'bg-brand-cyan/20' : 'hover:bg-gray-200 dark:hover:bg-gray-700/50'}`}
                                     style={{ animationDelay: `${Math.min(index * 50, 500)}ms` }}
-                                    title={project.description}
                                 >
                                     <div className="flex justify-between items-start">
                                         <div className="flex-1 truncate">
-                                            <p className={`font-semibold truncate ${activeProject?.id === project.id ? 'text-brand-cyan' : 'text-brand-light'}`}>{project.name || 'Untitled'}</p>
-                                             <div className="flex items-center gap-1 mt-1 flex-wrap">
-                                                {(project.tags || []).map(tag => (
-                                                    <span key={tag} className="px-2 py-0.5 text-xs rounded-full bg-purple-600/50 text-purple-200">{tag}</span>
-                                                ))}
-                                            </div>
-                                            <p className="text-xs text-gray-400 mt-1">Updated: {formatDate(project.updatedAt)}</p>
+                                            <p className={`font-semibold truncate ${activeProject?.id === project.id ? 'text-brand-cyan' : 'text-gray-800 dark:text-brand-light'}`}>{project.name || 'Untitled'}</p>
+                                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{formatDate(project.updatedAt)}</p>
                                         </div>
                                         {authenticatedUser.role === Role.Admin && (
-                                            <button onClick={(e) => handleDeleteClick(e, project)} disabled={disabled} className="p-2 text-gray-500 hover:text-red-400 transition-transform active:scale-95 rounded-full disabled:opacity-50 flex-shrink-0" title="Delete Project"><Icons.Trash /></button>
+                                            <button onClick={(e) => handleDeleteClick(e, project)} disabled={disabled} className="p-2 text-gray-500 hover:text-red-400 transition-transform active:scale-95 rounded-full disabled:opacity-50 flex-shrink-0"><Icons.Trash /></button>
                                         )}
                                     </div>
                                 </li>
@@ -218,51 +253,61 @@ export const ProjectManager = ({ projects, activeProject, activeVersionIndex, on
             </div>
 
             {activeProject && (
-                <div>
+                <div className="flex-1 flex flex-col min-h-0">
                     <div className="flex justify-between items-center mb-2">
-                        <h3 className="text-lg font-semibold text-brand-light">Version History</h3>
-                         <div className="flex items-center gap-2">
-                             {!isViewer && (
-                                <button
-                                    onClick={onCommitVersion}
-                                    disabled={!hasUnsavedChanges || disabled}
-                                    className="py-1 px-3 text-xs bg-green-600 text-white rounded hover:bg-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-transform active:scale-95 flex items-center gap-1"
-                                    title={hasUnsavedChanges ? "Save the current state as a new version" : "No changes to save"}
-                                >
-                                    <Icons.Commit />
-                                    Save Version
-                                </button>
-                             )}
-                            <button onClick={() => onEditProject(activeProject)} disabled={disabled || isViewer} className="py-1 px-3 text-xs bg-gray-600 rounded hover:bg-gray-500 disabled:opacity-50 flex items-center gap-1 transition-transform active:scale-95" title="Edit project details"><Icons.Edit /> Edit Details</button>
-                         </div>
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-brand-light">Version History</h3>
+                        <button onClick={() => onEditProject(activeProject)} disabled={disabled || isViewer} className="text-xs bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 px-2 py-1 rounded transition text-gray-700 dark:text-gray-300"><Icons.Edit /></button>
                     </div>
-                    <div className="bg-gray-800 border-2 border-gray-700 rounded-lg p-2">
+                    
+                    {!isViewer && (
+                        <button
+                            onClick={onCommitVersion}
+                            disabled={!hasUnsavedChanges || disabled}
+                            className={`w-full py-2 px-3 mb-2 font-bold rounded-lg border transition-all active:scale-95 disabled:opacity-50 text-sm flex items-center justify-center gap-2 ${hasUnsavedChanges ? 'bg-green-600 text-white border-green-500 hover:bg-green-500 animate-pulse' : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 border-gray-300 dark:border-gray-600 hover:bg-gray-300 dark:hover:bg-gray-600 cursor-default'}`}
+                            title={hasUnsavedChanges ? "Save your current changes as a new version" : "No unsaved changes"}
+                        >
+                            <Icons.Commit />
+                            {hasUnsavedChanges ? "Save New Version" : "Up to Date"}
+                        </button>
+                    )}
+
+                    <div className="bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-lg p-2 flex-1 overflow-y-auto max-h-64">
                         <ul className="space-y-1">
                             {activeProject.history.map((version, index) => (
                                 <li
                                     key={version.versionId}
-                                    className={`p-2 rounded-md animate-stagger-in transition-colors duration-200 ${index === activeVersionIndex ? 'bg-cyan-900/40' : ''}`}
+                                    className={`p-2 rounded-md animate-stagger-in transition-colors duration-200 ${index === activeVersionIndex ? 'bg-cyan-900/40 border border-cyan-800' : 'border border-transparent hover:bg-gray-200 dark:hover:bg-gray-700/30'}`}
                                     style={{ animationDelay: `${Math.min(index * 50, 500)}ms` }}
                                 >
-                                    <div className="flex justify-between items-center">
-                                        <div>
-                                            <p className={`font-semibold text-sm ${index === activeVersionIndex ? 'text-brand-cyan' : 'text-brand-light'}`}>{version.commitMessage}</p>
-                                            <p className="text-xs text-gray-400">Saved: {formatDate(version.createdAt)}</p>
+                                    <div className="flex justify-between items-start">
+                                        <div className="cursor-pointer flex-1" onClick={() => onLoadVersion(index)}>
+                                            <div className="flex items-center gap-2">
+                                                <p className={`font-semibold text-sm ${index === activeVersionIndex ? 'text-brand-cyan' : 'text-gray-800 dark:text-brand-light'}`}>{version.commitMessage}</p>
+                                                {index === 0 && <span className="text-[10px] bg-blue-900/50 text-blue-200 px-1.5 rounded">LATEST</span>}
+                                            </div>
+                                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{formatDate(version.createdAt)}</p>
                                         </div>
-                                        <div className="flex gap-1">
+                                        <div className="flex gap-1 items-center">
                                             {index < activeProject.history.length - 1 && !isViewer && (
                                                 <button
                                                     onClick={() => onCompareVersions(activeProject, index)}
                                                     disabled={disabled}
-                                                    className="py-1 px-2 text-xs bg-purple-600 text-white rounded hover:bg-purple-500 disabled:opacity-50 flex items-center gap-1 transition-transform active:scale-95"
-                                                    title={`Compare with previous version: "${activeProject.history[index+1].commitMessage}"`}
+                                                    className="p-1.5 text-purple-500 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded transition"
+                                                    title="Compare with previous version"
                                                 >
                                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3 h-3"><path strokeLinecap="round" strokeLinejoin="round" d="M12 19.5v-15m0 0l-6.75 6.75M12 4.5l6.75 6.75" /></svg>
-                                                    Compare
                                                 </button>
                                             )}
-                                            <button onClick={() => onLoadVersion(index)} disabled={disabled || index === activeVersionIndex} className="py-1 px-2 text-xs bg-gray-600 rounded hover:bg-gray-500 disabled:opacity-50 transition-transform active:scale-95">View</button>
-                                            {!isViewer && <button onClick={() => onRevertVersion(index)} disabled={disabled} className="py-1 px-2 text-xs bg-blue-600 rounded hover:bg-blue-500 disabled:opacity-50 flex items-center gap-1 transition-transform active:scale-95" title="Revert to this version"><Icons.Revert />Revert</button>}
+                                            {!isViewer && (
+                                                <button 
+                                                    onClick={() => onRevertVersion(index)} 
+                                                    disabled={disabled || (index === 0 && !hasUnsavedChanges)} 
+                                                    className="py-1 px-2 text-[10px] bg-blue-600 hover:bg-blue-500 text-white rounded disabled:opacity-50 transition" 
+                                                    title="Create a new version based on this state (Revert)"
+                                                >
+                                                    Revert
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                 </li>
@@ -272,26 +317,32 @@ export const ProjectManager = ({ projects, activeProject, activeVersionIndex, on
                 </div>
             )}
             
-            <div className="p-4 bg-gray-800/50 border border-gray-700 rounded-lg">
-                 <h3 className="text-lg font-semibold text-brand-light mb-2">Alternative Workflows</h3>
+            <div className="p-4 bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg mt-4">
+                 <h3 className="text-lg font-semibold text-gray-900 dark:text-brand-light mb-2">Tools</h3>
                   {!isViewer && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 gap-2">
                         <button onClick={onStartWithDeVinci} disabled={disabled} className="py-2 px-3 bg-purple-600 text-white font-semibold rounded-lg border border-purple-500 hover:bg-purple-500 transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center gap-2 justify-center" title="Start a new project via a conversation with the DeVinci AI">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M8.625 9.75a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375m-13.5 3.01c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.184-4.183a.375.375 0 0 1 .265-.108h3.284a3.375 3.375 0 0 0 3.375-3.375V9.75a3.375 3.375 0 0 0-3.375-3.375H5.25a3.375 3.375 0 0 0-3.375 3.375v3.01Z" /></svg>
-                            Start with DeVinci
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M8.625 9.75a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375m-13.5 3.01c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.184-4.183a.375.375 0 0 1 .265-.108h3.284a3.375 3.375 0 0 0 3.375-3.375V9.75a3.375 3.375 0 0 0-3.375 3.375H5.25a3.375 3.375 0 0 0-3.375 3.375v3.01Z" /></svg>
+                            DeVinci Assistant
+                        </button>
+                        <div className="grid grid-cols-2 gap-2">
+                             <button onClick={() => createImageInputRef.current?.click()} disabled={disabled} className="py-2 px-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white font-semibold rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-300 dark:hover:bg-gray-600 transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-xs flex items-center gap-2 justify-center" title="Reverse engineer a product from an image">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" /></svg>
+                                {isParsingImage ? 'Analyzing...' : 'Image Import'}
+                            </button>
+                            <button onClick={() => createPdfInputRef.current?.click()} disabled={disabled} className="py-2 px-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white font-semibold rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-300 dark:hover:bg-gray-600 transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-xs flex items-center gap-2 justify-center" title="Create a new project by extracting data from a PDF spec sheet">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m.75 12.75h4.875c.621 0 1.125-.504 1.125-1.125V11.25a2.25 2.25 0 0 0-2.25-2.25H6.375a2.25 2.25 0 0 0-2.25 2.25v6.75c0 .621.504 1.125 1.125 1.125H6.375m1.5-12.75-1.5-1.5m0 0A2.25 2.25 0 0 1 6.375 3h.625c.621 0 1.125.504 1.125 1.125v1.5m-1.5-1.5Z" /></svg>
+                                {isParsingPdf ? 'Parsing...' : 'PDF Import'}
+                            </button>
+                        </div>
+                        <button onClick={onOpenVideoImport} disabled={disabled} className="py-2 px-3 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white font-semibold rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-300 dark:hover:bg-gray-600 transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center gap-2 justify-center" title="Analyze a video file or YouTube link">
+                           {isParsingVideo ? <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> : <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>}
+                           {isParsingVideo ? 'Analyzing...' : 'Video Import'}
                         </button>
                          <input type="file" ref={createImageInputRef} onChange={handleCreateImageSelected} accept="image/*" className="hidden" disabled={disabled} />
-                        <button onClick={() => createImageInputRef.current?.click()} disabled={disabled} className="py-2 px-3 bg-purple-600 text-white font-semibold rounded-lg border border-purple-500 hover:bg-purple-500 transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center gap-2 justify-center" title="Reverse engineer a product from an image">
-                           {isParsingImage ? <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> : <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" /></svg>}
-                           {isParsingImage ? 'Analyzing...' : 'Reverse Engineer'}
-                        </button>
                          <input type="file" ref={createPdfInputRef} onChange={handleCreateFileSelected} accept="application/pdf" className="hidden" disabled={disabled} />
-                        <button onClick={() => createPdfInputRef.current?.click()} disabled={disabled} className="py-2 px-3 bg-purple-600 text-white font-semibold rounded-lg border border-purple-500 hover:bg-purple-500 transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center gap-2 justify-center" title="Create a new project by extracting data from a PDF spec sheet">
-                           {isParsingPdf ? <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> : <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m.75 12.75h4.875c.621 0 1.125-.504 1.125-1.125V11.25a2.25 2.25 0 0 0-2.25-2.25H6.375a2.25 2.25 0 0 0-2.25 2.25v6.75c0 .621.504 1.125 1.125 1.125H6.375m1.5-12.75-1.5-1.5m0 0A2.25 2.25 0 0 1 6.375 3h.625c.621 0 1.125.504 1.125 1.125v1.5m-1.5-1.5Z" /></svg>}
-                           {isParsingPdf ? 'Parsing...' : 'Create from PDF'}
-                        </button>
                          <input type="file" ref={brainstormPdfInputRef} onChange={handleBrainstormFileSelected} accept="application/pdf" className="hidden" disabled={disabled} />
-                        <button onClick={() => brainstormPdfInputRef.current?.click()} disabled={disabled} className="py-2 px-3 bg-purple-600 text-white font-semibold rounded-lg border border-purple-500 hover:bg-purple-500 transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center gap-2 justify-center" title="Start a brainstorming session by uploading a previous report">
+                        <button onClick={() => brainstormPdfInputRef.current?.click()} disabled={disabled} className="py-2 px-3 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white font-semibold rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-300 dark:hover:bg-gray-600 transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center gap-2 justify-center" title="Start a brainstorming session by uploading a previous report">
                            {isParsingForBrainstorm ? <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> : <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M12 20.25c4.97 0 9-3.694 9-8.25s-4.03-8.25-9-8.25S3 7.444 3 12c0 2.104.859 4.023 2.273 5.482L7 21h4m4 0-3.273-5.482M12 20.25V21" /></svg>}
                            {isParsingForBrainstorm ? 'Parsing...' : 'Brainstorm from PDF'}
                         </button>

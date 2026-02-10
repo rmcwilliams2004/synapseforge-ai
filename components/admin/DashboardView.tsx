@@ -116,29 +116,25 @@ export const DashboardView = ({ users, projects, logs }: DashboardViewProps) => 
                 <StatCard title="Total Analyses Run" value={totalAnalyses} icon={<Icons.Analyses />} />
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                 <BarChart data={modelUsageData} title="AI Model Usage" />
-                 <BarChart data={topUsersData} title="Top Active Users (by Analyses)" />
-            </div>
-             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                 <BarChart data={factionUsageData} title="Faction Usage Distribution" />
+            <BarChart data={modelUsageData} title="AI Model Usage" />
+            <BarChart data={topUsersData} title="Top Active Users (by Analyses)" />
+            <BarChart data={factionUsageData} title="Faction Usage Distribution" />
 
-                 <div className="bg-gray-800 border border-gray-700 p-6 rounded-lg">
-                    <h3 className="text-lg font-semibold text-brand-light mb-4">Recent Activity</h3>
-                    <ul className="space-y-3">
-                        {recentActivity.map(log => (
-                            <li key={log.id} className="flex items-start gap-3 text-sm">
-                                <div className="flex-shrink-0 mt-1">
-                                    {log.level === 'INFO' ? <Icons.LogInfo /> : <Icons.LogWarn />}
-                                </div>
-                                <div>
-                                    <p className="text-gray-300">{log.message}</p>
-                                    <p className="text-xs text-gray-500">{new Date(log.timestamp).toLocaleString()}</p>
-                                </div>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
+            <div className="bg-gray-800 border border-gray-700 p-6 rounded-lg">
+                <h3 className="text-lg font-semibold text-brand-light mb-4">Recent Activity</h3>
+                <ul className="space-y-3">
+                    {recentActivity.map(log => (
+                        <li key={log.id} className="flex items-start gap-3 text-sm">
+                            <div className="flex-shrink-0 mt-1">
+                                {log.level === 'INFO' ? <Icons.LogInfo /> : <Icons.LogWarn />}
+                            </div>
+                            <div>
+                                <p className="text-gray-300">{log.message}</p>
+                                <p className="text-xs text-gray-500">{new Date(log.timestamp).toLocaleString()}</p>
+                            </div>
+                        </li>
+                    ))}
+                </ul>
             </div>
         </div>
     );

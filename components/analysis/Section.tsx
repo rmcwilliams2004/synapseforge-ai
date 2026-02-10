@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 
 interface SectionProps {
@@ -12,7 +13,7 @@ export const Section: React.FC<SectionProps> = ({ id, title, children, actions, 
     const [isOpen, setIsOpen] = useState(defaultOpen);
     return (
         <div id={id} className="mb-6 animate-fade-in" style={{ animationDelay: '150ms' }}>
-            <div className="flex justify-between items-center mb-3 pb-2 border-b-2 border-cyan-800/50">
+            <div className="flex justify-between items-center mb-3 pb-2 border-b-2 border-cyan-500/30 dark:border-cyan-800/50">
                 <div className="flex items-center gap-3">
                     <button onClick={() => setIsOpen(!isOpen)} className="text-brand-cyan">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className={`w-5 h-5 transition-transform ${isOpen ? 'rotate-90' : ''}`}>

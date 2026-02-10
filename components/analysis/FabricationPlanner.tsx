@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { FabricationPlan, ManufacturingProcessType, AnalysisResult, User } from '../../types';
 import { useFabricationPlanner } from '../../hooks/useFabricationPlanner';
@@ -30,25 +31,25 @@ export const FabricationPlanner: React.FC<FabricationPlannerProps> = ({ fabricat
 
     return (
         <div className="space-y-6">
-            <div className="bg-gray-800/50 p-6 rounded-lg border border-gray-700 space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-white dark:bg-gray-800/50 p-6 rounded-lg border border-gray-200 dark:border-gray-700 space-y-4 transition-colors duration-300">
+                <div className="grid grid-cols-1 gap-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">1. Select Manufacturing Process</label>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">1. Select Manufacturing Process</label>
                         <select
                             value={selectedProcess}
                             onChange={(e) => setSelectedProcess(e.target.value as ManufacturingProcessType)}
-                            className="w-full p-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 focus:ring-2 focus:ring-purple-500"
+                            className="w-full p-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-gray-200 focus:ring-2 focus:ring-purple-500 transition-colors"
                             disabled={isLoading || isViewer}
                         >
                             {processOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                         </select>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">2. Confirm Material</label>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">2. Confirm Material</label>
                         <select
                             value={selectedMaterial}
                             onChange={(e) => setSelectedMaterial(e.target.value)}
-                            className="w-full p-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 focus:ring-2 focus:ring-purple-500"
+                            className="w-full p-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-gray-200 focus:ring-2 focus:ring-purple-500 transition-colors"
                             disabled={isLoading || isViewer}
                         >
                             {analysisResult.material_suggestions.map(mat => <option key={mat.name} value={mat.name}>{mat.name}</option>)}
@@ -70,44 +71,46 @@ export const FabricationPlanner: React.FC<FabricationPlannerProps> = ({ fabricat
             {isLoading && (
                 <div className="text-center p-4">
                     <svg className="animate-spin h-8 w-8 text-purple-400 mx-auto mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                    <p className="text-purple-300">AI is analyzing manufacturability...</p>
+                    <p className="text-purple-600 dark:text-purple-300">AI is analyzing manufacturability...</p>
                 </div>
             )}
-            {error && <p className="text-red-400">{error}</p>}
+            {error && <p className="text-red-500 dark:text-red-400">{error}</p>}
 
             {plan && (
-                <div className="bg-gray-800/50 p-6 rounded-lg border border-gray-700 space-y-4 animate-fade-in">
-                    <h4 className="text-lg font-semibold text-brand-light">Fabrication Plan Results</h4>
+                <div className="bg-white dark:bg-gray-800/50 p-6 rounded-lg border border-gray-200 dark:border-gray-700 space-y-4 animate-fade-in transition-colors duration-300">
+                    <h4 className="text-lg font-semibold text-gray-900 dark:text-brand-light">Fabrication Plan Results</h4>
                     <div>
-                        <h5 className="font-semibold text-gray-300 mb-2">Design for Manufacturability (DFM) Checks</h5>
-                        <table className="w-full text-sm text-left text-gray-400">
-                            <thead className="text-xs text-gray-300 uppercase bg-gray-700/50">
-                                <tr>
-                                    <th className="px-4 py-2">Component</th>
-                                    <th className="px-4 py-2">Issue</th>
-                                    <th className="px-4 py-2">Recommendation</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {plan.dfmChecks.map((check, i) => (
-                                    <tr key={i} className="border-b border-gray-700">
-                                        <td className="px-4 py-2 font-medium text-gray-200">{check.component}</td>
-                                        <td className="px-4 py-2 text-yellow-300">{check.issue}</td>
-                                        <td className="px-4 py-2">{check.recommendation}</td>
+                        <h5 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">Design for Manufacturability (DFM) Checks</h5>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm text-left text-gray-600 dark:text-gray-400">
+                                <thead className="text-xs text-gray-700 dark:text-gray-300 uppercase bg-gray-100 dark:bg-gray-700/50">
+                                    <tr>
+                                        <th className="px-4 py-2">Component</th>
+                                        <th className="px-4 py-2">Issue</th>
+                                        <th className="px-4 py-2">Recommendation</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody>
+                                    {plan.dfmChecks.map((check, i) => (
+                                        <tr key={i} className="border-b border-gray-200 dark:border-gray-700">
+                                            <td className="px-4 py-2 font-medium text-gray-800 dark:text-gray-200">{check.component}</td>
+                                            <td className="px-4 py-2 text-yellow-600 dark:text-yellow-300">{check.issue}</td>
+                                            <td className="px-4 py-2">{check.recommendation}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                     <div>
-                        <h5 className="font-semibold text-gray-300 mb-2">Tolerancing Notes</h5>
-                        <ul className="list-disc pl-5 space-y-1 text-sm text-gray-400">
+                        <h5 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">Tolerancing Notes</h5>
+                        <ul className="list-disc pl-5 space-y-1 text-sm text-gray-600 dark:text-gray-400">
                             {plan.tolerancingNotes.map((note, i) => <li key={i}>{note}</li>)}
                         </ul>
                     </div>
                     <div>
-                        <h5 className="font-semibold text-gray-300 mb-2">{plan.processSpecificOutput.title}</h5>
-                        <pre className="bg-gray-900/50 p-4 rounded-md text-cyan-300 text-xs overflow-x-auto font-mono">
+                        <h5 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">{plan.processSpecificOutput.title}</h5>
+                        <pre className="bg-gray-100 dark:bg-gray-900/50 p-4 rounded-md text-cyan-700 dark:text-cyan-300 text-xs overflow-x-auto font-mono border border-gray-200 dark:border-gray-600">
                             <code>{plan.processSpecificOutput.data}</code>
                         </pre>
                         {selectedProcess === 'CNC Machining' && plan.processSpecificOutput.data && (

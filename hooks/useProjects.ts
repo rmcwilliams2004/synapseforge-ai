@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import { Project, ProjectVersion, FactionId, ProjectIndexEntry, GeneratedImage, InnovationCouncil } from '../types';
+import { Project, ProjectVersion, FactionId, ProjectIndexEntry, GeneratedImage } from '../types';
 
 const getProjectKeywords = (projectHistory: ProjectVersion[]): string => {
     const keywords: (string | undefined)[] = [];
@@ -21,18 +21,19 @@ const getProjectKeywords = (projectHistory: ProjectVersion[]): string => {
 };
 
 
-const createNewProject = (details: {name: string; description: string; tags: string[]}, initialVersionData?: { prompt?: string; factionId?: FactionId, activeCouncil?: InnovationCouncil }): Project => {
+const createNewProject = (details: {name: string; description: string; tags: string[]}, initialVersionData?: { prompt?: string; factionId?: FactionId }): Project => {
     const timestamp = new Date().toISOString();
     const initialVersion: ProjectVersion = {
         versionId: `ver-${Date.now()}`,
         createdAt: timestamp,
-        commitMessage: initialVersionData?.activeCouncil ? 'War Room Council Assembled' : 'Initial Commit',
+        commitMessage: 'Initial Commit',
         prompt: initialVersionData?.prompt || '',
         factionId: initialVersionData?.factionId || FactionId.PRAGMATIC_PRODUCTION,
         result: null,
         fileUrls: [],
         drawings: [],
-        activeCouncil: initialVersionData?.activeCouncil,
+        inspirationalImages: [],
+        incorporatedSuggestions: [],
     };
     return {
         id: `proj-${Date.now()}`,
@@ -50,7 +51,7 @@ export const useProjects = () => {
     const [projects, setProjects] = useState<ProjectIndexEntry[]>([]);
     const [activeProject, setActiveProject] = useState<Project | null>(null);
 
-    const onNewProject = (details: {name: string; description: string; tags: string[]}, initialVersionData?: { prompt?: string; factionId?: FactionId, activeCouncil?: InnovationCouncil }): string => {
+    const onNewProject = (details: {name: string; description: string; tags: string[]}, initialVersionData?: { prompt?: string; factionId?: FactionId }): string => {
         const newProject = createNewProject(details, initialVersionData);
         
         const { history, ...indexEntry } = newProject;
@@ -93,9 +94,18 @@ export const useProjects = () => {
     };
     
     const onSelectProject = (projectId: string) => {
+        // Since we are not storing full projects in a list, we can assume the activeProject holds the full data.
+        // Selecting from the list is more about switching the view context if multiple projects were loaded.
+        // For this local-first model, we assume only the activeProject is fully in memory.
+        // A more complex implementation might keep all loaded projects in memory.
         if (activeProject?.id !== projectId) {
+             // This case is tricky in a pure local-first model without keeping all opened projects in memory.
+             // For now, we assume the user will re-open the file to switch contexts if needed.
+             // This function will effectively just change the highlighted item in the UI.
              const projectIndex = projects.find(p => p.id === projectId);
              if (projectIndex) {
+                 // To prevent errors, we create a temporary active project.
+                 // The user needs to re-open the file for full history.
                  setActiveProject({ ...projectIndex, history: [] });
                  console.warn("To view the full history of another project, please open its file.");
              }
@@ -131,6 +141,13 @@ export const useProjects = () => {
             commitMessage,
             versionId: `ver-${Date.now()}`,
             createdAt: timestamp,
+            // Explicit deep copy for array/object properties to ensure immutability in history
+            drawings: versionData.drawings ? JSON.parse(JSON.stringify(versionData.drawings)) : [],
+            inspirationalImages: versionData.inspirationalImages ? JSON.parse(JSON.stringify(versionData.inspirationalImages)) : [],
+            fileUrls: [...(versionData.fileUrls || [])],
+            incorporatedSuggestions: [...(versionData.incorporatedSuggestions || [])],
+            result: versionData.result ? JSON.parse(JSON.stringify(versionData.result)) : null,
+            rotorModel: versionData.rotorModel ? JSON.parse(JSON.stringify(versionData.rotorModel)) : undefined,
         };
 
         const updatedProject: Project = {
@@ -159,11 +176,20 @@ export const useProjects = () => {
         
         const oldVersion = activeProject.history[versionIndex];
         const timestamp = new Date().toISOString();
+        
+        // Deep copy everything from oldVersion to create newVersion
+        // This ensures that if the user modifies the reverted state, it doesn't affect the old version history entry
         const newVersion: ProjectVersion = {
             ...oldVersion,
             versionId: `ver-${Date.now()}`,
             createdAt: timestamp,
             commitMessage: `Reverted to: "${oldVersion.commitMessage}"`,
+            drawings: oldVersion.drawings ? JSON.parse(JSON.stringify(oldVersion.drawings)) : [],
+            inspirationalImages: oldVersion.inspirationalImages ? JSON.parse(JSON.stringify(oldVersion.inspirationalImages)) : [],
+            fileUrls: [...(oldVersion.fileUrls || [])],
+            incorporatedSuggestions: [...(oldVersion.incorporatedSuggestions || [])],
+            result: oldVersion.result ? JSON.parse(JSON.stringify(oldVersion.result)) : null,
+            rotorModel: oldVersion.rotorModel ? JSON.parse(JSON.stringify(oldVersion.rotorModel)) : undefined,
         };
 
         const updatedProject: Project = {

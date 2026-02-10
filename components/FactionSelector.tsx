@@ -1,5 +1,4 @@
 
-
 import React from 'react';
 import { Faction, User, FactionId } from '../types';
 import { ENGINEERING_PHILOSOPHIES } from '../constants';
@@ -25,17 +24,17 @@ const FactionCard: React.FC<FactionCardProps> = ({ faction, isSelected, onSelect
   // Color schemes for each faction
   const factionColors: Record<FactionId, { selected: string; hover: string; icon: string }> = {
     [FactionId.ADVANCED_MATERIALS]: {
-      selected: 'border-brand-cyan bg-cyan-900/40 shadow-lg shadow-cyan-900/50',
+      selected: 'border-brand-cyan bg-cyan-50 dark:bg-cyan-900/40 shadow-lg shadow-cyan-500/20 dark:shadow-cyan-900/50',
       hover: 'hover:border-brand-cyan',
       icon: 'text-brand-cyan',
     },
     [FactionId.PRAGMATIC_PRODUCTION]: {
-      selected: 'border-amber-500 bg-amber-900/40 shadow-lg shadow-amber-900/50',
+      selected: 'border-amber-500 bg-amber-50 dark:bg-amber-900/40 shadow-lg shadow-amber-500/20 dark:shadow-amber-900/50',
       hover: 'hover:border-amber-500',
       icon: 'text-amber-500',
     },
     [FactionId.SYSTEMS_AUTOMATION]: {
-      selected: 'border-purple-500 bg-purple-900/40 shadow-lg shadow-purple-900/50',
+      selected: 'border-purple-500 bg-purple-50 dark:bg-purple-900/40 shadow-lg shadow-purple-500/20 dark:shadow-purple-900/50',
       hover: 'hover:border-purple-500',
       icon: 'text-purple-500',
     },
@@ -49,17 +48,17 @@ const FactionCard: React.FC<FactionCardProps> = ({ faction, isSelected, onSelect
       className={`p-4 border-2 rounded-lg transition-all duration-300 ${
         isSelected
           ? colors.selected
-          : `border-gray-700 bg-gray-800 ${colors.hover}`
+          : `border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 ${colors.hover}`
       } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:-translate-y-1'}`}
     >
       <div className="flex items-center mb-2">
         <Icon className={`w-8 h-8 mr-3 ${colors.icon}`} />
-        <h3 className="text-lg font-bold text-brand-light">{faction.name}</h3>
+        <h3 className="text-lg font-bold text-gray-900 dark:text-brand-light">{faction.name}</h3>
       </div>
-      <p className="text-sm text-gray-400 font-mono mb-2">
+      <p className="text-sm text-gray-500 dark:text-gray-400 font-mono mb-2">
         <strong>Focus:</strong> {faction.focus}
       </p>
-      <p className="text-sm text-gray-300">{faction.philosophy}</p>
+      <p className="text-sm text-gray-600 dark:text-gray-300">{faction.philosophy}</p>
     </div>
   );
 };
@@ -68,8 +67,8 @@ export const FactionSelector = ({ selectedFaction, onSelectFaction, disabled, au
   const isViewer = authenticatedUser.role === 'Viewer';
   return (
     <div id="tour-step-1">
-      <h2 className="text-xl font-semibold text-brand-light mb-3">1. Select an Analytical Lens</h2>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <h2 className="text-xl font-semibold text-gray-900 dark:text-brand-light mb-3">1. Select an Analytical Lens</h2>
+      <div className="grid grid-cols-1 gap-4">
         {ENGINEERING_PHILOSOPHIES.map((faction) => (
           <FactionCard
             key={faction.id}

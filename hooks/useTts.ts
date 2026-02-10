@@ -1,5 +1,4 @@
 
-
 import { useState, useRef, useCallback } from 'react';
 import { generateSpeech as performTextToSpeech, parseApiError } from '../services/geminiService';
 import { LogEntry } from '../types';
@@ -46,13 +45,22 @@ export const useTts = (addLog: (level: LogEntry['level'], message: string) => vo
     const stop = useCallback(() => {
         if (sourceNodeRef.current) {
             sourceNodeRef.current.onended = null; // Prevent onended from firing on manual stop
-            sourceNodeRef.current.stop();
+            try { sourceNodeRef.current.stop(); } catch(e) { /* ignore */ }
             sourceNodeRef.current = null;
         }
-        if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-            audioContextRef.current.close().catch(console.error);
-            audioContextRef.current = null;
+        
+        const ctx = audioContextRef.current;
+        if (ctx) {
+            try {
+                if (ctx.state !== 'closed') {
+                    ctx.close().catch(e => console.warn("Safe close TTS context:", e));
+                }
+            } catch (e) {
+                console.warn("Error closing TTS audio context:", e);
+            }
         }
+        audioContextRef.current = null;
+        
         setIsPlaying(false);
         setIsLoading(false);
         setSpeakingText(null);

@@ -14,9 +14,26 @@ interface CadViewerModalProps {
 
 const SNAP_RADIUS = 5; // in world units
 
+// Professional engineering color palette
+const COMPONENT_COLORS = [
+    0x06b6d4, // Brand Cyan
+    0x3b82f6, // Blue
+    0x8b5cf6, // Violet
+    0xf59e0b, // Amber
+    0x10b981, // Emerald
+    0xf43f5e, // Rose
+    0x6366f1, // Indigo
+    0xec4899, // Pink
+    0x14b8a6, // Teal
+];
+
+const getComponentColor = (index: number) => {
+    return COMPONENT_COLORS[index % COMPONENT_COLORS.length];
+};
+
 // Helper to find the closest vertex on a mesh to a given point
 const findClosestVertex = (intersect: THREE.Intersection): { point: THREE.Vector3, distance: number } | null => {
-    if (!intersect) return null;
+    if (!intersect || !(intersect.object instanceof THREE.Mesh)) return null;
 
     const geometry = intersect.object.geometry;
     const positionAttribute = geometry.attributes.position;
@@ -49,6 +66,8 @@ export const CadViewerModal: React.FC<CadViewerModalProps> = ({ isOpen, onClose,
     const [explodeFactor, setExplodeFactor] = useState(0.5);
     const [isSectionEnabled, setIsSectionEnabled] = useState(false);
     const [sectionPlaneConfig, setSectionPlaneConfig] = useState({ axis: 'x', constant: 0, inverted: false });
+    const [isAutoRotate, setIsAutoRotate] = useState(false);
+    const [showGrid, setShowGrid] = useState(true);
     
     // State for click-and-drag measurement
     const [measurements, setMeasurements] = useState<(CadMeasurement & { line: THREE.Line; label: HTMLDivElement })[]>([]);
@@ -67,9 +86,10 @@ export const CadViewerModal: React.FC<CadViewerModalProps> = ({ isOpen, onClose,
         originalPositions: Map<string, THREE.Vector3>,
         clippingPlanes: THREE.Plane[],
         planeHelper?: THREE.PlaneHelper,
-        // New helpers for measurement
+        gridHelper?: THREE.GridHelper,
         snapIndicator?: THREE.Mesh,
         previewLine?: THREE.Line,
+        animationFrameId?: number,
     }>({ meshMap: new Map(), originalPositions: new Map(), clippingPlanes: [] });
 
     const handleResetMeasurements = useCallback(() => {
@@ -102,8 +122,7 @@ export const CadViewerModal: React.FC<CadViewerModalProps> = ({ isOpen, onClose,
         const mouse = new THREE.Vector2(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1);
         const raycaster = new THREE.Raycaster();
         raycaster.setFromCamera(mouse, t.camera);
-        // FIX: Added explicit type cast to resolve 'unknown' property access on 'visible' property during filtering
-        const intersects = raycaster.intersectObjects(Array.from(t.meshMap.values()).filter((m: THREE.Mesh) => m.visible));
+        const intersects = raycaster.intersectObjects((Array.from(t.meshMap.values()) as THREE.Mesh[]).filter(m => m.visible));
         return intersects.length > 0 ? intersects[0] : null;
     }, []);
 
@@ -114,70 +133,122 @@ export const CadViewerModal: React.FC<CadViewerModalProps> = ({ isOpen, onClose,
         const currentMount = mountRef.current;
         const t = threeRef.current;
 
+        // Initialize Scene
         t.scene = new THREE.Scene();
-        t.scene.background = new THREE.Color(0x0f172a);
+        t.scene.background = new THREE.Color(0x0f172a); // brand-dark
+        t.scene.fog = new THREE.FogExp2(0x0f172a, 0.001); // Fog for depth
+
+        // Initialize Camera
         t.camera = new THREE.PerspectiveCamera(75, currentMount.clientWidth / currentMount.clientHeight, 0.1, 10000);
-        t.renderer = new THREE.WebGLRenderer({ antialias: true });
+        
+        // Initialize Renderer
+        t.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         t.renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
         t.renderer.setPixelRatio(window.devicePixelRatio);
         t.renderer.localClippingEnabled = true;
+        t.renderer.shadowMap.enabled = true;
+        t.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         currentMount.appendChild(t.renderer.domElement);
         
+        // Initialize Controls
         t.controls = new OrbitControls(t.camera, t.renderer.domElement);
         t.controls.enableDamping = true;
+        t.controls.dampingFactor = 0.05;
+        t.controls.autoRotateSpeed = 2.0;
 
-        const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
         t.scene.add(ambientLight);
-        const dirLight1 = new THREE.DirectionalLight(0xffffff, 1.5);
-        dirLight1.position.set(1, 1, 1).normalize();
+        
+        const dirLight1 = new THREE.DirectionalLight(0xffffff, 1.0);
+        dirLight1.position.set(50, 100, 50);
+        dirLight1.castShadow = true;
+        dirLight1.shadow.mapSize.width = 2048;
+        dirLight1.shadow.mapSize.height = 2048;
         t.scene.add(dirLight1);
 
-        const snapIndicator = new THREE.Mesh(new THREE.SphereGeometry(2), new THREE.MeshBasicMaterial({ color: 0x06b6d4 }));
+        const dirLight2 = new THREE.DirectionalLight(0x06b6d4, 0.5); // Cyan rim light
+        dirLight2.position.set(-50, 0, -50);
+        t.scene.add(dirLight2);
+
+        // Helpers
+        const gridHelper = new THREE.GridHelper(2000, 50, 0x4b5563, 0x1f2937);
+        t.gridHelper = gridHelper;
+        t.scene.add(gridHelper);
+
+        const snapIndicator = new THREE.Mesh(new THREE.SphereGeometry(2), new THREE.MeshBasicMaterial({ color: 0xffd700 }));
         t.snapIndicator = snapIndicator;
-        t.snapIndicator.visible = false;
-        t.scene.add(t.snapIndicator);
+        snapIndicator.visible = false;
+        t.scene.add(snapIndicator);
         
         const previewLineGeom = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
         const previewLine = new THREE.Line(previewLineGeom, new THREE.LineDashedMaterial({ color: 0xffeb3b, dashSize: 3, gapSize: 1 }));
         t.previewLine = previewLine;
-        t.previewLine.computeLineDistances();
-        t.previewLine.visible = false;
-        t.scene.add(t.previewLine);
+        previewLine.computeLineDistances();
+        previewLine.visible = false;
+        t.scene.add(previewLine);
 
+        // Load Components
         const group = new THREE.Group();
         t.meshMap.clear();
         t.originalPositions.clear();
-        cadData.components.forEach(comp => {
-            const geometry = comp.shape === 'cylinder' ? new THREE.CylinderGeometry(comp.dimensions.x / 2, comp.dimensions.x / 2, comp.dimensions.z, 32)
-                             : comp.shape === 'sphere' ? new THREE.SphereGeometry(comp.dimensions.x / 2, 32, 16)
-                             : new THREE.BoxGeometry(comp.dimensions.x, comp.dimensions.y, comp.dimensions.z);
-            
+        
+        cadData.components.forEach((comp, index) => {
+            let geometry: THREE.BufferGeometry;
+            switch(comp.shape) {
+                case 'cylinder':
+                    geometry = new THREE.CylinderGeometry(comp.dimensions.x / 2, comp.dimensions.x / 2, comp.dimensions.z, 32);
+                    break;
+                case 'sphere':
+                    geometry = new THREE.SphereGeometry(comp.dimensions.x / 2, 32, 16);
+                    break;
+                case 'cube':
+                default:
+                    geometry = new THREE.BoxGeometry(comp.dimensions.x, comp.dimensions.y, comp.dimensions.z);
+                    break;
+            }
+
+            const baseColor = getComponentColor(index);
             const material = new THREE.MeshStandardMaterial({
-                color: 0x06b6d4, transparent: true, opacity: 0.8, metalness: 0.3, roughness: 0.4,
-                clipping: true, clipIntersection: false,
+                color: baseColor, 
+                transparent: true, 
+                opacity: 0.9, 
+                metalness: 0.2, 
+                roughness: 0.5,
+                side: THREE.DoubleSide
             });
+            material.clipIntersection = false;
+            
             const mesh = new THREE.Mesh(geometry, material);
             mesh.position.set(comp.position.x, comp.position.y, comp.position.z);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
             mesh.name = comp.name;
+            mesh.userData = { baseColor }; // Store base color for resetting after selection
+            
             group.add(mesh);
             t.meshMap.set(comp.name, mesh);
             t.originalPositions.set(comp.name, mesh.position.clone());
         });
         
+        // Center and Fit Camera
         const box = new THREE.Box3().setFromObject(group);
         const center = box.getCenter(new THREE.Vector3());
-        group.position.sub(center);
+        group.position.sub(center); // Center objects at origin
         const size = box.getSize(new THREE.Vector3());
         const maxDim = Math.max(size.x, size.y, size.z);
         const fov = t.camera.fov * (Math.PI / 180);
-        let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 1.5;
-        t.camera.position.set(cameraZ, cameraZ, cameraZ);
+        let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 2.0;
+        // Clamp camera distance to reasonable limits
+        cameraZ = Math.max(cameraZ, 50); 
+        
+        t.camera.position.set(cameraZ, cameraZ * 0.8, cameraZ);
         t.controls.target.set(0, 0, 0);
         t.scene.add(group);
 
-        let animationFrameId: number;
+        // Animation Loop
         const animate = () => {
-            animationFrameId = requestAnimationFrame(animate);
+            t.animationFrameId = requestAnimationFrame(animate);
             t.controls?.update();
             measurements.forEach(m => {
                  if (t.camera && t.renderer) {
@@ -195,14 +266,27 @@ export const CadViewerModal: React.FC<CadViewerModalProps> = ({ isOpen, onClose,
         };
         animate();
 
-        return () => { // Cleanup function
-            cancelAnimationFrame(animationFrameId);
+        // Handle Resizing
+        const resizeObserver = new ResizeObserver((entries) => {
+            if (!t.renderer || !t.camera) return;
+            for (let entry of entries) {
+                const { width, height } = entry.contentRect;
+                t.camera.aspect = width / height;
+                t.camera.updateProjectionMatrix();
+                t.renderer.setSize(width, height);
+            }
+        });
+        resizeObserver.observe(currentMount);
+
+        return () => {
+            resizeObserver.disconnect();
+            if (t.animationFrameId) cancelAnimationFrame(t.animationFrameId);
             t.controls?.dispose();
             t.scene?.traverse(o => {
                 if (o instanceof THREE.Mesh) {
                     o.geometry.dispose();
                     if(Array.isArray(o.material)) o.material.forEach(m => m.dispose());
-                    else o.material.dispose();
+                    else (o.material as THREE.Material).dispose();
                 }
             });
             handleResetMeasurements();
@@ -213,7 +297,7 @@ export const CadViewerModal: React.FC<CadViewerModalProps> = ({ isOpen, onClose,
         };
     }, [isOpen, cadData, handleResetMeasurements]);
 
-    // This robust useEffect manages all event listeners, recreating them when dependencies change.
+    // Interaction Logic (Click, Measure)
     useEffect(() => {
         const rendererEl = threeRef.current.renderer?.domElement;
         if (!rendererEl) return;
@@ -309,7 +393,7 @@ export const CadViewerModal: React.FC<CadViewerModalProps> = ({ isOpen, onClose,
 
             const start = startPointRef.current.point;
             const distance = start.distanceTo(endPoint);
-            if (distance < 0.1) return; // Ignore tiny measurements
+            if (distance < 0.1) return; 
 
             const lineGeom = new THREE.BufferGeometry().setFromPoints([start, endPoint]);
             const line = new THREE.Line(lineGeom, new THREE.LineBasicMaterial({ color: 0xffeb3b, linewidth: 2, depthTest: false }));
@@ -344,26 +428,33 @@ export const CadViewerModal: React.FC<CadViewerModalProps> = ({ isOpen, onClose,
             rendererEl.removeEventListener('mouseup', handleMouseUp);
             rendererEl.removeEventListener('click', handleClick);
         };
-    }, [isOpen, activeTool, getIntersect, cadData.units]); // Re-attach listeners if dependencies change
+    }, [isOpen, activeTool, getIntersect, cadData.units]);
     
+    // Tool State Updates
     useEffect(() => {
         if(threeRef.current.controls) threeRef.current.controls.enabled = activeTool === 'select';
         if(mountRef.current) mountRef.current.style.cursor = activeTool === 'measure' ? 'crosshair' : (activeTool === 'select' ? 'grab' : 'default');
     }, [activeTool]);
 
+    // Selection Effect
     useEffect(() => {
         threeRef.current.meshMap.forEach((mesh, name) => {
             const isSelected = name === selectedComponentName;
             const material = mesh.material as THREE.MeshStandardMaterial;
-            material.color.set(isSelected ? 0xfbbf24 : 0x06b6d4);
-            material.emissive.set(isSelected ? 0xcc8400 : 0x000000);
+            const baseColor = mesh.userData.baseColor || 0x06b6d4;
+            
+            material.color.setHex(isSelected ? 0xfbbf24 : baseColor);
+            material.emissive.setHex(isSelected ? 0x443300 : 0x000000);
+            material.opacity = isSelected ? 1.0 : 0.9;
         });
     }, [selectedComponentName]);
 
+    // Visibility Effect
     useEffect(() => {
         threeRef.current.meshMap.forEach((mesh, name) => { mesh.visible = visibleIds.has(name); });
     }, [visibleIds]);
 
+    // Explode View Effect
     useEffect(() => {
         const { meshMap, originalPositions } = threeRef.current;
         if (!meshMap.size || !originalPositions.size) return;
@@ -379,6 +470,7 @@ export const CadViewerModal: React.FC<CadViewerModalProps> = ({ isOpen, onClose,
         });
     }, [isExploded, explodeFactor]);
 
+    // Section View Effect
     useEffect(() => {
         const { scene, renderer, meshMap, clippingPlanes } = threeRef.current;
         if (!scene || !renderer) return;
@@ -403,6 +495,20 @@ export const CadViewerModal: React.FC<CadViewerModalProps> = ({ isOpen, onClose,
         });
     }, [isSectionEnabled, sectionPlaneConfig]);
 
+    // Auto Rotate Effect
+    useEffect(() => {
+        if (threeRef.current.controls) {
+            threeRef.current.controls.autoRotate = isAutoRotate;
+        }
+    }, [isAutoRotate]);
+
+    // Grid Toggle Effect
+    useEffect(() => {
+        if (threeRef.current.gridHelper) {
+            threeRef.current.gridHelper.visible = showGrid;
+        }
+    }, [showGrid]);
+
     if (!isOpen) return null;
 
     return (
@@ -422,8 +528,12 @@ export const CadViewerModal: React.FC<CadViewerModalProps> = ({ isOpen, onClose,
                             onToggleExplode={() => setIsExploded(!isExploded)}
                             isSectionEnabled={isSectionEnabled}
                             onToggleSection={() => setIsSectionEnabled(!isSectionEnabled)}
+                            isAutoRotate={isAutoRotate}
+                            onToggleAutoRotate={() => setIsAutoRotate(!isAutoRotate)}
+                            showGrid={showGrid}
+                            onToggleGrid={() => setShowGrid(!showGrid)}
                         />
-                         <div ref={mountRef} className="w-full h-full" />
+                         <div ref={mountRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
                          <div ref={labelsRef} className="absolute top-0 left-0 pointer-events-none" />
                     </div>
                     <CadViewerSidebar

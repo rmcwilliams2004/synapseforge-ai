@@ -1,3 +1,4 @@
+
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { GoogleGenAI, LiveServerMessage, Modality, Blob } from '@google/genai';
 import { VoiceCommanderState } from '../types';
@@ -57,8 +58,8 @@ function createBlob(data: Float32Array): Blob {
 
 interface VoiceCommanderCallbacks {
     onNavigate: (sectionId: string) => void;
-    onDownloadDrawings: () => void;
-    onGenerateVideo: (prompt: string, useUploadedImage: boolean) => void;
+    onDownloadDrawings: () => string;
+    onGenerateVideo: (prompt: string, useUploadedImage: boolean) => string;
 }
 
 export const useVoiceCommander = ({ onNavigate, onDownloadDrawings, onGenerateVideo }: VoiceCommanderCallbacks) => {
@@ -73,11 +74,24 @@ export const useVoiceCommander = ({ onNavigate, onDownloadDrawings, onGenerateVi
         nextStartTime: number,
         sources: Set<AudioBufferSourceNode>
     }>({ nextStartTime: 0, sources: new Set() });
+    
+    // Use refs for callbacks to avoid stale closures in the session event handlers.
+    // This is crucial for onGenerateVideo to see the latest 'files' state when the user uploads an image
+    // *after* the voice session has already started.
+    const callbacksRef = useRef({ onNavigate, onDownloadDrawings, onGenerateVideo });
+    
+    useEffect(() => {
+        callbacksRef.current = { onNavigate, onDownloadDrawings, onGenerateVideo };
+    }, [onNavigate, onDownloadDrawings, onGenerateVideo]);
 
     const stopListening = useCallback(() => {
         audioRefs.current.mediaStream?.getTracks().forEach(track => track.stop());
-        audioRefs.current.scriptProcessor?.disconnect();
-        audioRefs.current.source?.disconnect();
+        if (audioRefs.current.scriptProcessor) {
+            try { audioRefs.current.scriptProcessor.disconnect(); } catch (e) { /* ignore */ }
+        }
+        if (audioRefs.current.source) {
+            try { audioRefs.current.source.disconnect(); } catch (e) { /* ignore */ }
+        }
 
         if (sessionPromise.current) {
             sessionPromise.current.then(session => session?.close());
@@ -85,18 +99,40 @@ export const useVoiceCommander = ({ onNavigate, onDownloadDrawings, onGenerateVi
         }
         
         audioRefs.current.sources.forEach(source => {
-            try { source.stop(); } catch(e) {}
+            try { source.stop(); } catch (e) { /* ignore */ }
         });
         audioRefs.current.sources.clear();
         
-        audioRefs.current.inputAudioContext?.close().catch(console.error);
-        audioRefs.current.outputAudioContext?.close().catch(console.error);
+        const inputCtx = audioRefs.current.inputAudioContext;
+        if (inputCtx) {
+            try {
+                if (inputCtx.state !== 'closed') {
+                    inputCtx.close().catch(e => console.warn("Safe close inputCtx:", e));
+                }
+            } catch (e) {
+                console.warn("Error closing input audio context:", e);
+            }
+        }
+        audioRefs.current.inputAudioContext = undefined;
+
+        const outputCtx = audioRefs.current.outputAudioContext;
+        if (outputCtx) {
+            try {
+                if (outputCtx.state !== 'closed') {
+                    outputCtx.close().catch(e => console.warn("Safe close outputCtx:", e));
+                }
+            } catch (e) {
+                console.warn("Error closing output audio context:", e);
+            }
+        }
+        audioRefs.current.outputAudioContext = undefined;
         
         setState('idle');
     }, []);
 
     const startListening = useCallback(async () => {
-        if (state !== 'idle') return;
+        // Allow starting from 'idle' or 'error' state to enable retries.
+        if (state !== 'idle' && state !== 'error') return;
 
         setState('listening');
         audioRefs.current = { nextStartTime: 0, sources: new Set() };
@@ -115,12 +151,11 @@ export const useVoiceCommander = ({ onNavigate, onDownloadDrawings, onGenerateVi
         outputNode.connect(audioRefs.current.outputAudioContext.destination);
 
         sessionPromise.current = ai.live.connect({
-            // Model updated to the latest 12-2025 version for better real-time audio performance
-            model: 'gemini-2.5-flash-native-audio-preview-12-2025',
+            model: 'gemini-2.5-flash-native-audio-preview-09-2025',
             config: {
                 responseModalities: [Modality.AUDIO],
                 speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } },
-                systemInstruction: "You are a voice command assistant for a web application. Your job is to listen for user commands and call the appropriate function. You can navigate to sections using 'show_section', download all drawings as a zip file using 'download_drawings', or generate a video using 'generate_video'. Be concise in your audio responses, like 'Okay', 'Navigating', or 'Starting video generation'.",
+                systemInstruction: "You are a voice command assistant for a web application. Your job is to listen for user commands and call the appropriate function. You can navigate to sections using 'show_section', download all drawings as a zip file using 'download_drawings', or generate a video using 'generate_video'. If the user wants to animate an uploaded image or refers to 'this image', set 'useUploadedImage' to true. Be concise in your audio responses based on the tool execution result.",
                 tools: [{ functionDeclarations: [showSectionFunctionDeclaration, downloadDrawingsFunctionDeclaration, generateVideoFunctionDeclaration] }],
             },
             callbacks: {
@@ -140,28 +175,21 @@ export const useVoiceCommander = ({ onNavigate, onDownloadDrawings, onGenerateVi
                     scriptProcessor.connect(inputCtx.destination);
                 },
                 onmessage: async (message: LiveServerMessage) => {
-                    // Handle model interruption: stop all currently playing audio chunks
-                    const interrupted = message.serverContent?.interrupted;
-                    if (interrupted) {
-                        for (const source of audioRefs.current.sources.values()) {
-                            try { source.stop(); } catch (e) {}
-                        }
-                        audioRefs.current.sources.clear();
-                        audioRefs.current.nextStartTime = 0;
-                    }
-
                     if (message.toolCall) {
                         setState('thinking');
                         for (const fc of message.toolCall.functionCalls) {
                             let responseResult = 'ok';
+                            // IMPORTANT: Access callbacks from the ref to ensure we use the latest version
+                            // that has access to current state (like uploaded files).
+                            const { onNavigate, onDownloadDrawings, onGenerateVideo } = callbacksRef.current;
+                            
                             if (fc.name === 'show_section' && fc.args.sectionId) {
                                 onNavigate(fc.args.sectionId);
+                                responseResult = 'Navigating to section.';
                             } else if (fc.name === 'download_drawings') {
-                                onDownloadDrawings();
-                                responseResult = 'download started';
+                                responseResult = onDownloadDrawings();
                             } else if (fc.name === 'generate_video' && fc.args.prompt) {
-                                onGenerateVideo(fc.args.prompt, fc.args.useUploadedImage || false);
-                                responseResult = 'video generation started';
+                                responseResult = onGenerateVideo(fc.args.prompt, fc.args.useUploadedImage || false);
                             }
                             
                             sessionPromise.current?.then(session => {
@@ -193,14 +221,14 @@ export const useVoiceCommander = ({ onNavigate, onDownloadDrawings, onGenerateVi
                     setState('error');
                     stopListening();
                 },
-                onclose: () => {
+                onclose: (e: CloseEvent) => {
                      if (state !== 'error') {
                         setState('idle');
                      }
                 },
             },
         });
-    }, [state, onNavigate, stopListening, onDownloadDrawings, onGenerateVideo]);
+    }, [state, stopListening]);
 
     useEffect(() => {
         return () => {
