@@ -1,3 +1,4 @@
+
 import { useState, useCallback } from 'react';
 import { generateTechnicalDrawingImage, parseApiError, generateDrawingFromImage } from '../services/geminiService';
 import { AnalysisResult, GeneratedDrawing, LogEntry } from '../types';
@@ -33,7 +34,7 @@ export const useDrawingGenerator = (addLog: (level: LogEntry['level'], message: 
             isLoading: true,
             error: null,
             includeInReport: true,
-            isCoverImage: prev.length === 0, // Set as cover if it's the first one
+            isCoverImage: prev.length === 0, 
         };
         return [...prev, newDrawing];
     });
@@ -48,6 +49,25 @@ export const useDrawingGenerator = (addLog: (level: LogEntry['level'], message: 
       addLog('ERROR', `2D drawing generation for "${specificPrompt}" failed: ${errorMessage}`);
     }
   }, [addLog]);
+
+  /**
+   * Adds a locally generated snapshot (from WebGL buffer) to the drawings collection.
+   * This bypasses the API for orthographic and isometric captures.
+   */
+  const addLocalSnapshot = useCallback((dataUrl: string, prompt: string) => {
+      const drawingId = `snap-${Date.now()}`;
+      const newDrawing: GeneratedDrawing = {
+          id: drawingId,
+          prompt: `Snapshot: ${prompt}`,
+          url: dataUrl,
+          isLoading: false,
+          error: null,
+          includeInReport: true,
+          isCoverImage: drawings.length === 0,
+      };
+      setDrawings(prev => [...prev, newDrawing]);
+      addLog('INFO', `[VIS_DOC]: Local ${prompt} view captured and added to technical folder.`);
+  }, [drawings.length, addLog]);
 
   const requestDrawingFromImage = useCallback(async (imageFile: File, specificPrompt: string) => {
     const drawingId = crypto.randomUUID();
@@ -80,9 +100,6 @@ export const useDrawingGenerator = (addLog: (level: LogEntry['level'], message: 
   }, [addLog]);
   
   const removeDrawing = useCallback((id: string) => {
-    // FIX: Removed buggy logic that automatically reassigned a cover image.
-    // This logic was unaware of inspirational images and could lead to multiple
-    // cover images being selected, causing state inconsistencies.
     setDrawings(prev => prev.filter(d => d.id !== id));
   }, []);
   
@@ -94,5 +111,5 @@ export const useDrawingGenerator = (addLog: (level: LogEntry['level'], message: 
     setDrawings(prev => prev.map(d => d.id === id ? { ...d, includeInReport: !d.includeInReport } : d));
   }, []);
 
-  return { drawings, requestDrawing, requestDrawingFromImage, removeDrawing, setDrawings, clearAllDrawings, toggleDrawingReportInclusion };
+  return { drawings, requestDrawing, addLocalSnapshot, requestDrawingFromImage, removeDrawing, setDrawings, clearAllDrawings, toggleDrawingReportInclusion };
 };

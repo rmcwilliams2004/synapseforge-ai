@@ -8,7 +8,10 @@ import {
     generateVideoFunctionDeclaration,
     switchAppViewFunctionDeclaration,
     toggleDocumentationFunctionDeclaration,
-    engageAnalysisFunctionDeclaration
+    engageAnalysisFunctionDeclaration,
+    createProjectFunctionDeclaration,
+    analyzeFileFunctionDeclaration,
+    triggerFullAnalysisFunctionDeclaration
 } from '../services/geminiService';
 
 function encode(bytes: Uint8Array): string {
@@ -66,7 +69,15 @@ interface VoiceCommanderCallbacks {
     onGenerateVideo: (prompt: string, useUploadedImage: boolean) => string;
     onSwitchView: (view: any) => void;
     onToggleDoc: (type: 'manual' | 'technical', open: boolean) => void;
-    onEngageAnalysis: () => void;
+    onEngageAnalysis: (factionId?: string, promptOverride?: string) => string;
+    onCreateProject: (args: { name: string, description: string, tags?: string[], factionId: any }) => string;
+    onAnalyzeFile: (fileName: string, workflow: string) => string;
+    getAppState: () => {
+        projectName: string;
+        prompt: string;
+        selectedFactionId: string | null;
+        files: { name: string, type: string }[];
+    };
 }
 
 export const useVoiceCommander = ({ 
@@ -75,7 +86,10 @@ export const useVoiceCommander = ({
     onGenerateVideo,
     onSwitchView,
     onToggleDoc,
-    onEngageAnalysis
+    onEngageAnalysis,
+    onCreateProject,
+    onAnalyzeFile,
+    getAppState
 }: VoiceCommanderCallbacks) => {
     const [state, setState] = useState<VoiceCommanderState>('idle');
     const sessionPromise = useRef<Promise<any> | null>(null);
@@ -89,11 +103,11 @@ export const useVoiceCommander = ({
         sources: Set<AudioBufferSourceNode>
     }>({ nextStartTime: 0, sources: new Set() });
     
-    const callbacksRef = useRef({ onNavigate, onDownloadDrawings, onGenerateVideo, onSwitchView, onToggleDoc, onEngageAnalysis });
+    const callbacksRef = useRef({ onNavigate, onDownloadDrawings, onGenerateVideo, onSwitchView, onToggleDoc, onEngageAnalysis, onCreateProject, onAnalyzeFile, getAppState });
     
     useEffect(() => {
-        callbacksRef.current = { onNavigate, onDownloadDrawings, onGenerateVideo, onSwitchView, onToggleDoc, onEngageAnalysis };
-    }, [onNavigate, onDownloadDrawings, onGenerateVideo, onSwitchView, onToggleDoc, onEngageAnalysis]);
+        callbacksRef.current = { onNavigate, onDownloadDrawings, onGenerateVideo, onSwitchView, onToggleDoc, onEngageAnalysis, onCreateProject, onAnalyzeFile, getAppState };
+    }, [onNavigate, onDownloadDrawings, onGenerateVideo, onSwitchView, onToggleDoc, onEngageAnalysis, onCreateProject, onAnalyzeFile, getAppState]);
 
     const stopListening = useCallback(() => {
         audioRefs.current.mediaStream?.getTracks().forEach(track => track.stop());
@@ -162,12 +176,30 @@ export const useVoiceCommander = ({
         const outputNode = audioRefs.current.outputAudioContext.createGain();
         outputNode.connect(audioRefs.current.outputAudioContext.destination);
 
+        const currentAppState = callbacksRef.current.getAppState();
+        const systemInstruction = `You are the SynapseForge Voice Assistant. 
+You help users navigate a reverse engineering foundry.
+
+### CURRENT WORKSPACE STATE
+Project Name: ${currentAppState.projectName || 'None'}
+Lens: ${currentAppState.selectedFactionId || 'None'}
+Description: ${currentAppState.prompt || 'None'}
+Uploaded Files: ${currentAppState.files.length > 0 ? currentAppState.files.map(f => `"${f.name}" (${f.type})`).join(', ') : 'None'}
+
+### VOICE WORKFLOWS
+1. CORE ANALYSIS: Triggered by 'trigger_full_analysis'. You MUST clarify the lens (Advanced Materials, Pragmatic Production, or Systems & Automation) if not set.
+2. FILE INTAKE: Triggered by 'analyze_file'. You MUST clarify WHICH file if multiple are uploaded, and the intended synthesis protocol (e.g. IMAGE_SYNTHESIS for photos, TECHNICAL_INTAKE for PDFs).
+3. NAVIGATION: Use 'show_section' or 'switch_app_view'.
+4. CREATION: Use 'create_project' for natural language concept starts.
+
+Be professional, concise, and proactive. If information is ambiguous, ask the user for clarification before executing a tool.`;
+
         const livePromise = ai.live.connect({
             model: 'gemini-2.5-flash-native-audio-preview-12-2025', 
             config: {
                 responseModalities: ['AUDIO'],
                 speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } },
-                systemInstruction: "You are the SynapseForge Voice Assistant. You can help the user navigate the app, access documentation, start project analysis, generate drawings/videos, and scroll to report sections. Be concise and professional.",
+                systemInstruction,
                 tools: [{ 
                     functionDeclarations: [
                         showSectionFunctionDeclaration, 
@@ -175,7 +207,10 @@ export const useVoiceCommander = ({
                         generateVideoFunctionDeclaration,
                         switchAppViewFunctionDeclaration,
                         toggleDocumentationFunctionDeclaration,
-                        engageAnalysisFunctionDeclaration
+                        engageAnalysisFunctionDeclaration,
+                        createProjectFunctionDeclaration,
+                        analyzeFileFunctionDeclaration,
+                        triggerFullAnalysisFunctionDeclaration
                     ] 
                 }],
             },
@@ -200,7 +235,7 @@ export const useVoiceCommander = ({
                         setState('thinking');
                         for (const fc of message.toolCall.functionCalls) {
                             let responseResult = 'ok';
-                            const { onNavigate, onDownloadDrawings, onGenerateVideo, onSwitchView, onToggleDoc, onEngageAnalysis } = callbacksRef.current;
+                            const { onNavigate, onDownloadDrawings, onGenerateVideo, onSwitchView, onToggleDoc, onEngageAnalysis, onCreateProject, onAnalyzeFile } = callbacksRef.current;
                             
                             if (fc.name === 'show_section' && fc.args.sectionId) {
                                 onNavigate(fc.args.sectionId);
@@ -215,9 +250,12 @@ export const useVoiceCommander = ({
                             } else if (fc.name === 'toggle_documentation' && fc.args.doc_type) {
                                 onToggleDoc(fc.args.doc_type, fc.args.open !== undefined ? fc.args.open : true);
                                 responseResult = `${fc.args.open === false ? 'Closing' : 'Opening'} ${fc.args.doc_type} documentation.`;
-                            } else if (fc.name === 'engage_analysis') {
-                                onEngageAnalysis();
-                                responseResult = 'Initiating project analysis.';
+                            } else if (fc.name === 'engage_analysis' || fc.name === 'trigger_full_analysis') {
+                                responseResult = onEngageAnalysis(fc.args.useFactionId as string, fc.args.descriptionOverride as string);
+                            } else if (fc.name === 'create_project') {
+                                responseResult = onCreateProject(fc.args as any);
+                            } else if (fc.name === 'analyze_file') {
+                                responseResult = onAnalyzeFile(fc.args.fileName as string, fc.args.workflow as string);
                             }
                             
                             livePromise.then(session => {

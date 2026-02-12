@@ -1,7 +1,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { VoiceInterfaceMode, VoiceTranscriptEntry, FactionId } from '../types';
+import { VoiceInterfaceMode, VoiceTranscriptEntry, FactionId, User } from '../types';
 import { useTts } from './useTts';
+import { generateSystemVerificationPDF } from '../services/pdfService';
 
 declare global {
   interface Window {
@@ -15,6 +16,7 @@ interface ForgeVoiceCallbacks {
     onSetMaterial: (materialName: string) => void;
     onUpdateParam: (param: string, delta: number) => void;
     onGenerateCertificate: () => void;
+    onSetCover: (id: string, type: 'drawing' | 'image') => void;
     onSealBundle: () => void;
     onAddLog: (level: 'INFO' | 'WARN' | 'ERROR', message: string) => void;
     onStartAnalysis: () => void;
@@ -22,6 +24,8 @@ interface ForgeVoiceCallbacks {
     onOpenTechDoc: () => void;
     onSwitchView: (view: 'app' | 'admin' | 'suite' | 'pricing' | 'account') => void;
     onNavigateSection: (sectionId: string) => void;
+    onLaunchNewProjectWizard: () => void;
+    authenticatedUser: User | null;
 }
 
 export const useForgeVoice = (
@@ -145,9 +149,31 @@ export const useForgeVoice = (
             tts.speak("Synthesizing Innovation Certificate.", "Zephyr");
             addTranscript(text, "TRIGGER_IP", "EXECUTED");
         }
+        else if (command.includes("set") && command.includes("cover")) {
+            callbacks.onSetCover("auto-selected", "drawing");
+            tts.speak("Setting the primary technical drawing as the report cover.", "Zephyr");
+            addTranscript(text, "SET_COVER", "EXECUTED");
+        }
         else if (command.includes("seal") && (command.includes("bundle") || command.includes("vault"))) {
             callbacks.onSealBundle();
             addTranscript(text, "SEAL_BUNDLE", "EXECUTED");
+        }
+        // 7. System Reports
+        else if (command.includes("verification report") || command.includes("health report")) {
+            if (callbacks.authenticatedUser) {
+                generateSystemVerificationPDF(callbacks.authenticatedUser);
+                tts.speak("Generating formal System Verification Report. All architectural fixes have been logged and signed.", "Zephyr");
+                addTranscript(text, "SYSTEM_REPORT", "EXECUTED");
+            } else {
+                tts.speak("Unauthorized. Administrator identity required for system audit.", "Zephyr");
+                addTranscript(text, "SYSTEM_REPORT", "REJECTED");
+            }
+        }
+        // 8. New Project Control
+        else if (command.includes("new project") || command.includes("create a project") || command.includes("forge a project")) {
+            callbacks.onLaunchNewProjectWizard();
+            tts.speak("Initializing DeVinci for project synthesis. Please describe your core concept.", "Zephyr");
+            addTranscript(text, "NEW_PROJECT_WIZARD", "EXECUTED");
         }
         else {
             addTranscript(text, "UNKNOWN", "REJECTED");

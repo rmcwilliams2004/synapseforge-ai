@@ -1,7 +1,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { SystemState, Role, User, IoStatus, ExportStatus, VoiceInterfaceMode, NalPrecision } from '../types';
-import { defrostSystem } from '../services/StorageManager';
+import { defrostSystem, performAgnosticWipe } from '../services/StorageManager';
 
 export const useForgeController = (user: User | null) => {
     const [systemState, setSystemState] = useState<SystemState>(SystemState.IDLE);
@@ -41,19 +41,30 @@ export const useForgeController = (user: User | null) => {
         transition(SystemState.IDLE);
     }, [isAdmin, transition]);
 
+    const agnosticWipe = useCallback(async () => {
+        window.dispatchEvent(new CustomEvent('forge-log', { detail: "[SYSTEM]: Executing Agnostic Wipe Sequence..." }));
+        await performAgnosticWipe();
+        transition(SystemState.IDLE);
+    }, [transition]);
+
     const handleNalActivity = useCallback(() => {
         // "Down-shift" to Draft mode for snappiness during slider moves
         setActivePrecision(NalPrecision.DRAFT);
         
+        // Only log "Waiting" at the start of a burst to avoid log spam
+        if (!precisionTimeoutRef.current) {
+            window.dispatchEvent(new CustomEvent('forge-log', { detail: `[NAL_CONTROLLER]: Input detected. Waiting for stability...` }));
+        }
+
         if (precisionTimeoutRef.current) {
             window.clearTimeout(precisionTimeoutRef.current);
         }
 
-        // "Up-shift" back to target precision after movement stops
+        // "Up-shift" back to target precision after movement stops (500ms debounce)
         precisionTimeoutRef.current = window.setTimeout(() => {
             setActivePrecision(targetPrecision);
             window.dispatchEvent(new CustomEvent('forge-log', { 
-                detail: `[NAL_CONTROLLER]: Input stable. Up-shifting to ${targetPrecision === NalPrecision.FOUNDRY ? 'FOUNDRY' : 'ANALYSIS'} precision (${targetPrecision}).` 
+                detail: `[NAL_CONTROLLER]: Configuration stable. Deep-solving enabled.` 
             }));
             
             if (targetPrecision === NalPrecision.FOUNDRY) {
@@ -61,7 +72,8 @@ export const useForgeController = (user: User | null) => {
             } else {
                 transition(SystemState.STABLE);
             }
-        }, 800);
+            precisionTimeoutRef.current = null;
+        }, 500);
     }, [targetPrecision, transition]);
 
     useEffect(() => {
@@ -115,6 +127,7 @@ export const useForgeController = (user: User | null) => {
         forceFlush, 
         forceStable, 
         performDefrost,
+        agnosticWipe,
         transition 
     };
 };

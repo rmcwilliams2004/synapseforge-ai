@@ -73,6 +73,8 @@ import { useForgeController } from './hooks/useForgeController';
 import { useProjectExport } from './hooks/useProjectExport';
 import { useForgeVoice } from './hooks/useForgeVoice';
 import { MATERIAL_LIBRARY } from './constants/materialLibrary';
+// Added CadViewerModal import to App.tsx
+import { CadViewerModal } from './components/cad/CadViewerModal';
 
 const useRossAnalysis = (addLog: (level: LogEntry['level'], message: string) => void) => {
     const workerRef = useRef<Worker | null>(null);
@@ -379,11 +381,61 @@ export function App() {
   const forgeController = useForgeController(authenticatedUser);
   const projectExport = useProjectExport(addLog, tts);
 
-  const { drawings, requestDrawing, requestDrawingFromImage, removeDrawing, setDrawings, clearAllDrawings, toggleDrawingReportInclusion } = useDrawingGenerator(addLog);
+  const { drawings, requestDrawing, addLocalSnapshot, requestDrawingFromImage, removeDrawing, setDrawings, clearAllDrawings, toggleDrawingReportInclusion } = useDrawingGenerator(addLog);
   const { inspirationalImages, requestInspirationalImage, removeInspirationalImage, setInspirationalImages, clearAllInspirationalImages, toggleImageReportInclusion } = useInspirationalImageGenerator(addLog);
   const { videoUrl, isVideoLoading, videoError, generateVideo, clearVideo } = useVideoGenerator(addLog);
   
   const isViewer = authenticatedUser?.role === Role.Viewer;
+
+  // --- Handlers Moved Above useVoiceCommander/useForgeVoice hooks to fix variable usage before declaration errors ---
+
+  const handleUpdateProfile = useCallback((updatedUser: User | Partial<User>) => {
+    setAuthenticatedUser(prev => {
+        if (!prev) return null;
+        const next = { ...prev, ...updatedUser } as User;
+        setUsers(usersPrev => usersPrev.map(u => u.id === next.id ? next : u));
+        return next;
+    });
+    addLog('INFO', `User profile updated: ${authenticatedUser?.name}`);
+  }, [addLog, authenticatedUser]);
+
+  const handleDeVinciProjectCreation = async (functionCall: { name: string, args: any, id: string }) => {
+      if (functionCall.name === 'create_project') {
+          const { name, description, tags, factionId } = functionCall.args;
+          if (name && description && factionId) {
+              const newProjectId = onNewProject({ name, description, tags: tags || [] }, { factionId });
+              onSelectProject(newProjectId);
+              creationDeVinci.stopConversation();
+              setDeVinciMode(null);
+              return { success: true, message: `Excellent! I've created the project "${name}" for you.` };
+          }
+      }
+      return { success: false, message: 'Missing some information.' };
+  };
+
+  const handleLaunchCreationDeVinci = () => {
+      if (!authenticatedUser) return;
+      creationDeVinci.startConversation({
+          systemInstruction: "You are the Neutral Foundry Synthesis Partner. Help the user define their engineering concept from first principles. Call create_project when they have a validated name and objective.",
+          voice: 'Zephyr',
+          tools: [{ functionDeclarations: [createProjectFunctionDeclaration] }],
+          onFunctionCall: handleDeVinciProjectCreation,
+          authenticatedUser,
+      });
+      setDeVinciMode('creation');
+  };
+
+  const handleSetCover = useCallback((id: string, type: 'drawing' | 'image') => {
+    setDrawings(prev => prev.map(d => ({
+        ...d,
+        isCoverImage: type === 'drawing' && d.id === id
+    })));
+    setInspirationalImages(prev => prev.map(img => ({
+        ...img,
+        isCoverImage: type === 'image' && img.id === id
+    })));
+    addLog('INFO', `Set new report cover image (${type}: ${id}).`);
+  }, [setDrawings, setInspirationalImages, addLog]);
 
   const handleDownloadDrawings = useCallback((): string => {
     const projectNameForZip = activeProject?.name || 'SynapseForge_Analysis';
@@ -419,26 +471,97 @@ export function App() {
 
   }, [files, generateVideo, addLog, isViewer]);
 
+  const handleStartFromImage = async (file: File) => {
+    setIsParsingImage(true);
+    addLog('INFO', `Analyzing image "${file.name}" to extract project details...`);
+    try {
+        const imagePart = await fileToGenerativePart(file);
+        const details = await extractProjectDetailsFromImage(imagePart);
+        setInitialProjectData(details);
+        setIsProjectModalOpen(true);
+        addLog('INFO', `Extracted details for "${details.name}" from image.`);
+    } catch (e) {
+        addLog('ERROR', `Image parsing failed: ${parseApiError(e)}`);
+    } finally {
+        setIsParsingImage(false);
+    }
+  };
+
+  const handleStartFromPdf = async (file: File) => {
+    setIsParsingPdf(true);
+    addLog('INFO', `Analyzing PDF "${file.name}" to extract project details...`);
+    try {
+        const pdfPart = await fileToGenerativePart(file);
+        const details = await extractProjectDetailsFromPdf(pdfPart);
+        setInitialProjectData(details);
+        setIsProjectModalOpen(true);
+        addLog('INFO', `Extracted details for "${details.name}" from PDF.`);
+    } catch (e) {
+        addLog('ERROR', `PDF parsing failed: ${parseApiError(e)}`);
+    } finally {
+        setIsParsingPdf(false);
+    }
+  };
+
+  const handleIdentifyFile = async (file: File) => {
+    setIsParsingVideo(true);
+    addLog('INFO', `Analyzing video file "${file.name}" frame-by-frame...`);
+    try {
+        const videoPart = await fileToGenerativePart(file);
+        const details = await extractProjectDetailsFromVideo(videoPart);
+        setInitialProjectData(details);
+        setIsProjectModalOpen(true);
+        setIsVideoImportModalOpen(false);
+        addLog('INFO', `Video file analysis complete for "${details.name}".`);
+    } catch (e) {
+        addLog('ERROR', `Video analysis failed: ${parseApiError(e)}`);
+    } finally {
+        setIsParsingVideo(false);
+    }
+  };
+
+  const handleStartBrainstormFromPdf = async (file: File) => {
+    setIsParsingForBrainstorm(true);
+    addLog('INFO', `Starting AI brainstorming session based on PDF "${file.name}"...`);
+    try {
+        const pdfPart = await fileToGenerativePart(file);
+        const details = await extractProjectDetailsFromPdf(pdfPart);
+        const newId = onNewProject(
+          { name: `Brainstorm: ${details.name}`, description: details.description, tags: [...details.tags, 'brainstorm'] },
+          { prompt: `System Brainstorm request based on technical manual: ${details.initialPrompt}`, factionId: FactionId.ADVANCED_MATERIALS }
+        );
+        onSelectProject(newId);
+        addLog('INFO', `Created brainstorming project for "${details.name}".`);
+    } catch (e) {
+        addLog('ERROR', `Brainstorming failed: ${parseApiError(e)}`);
+    } finally {
+        setIsParsingForBrainstorm(false);
+    }
+  };
+
   // ANALYSIS ENGAGEMENT (Extracted for voice trigger)
-  const handleEngage = useCallback(async (isReanalysis = false) => {
-    if (!selectedFaction || !prompt.trim() || !projectName.trim()) {
+  const handleEngage = useCallback(async (isReanalysis = false, factionId?: string, promptOverride?: string) => {
+    const finalFaction = factionId ? (ENGINEERING_PHILOSOPHIES.find(f => f.id === factionId) || selectedFaction) : selectedFaction;
+    const finalPrompt = promptOverride || prompt;
+
+    if (!finalFaction || !finalPrompt.trim() || !projectName.trim()) {
       addLog('WARN', 'Engagement failed: Missing lens, name, or prompt.');
-      return;
+      return "Missing parameters. Please clarify the engineering lens or product description.";
     }
 
-    const newResult = await performAnalysis(projectName, prompt, selectedFaction, { 
+    const newResult = await performAnalysis(projectName, finalPrompt, finalFaction, { 
         files, 
         fileUrls: activeProject?.knowledgeBase?.map(d => d.id) ? [] : activeVersion?.fileUrls,
         knowledgeBase: activeProject?.knowledgeBase || []
     });
 
     if (newResult) {
-      const commitMessage = isReanalysis ? `Re-analyzed with ${selectedFaction.name}` : 'New analysis from workspace';
+      const commitMessage = isReanalysis ? `Re-analyzed with ${finalFaction.name}` : 'New analysis from workspace';
       const fileUrls = files.length > 0 ? await Promise.all(files.map(fileToDataUrl)) : activeVersion?.fileUrls || [];
 
       const versionData: Omit<ProjectVersion, 'versionId' | 'createdAt' | 'commitMessage'> = {
-          prompt,
-          factionId: selectedFaction.id,
+          prompt: finalPrompt,
+          factionId: finalFaction.id,
           result: newResult,
           fileUrls: fileUrls,
           drawings: [],
@@ -447,8 +570,8 @@ export function App() {
 
       if (!activeProject) {
          onNewProject({ name: projectName, description: 'New Analysis', tags }, { 
-            prompt, 
-            factionId: selectedFaction.id,
+            prompt: finalPrompt, 
+            factionId: finalFaction.id,
             result: newResult,
             fileUrls: fileUrls
          });
@@ -467,7 +590,9 @@ export function App() {
       setRotorModel(undefined);
       setHasUnsavedChanges(false);
       clearInProgressAnalysis();
+      return "Analysis sequence successful. Report is now available in the vault.";
     }
+    return "Analysis failed. Check logs for physical solver errors.";
   }, [selectedFaction, prompt, projectName, activeProject, files, activeVersion, saveNewVersion, clearAllDrawings, clearAllInspirationalImages, clearVideo, clearCad, clearSummary, liveCosting, clearInProgressAnalysis, onNewProject, tags, patentGenerator, addLog, performAnalysis]);
 
   const voiceCommander = useVoiceCommander({
@@ -486,10 +611,41 @@ export function App() {
         else if (type === 'technical') setIsTechDocOpen(open);
         addLog('INFO', `Voice Trigger: ${open ? 'Opened' : 'Closed'} ${type} documentation`);
     },
-    onEngageAnalysis: () => {
-        handleEngage();
+    onEngageAnalysis: (factionId, promptOverride) => {
+        handleEngage(false, factionId, promptOverride);
         addLog('INFO', 'Voice Trigger: Engaging project analysis');
-    }
+        return "Initiating core synthesis. Calibrating physics mesh...";
+    },
+    onCreateProject: (args) => {
+        const { name, description, tags, factionId } = args;
+        // Agnostic Wipe first to isolate context
+        forgeController.agnosticWipe();
+        const newId = onNewProject({ name, description, tags: tags || [] }, { factionId });
+        onSelectProject(newId);
+        setProjectName(name);
+        addLog('INFO', `Voice Trigger: Forged new project '${name}' [${factionId}]`);
+        return `Excellent. I have purged the vault buffers and initialized the '${name}' project for you.`;
+    },
+    onAnalyzeFile: (fileName, workflow) => {
+        const file = files.find(f => f.name === fileName);
+        if (!file) return `I cannot find a file named "${fileName}" in your current upload set.`;
+
+        switch(workflow) {
+            case 'IMAGE_SYNTHESIS': handleStartFromImage(file); break;
+            case 'TECHNICAL_INTAKE': handleStartFromPdf(file); break;
+            case 'VISUAL_INTAKE': handleIdentifyFile(file); break;
+            case 'RECURSIVE_LOGIC': handleStartBrainstormFromPdf(file); break;
+            case 'SYSTEM_MAPPING': imageIdentifier.identifyImage(file); setIsIdentifierModalOpen(true); break;
+            default: return `Workflow "${workflow}" is not supported.`;
+        }
+        return `Triggering ${workflow.replace('_', ' ')} for ${fileName}. Extraction sequence starting.`;
+    },
+    getAppState: () => ({
+        projectName,
+        prompt,
+        selectedFactionId: selectedFaction?.id || null,
+        files: files.map(f => ({ name: f.name, type: f.type }))
+    })
   });
 
   const handleVoiceSetMaterial = useCallback((materialName: string) => {
@@ -515,6 +671,10 @@ export function App() {
           window.dispatchEvent(new CustomEvent('forge-voice-secure-ip'));
           addLog('INFO', 'Voice Trigger: IP Synthesis initialized.');
       },
+      onSetCover: (id, type) => {
+          handleSetCover(id, type);
+          addLog('INFO', `Voice Trigger: Set report cover to ${type} ${id}`);
+      },
       onSealBundle: () => {
           if (activeProject) projectExport.exportSovereignBundle(activeProject, drawings, inspirationalImages);
           addLog('INFO', 'Voice Trigger: Sovereign Bundle sealed.');
@@ -527,19 +687,12 @@ export function App() {
           document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
           addLog('INFO', `Voice navigation to: ${sectionId}`);
       },
-      onAddLog: addLog
+      // Fix: Added missing callback required by ForgeVoiceCallbacks
+      onLaunchNewProjectWizard: handleLaunchCreationDeVinci,
+      onAddLog: addLog,
+      authenticatedUser
   });
   
-  const handleUpdateProfile = useCallback((updatedUser: User | Partial<User>) => {
-    setAuthenticatedUser(prev => {
-        if (!prev) return null;
-        const next = { ...prev, ...updatedUser } as User;
-        setUsers(usersPrev => usersPrev.map(u => u.id === next.id ? next : u));
-        return next;
-    });
-    addLog('INFO', `User profile updated: ${authenticatedUser?.name}`);
-  }, [addLog, authenticatedUser]);
-
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
         if (authenticatedUser?.role === Role.Admin && e.ctrlKey && (e.key === '~' || e.key === '`')) {
@@ -697,32 +850,6 @@ export function App() {
     }
   };
 
-  const handleDeVinciProjectCreation = async (functionCall: { name: string, args: any, id: string }) => {
-      if (functionCall.name === 'create_project') {
-          const { name, description, tags, factionId } = functionCall.args;
-          if (name && description && factionId) {
-              const newProjectId = onNewProject({ name, description, tags: tags || [] }, { factionId });
-              onSelectProject(newProjectId);
-              creationDeVinci.stopConversation();
-              setDeVinciMode(null);
-              return { success: true, message: `Excellent! I've created the project "${name}" for you.` };
-          }
-      }
-      return { success: false, message: 'Missing some information.' };
-  };
-
-  const handleLaunchCreationDeVinci = () => {
-      if (!authenticatedUser) return;
-      creationDeVinci.startConversation({
-          systemInstruction: "You are DeVinci. Help the user define a project. Call create_project when they have a name and goal.",
-          voice: 'Zephyr',
-          tools: [{ functionDeclarations: [createProjectFunctionDeclaration] }],
-          onFunctionCall: handleDeVinciProjectCreation,
-          authenticatedUser,
-      });
-      setDeVinciMode('creation');
-  };
-
   const handleLoadVersion = useCallback((index: number) => {
     if (!activeProject) return;
     const history = activeProject.history || [];
@@ -769,13 +896,16 @@ export function App() {
     setIsConfigGateOpen(true);
   };
 
-  const handleConfigGateComplete = (config: { name: string, category: DomainCategory, branch: EngineeringBranch, description: string }) => {
+  const handleConfigGateComplete = async (config: { name: string, category: DomainCategory, branch: EngineeringBranch, description: string }) => {
+      // AGNOSTIC WIPE TRIGGER: Purge previous session context for intellectual clarity
+      await forgeController.agnosticWipe();
+      
       const newId = onNewProject({ name: config.name, description: config.description, tags: [config.category] }, { factionId: FactionId.PRAGMATIC_PRODUCTION });
       updateProjectDetails(newId, { domainCategory: config.category });
       onSelectProject(newId);
       setProjectName(config.name);
       setIsConfigGateOpen(false);
-      addLog('INFO', `Forged blank environment for '${config.name}' [${config.category}] with PhD [${config.branch}] Agent active.`);
+      addLog('INFO', `Forged agnostic environment for '${config.name}' [${config.category}] with PhD [${config.branch}] Agent active. Context bias neutralized.`);
   };
 
   const handleSaveProjectDetails = (details: {name: string, description: string, tags: string[]}) => {
@@ -807,57 +937,6 @@ export function App() {
       }
   };
 
-  const handleStartFromImage = async (file: File) => {
-      setIsParsingImage(true);
-      addLog('INFO', `Analyzing image "${file.name}" to extract project details...`);
-      try {
-          const imagePart = await fileToGenerativePart(file);
-          const details = await extractProjectDetailsFromImage(imagePart);
-          setInitialProjectData(details);
-          setIsProjectModalOpen(true);
-          addLog('INFO', `Extracted details for "${details.name}" from image.`);
-      } catch (e) {
-          addLog('ERROR', `Image parsing failed: ${parseApiError(e)}`);
-      } finally {
-          setIsParsingImage(false);
-      }
-  };
-
-  const handleStartFromPdf = async (file: File) => {
-      setIsParsingPdf(true);
-      addLog('INFO', `Analyzing PDF "${file.name}" to extract project details...`);
-      try {
-          const pdfPart = await fileToGenerativePart(file);
-          const details = await extractProjectDetailsFromPdf(pdfPart);
-          setInitialProjectData(details);
-          setIsProjectModalOpen(true);
-          addLog('INFO', `Extracted details for "${details.name}" from PDF.`);
-      } catch (e) {
-          addLog('ERROR', `PDF parsing failed: ${parseApiError(e)}`);
-      } finally {
-          setIsParsingPdf(false);
-      }
-  };
-
-  const handleStartBrainstormFromPdf = async (file: File) => {
-      setIsParsingForBrainstorm(true);
-      addLog('INFO', `Starting AI brainstorming session based on PDF "${file.name}"...`);
-      try {
-          const pdfPart = await fileToGenerativePart(file);
-          const details = await extractProjectDetailsFromPdf(pdfPart);
-          const newId = onNewProject(
-            { name: `Brainstorm: ${details.name}`, description: details.description, tags: [...details.tags, 'brainstorm'] },
-            { prompt: `System Brainstorm request based on technical manual: ${details.initialPrompt}`, factionId: FactionId.ADVANCED_MATERIALS }
-          );
-          onSelectProject(newId);
-          addLog('INFO', `Created brainstorming project for "${details.name}".`);
-      } catch (e) {
-          addLog('ERROR', `Brainstorming failed: ${parseApiError(e)}`);
-      } finally {
-          setIsParsingForBrainstorm(false);
-      }
-  };
-
   const handleIdentifyUrl = async (url: string) => {
       setIsParsingVideo(true);
       addLog('INFO', `Searching web and identifying video content at ${url}...`);
@@ -873,35 +952,6 @@ export function App() {
           setIsParsingVideo(false);
       }
   };
-
-  const handleIdentifyFile = async (file: File) => {
-      setIsParsingVideo(true);
-      addLog('INFO', `Analyzing video file "${file.name}" frame-by-frame...`);
-      try {
-          const videoPart = await fileToGenerativePart(file);
-          const details = await extractProjectDetailsFromVideo(videoPart);
-          setInitialProjectData(details);
-          setIsProjectModalOpen(true);
-          setIsVideoImportModalOpen(false);
-          addLog('INFO', `Video file analysis complete for "${details.name}".`);
-      } catch (e) {
-          addLog('ERROR', `Video analysis failed: ${parseApiError(e)}`);
-      } finally {
-          setIsParsingVideo(false);
-      }
-  };
-
-  const handleSetCover = useCallback((id: string, type: 'drawing' | 'image') => {
-    setDrawings(prev => prev.map(d => ({
-        ...d,
-        isCoverImage: type === 'drawing' && d.id === id
-    })));
-    setInspirationalImages(prev => prev.map(img => ({
-        ...img,
-        isCoverImage: type === 'image' && img.id === id
-    })));
-    addLog('INFO', `Set new report cover image (${type}: ${id}).`);
-  }, [setDrawings, setInspirationalImages, addLog]);
 
   const handlePlanSelect = async (status: SubscriptionStatus) => {
       if (!authenticatedUser) return;
@@ -998,6 +1048,7 @@ export function App() {
         onForceFlush={forgeController.forceFlush}
         onForceStable={forgeController.forceStable}
         onDefrost={forgeController.performDefrost}
+        onAgnosticWipe={forgeController.agnosticWipe}
       />
       <SystemToast />
       
@@ -1122,6 +1173,7 @@ export function App() {
                 isCadLoading={isCadLoading}
                 cadError={cadError}
                 onOpenCadViewer={() => handleGatedAction(() => setIsCadViewerOpen(true))}
+                onAddLocalSnapshot={addLocalSnapshot}
                 isGoogleExporterAuthenticated={googleExporter.isAuthenticated}
                 googleExporterUser={googleExporter.authenticatedUser}
                 isGoogleAuthLoading={googleExporter.isAuthLoading}
@@ -1243,6 +1295,18 @@ export function App() {
         manualRetry={creationDeVinci.manualRetry}
         retryCount={creationDeVinci.retryCount}
       />
+
+      {/* Added missing CadViewerModal to App.tsx return to support Open Foundry Viewer functionality */}
+      {isCadViewerOpen && cadData && (
+        <CadViewerModal
+          isOpen={isCadViewerOpen}
+          onClose={() => setIsCadViewerOpen(false)}
+          cadData={cadData}
+          isViewer={isViewer}
+          foundryResult={foundryResult}
+          onAddSnapshot={addLocalSnapshot}
+        />
+      )}
     </div>
   );
 }

@@ -822,6 +822,7 @@ export const generateSimulationResult = async (type: SimulationType, componentNa
             }
         }
     });
+    // Fixed: Removed undefined 'height' wrapper; JSON.parse expects the response text string directly.
     return JSON.parse(response.text!);
 };
 
@@ -1103,6 +1104,35 @@ export const createProjectFunctionDeclaration: FunctionDeclaration = {
             factionId: { type: Type.STRING, enum: Object.values(FactionId) }
         },
         required: ["name", "description", "factionId"]
+    }
+};
+
+export const triggerFullAnalysisFunctionDeclaration: FunctionDeclaration = {
+    name: 'trigger_full_analysis',
+    description: 'Executes the core SynapseForge engineering analysis on current session context. Call this only when project name, description, and lens are clarified.',
+    parameters: {
+        type: Type.OBJECT,
+        properties: {
+            useFactionId: { type: Type.STRING, enum: Object.values(FactionId), description: 'The engineering lens to apply.' },
+            descriptionOverride: { type: Type.STRING, description: 'Optional updated product concept description.' }
+        }
+    }
+};
+
+export const analyzeFileFunctionDeclaration: FunctionDeclaration = {
+    name: 'analyze_file',
+    description: 'Triggers a specific intake workflow for an uploaded file (Image, PDF, or Video).',
+    parameters: {
+        type: Type.OBJECT,
+        properties: {
+            fileName: { type: Type.STRING, description: 'The name of the file to analyze from the uploaded set.' },
+            workflow: { 
+                type: Type.STRING, 
+                enum: ['IMAGE_SYNTHESIS', 'TECHNICAL_INTAKE', 'VISUAL_INTAKE', 'SYSTEM_MAPPING', 'RECURSIVE_LOGIC'],
+                description: 'The specific synthesis protocol to trigger.'
+            }
+        },
+        required: ["fileName", "workflow"]
     }
 };
 

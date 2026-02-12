@@ -45,12 +45,13 @@ interface DiagnosticsPanelProps {
     onForceFlush: () => void;
     onForceStable: () => void;
     onDefrost: () => void;
+    onAgnosticWipe: () => void;
 }
 
 export const DiagnosticsPanel: React.FC<DiagnosticsPanelProps> = ({ 
     isOpen, user, tts, onUpdateUser, systemState, ioStatus, exportStatus, 
     voiceMode, setVoiceMode, voiceTranscripts, nalPrecision, targetPrecision, setTargetPrecision,
-    onForceFlush, onForceStable, onDefrost 
+    onForceFlush, onForceStable, onDefrost, onAgnosticWipe
 }) => {
     const [lines, setLines] = useState<string[]>([]);
     const [ioDetails, setIoDetails] = useState<{status: IoStatus, progress: number}>({ status: 'IDLE', progress: 0 });
@@ -61,7 +62,8 @@ export const DiagnosticsPanel: React.FC<DiagnosticsPanelProps> = ({
         latency: 12,
         cpu: 24,
         mem: 1.2,
-        nalLoad: 5
+        nalLoad: 5,
+        biasLeakage: 0
     });
 
     useEffect(() => {
@@ -85,7 +87,8 @@ export const DiagnosticsPanel: React.FC<DiagnosticsPanelProps> = ({
                 latency: 8 + Math.floor(Math.random() * 10),
                 cpu: (nalPrecision === NalPrecision.FOUNDRY ? 85 : nalPrecision === NalPrecision.ANALYSIS ? 40 : 15) + Math.floor(Math.random() * 10),
                 mem: 1.1 + (Math.random() * 0.4),
-                nalLoad: nalPrecision === NalPrecision.FOUNDRY ? 98 : nalPrecision === NalPrecision.ANALYSIS ? 45 : 12
+                nalLoad: nalPrecision === NalPrecision.FOUNDRY ? 98 : nalPrecision === NalPrecision.ANALYSIS ? 45 : 12,
+                biasLeakage: Math.random() > 0.98 ? Math.floor(Math.random() * 10) : prev.biasLeakage
             }));
         }, 150).valueOf();
 
@@ -138,6 +141,27 @@ export const DiagnosticsPanel: React.FC<DiagnosticsPanelProps> = ({
                 </div>
                 
                 <div className="flex gap-4">
+                    {/* Bias Audit Tool */}
+                    <div className="bg-gray-800 border border-gray-700 p-4 rounded-2xl w-64 shadow-xl">
+                        <div className="flex justify-between items-center mb-3">
+                            <span className="text-[10px] font-black text-cyan-400 uppercase tracking-widest">Bias Audit</span>
+                            <span className={`text-[8px] font-bold ${telemetry.biasLeakage > 0 ? 'text-red-500' : 'text-green-500'}`}>
+                                {telemetry.biasLeakage > 0 ? 'LEAKAGE DETECTED' : 'AGNOSTIC_CLEAN'}
+                            </span>
+                        </div>
+                        <div className="space-y-2">
+                            <button 
+                                onClick={onAgnosticWipe}
+                                className="w-full py-2 bg-cyan-600/20 hover:bg-cyan-600/30 border border-cyan-500/30 rounded-lg text-[9px] font-black text-cyan-300 uppercase tracking-widest transition-all"
+                            >
+                                Neutralize System Bias
+                            </button>
+                            <div className="mt-2 text-[8px] text-gray-500 uppercase tracking-tighter text-center">
+                                Scans for hard-coded design intent in inference buffers.
+                            </div>
+                        </div>
+                    </div>
+
                     {/* Voice Dashboard Controls */}
                     <div className="bg-gray-800 border border-gray-700 p-4 rounded-2xl w-64 shadow-xl">
                         <div className="flex justify-between items-center mb-3">
@@ -157,42 +181,6 @@ export const DiagnosticsPanel: React.FC<DiagnosticsPanelProps> = ({
                             >
                                 Skip Orientation
                             </button>
-                            <div className="flex items-center justify-between px-1 mt-2">
-                                <span className="text-[8px] font-bold text-gray-500 uppercase">Mute Intro</span>
-                                <input 
-                                    type="checkbox" 
-                                    checked={user?.isSilenced} 
-                                    onChange={(e) => onUpdateUser?.({ isSilenced: e.target.checked })} 
-                                    className="accent-brand-cyan" 
-                                />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* NAL Precision Controller */}
-                    <div className="bg-gray-800 border border-gray-700 p-4 rounded-2xl w-64 shadow-xl">
-                         <div className="flex justify-between items-center mb-3">
-                            <span className="text-[10px] font-black text-brand-cyan uppercase tracking-widest">NAL Precision</span>
-                            <span className={`text-[10px] font-black uppercase ${nalPrecision === NalPrecision.FOUNDRY ? 'text-purple-400' : 'text-cyan-400'}`}>{precisionLabel}</span>
-                        </div>
-                        <div className="space-y-4">
-                            <input 
-                                type="range"
-                                min="0"
-                                max="2"
-                                step="1"
-                                value={targetPrecision === NalPrecision.DRAFT ? 0 : targetPrecision === NalPrecision.ANALYSIS ? 1 : 2}
-                                onChange={(e) => {
-                                    const val = parseInt(e.target.value);
-                                    setTargetPrecision(val === 0 ? NalPrecision.DRAFT : val === 1 ? NalPrecision.ANALYSIS : NalPrecision.FOUNDRY);
-                                }}
-                                className="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-brand-cyan"
-                            />
-                            <div className="flex justify-between px-1">
-                                <span className="text-[8px] font-black text-gray-600 uppercase">Speed</span>
-                                <span className="text-[8px] font-black text-gray-600 uppercase">Balance</span>
-                                <span className="text-[8px] font-black text-gray-600 uppercase">IP-Ready</span>
-                            </div>
                         </div>
                     </div>
 

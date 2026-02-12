@@ -23,11 +23,10 @@ export const useAppVoice = (tts: ReturnType<typeof useTts>, user: User | null, v
 
         if (user.is_first_login) {
             briefing = `
-                ${timeOfDayGreeting}, ${user.name.split(' ')[0]}. Your sovereign vault is initialized. 
-                System confirms Ultra-tier authorization. Rate limits are optimized for high-fidelity synthesis.
-                SynapseForge operates on a formal Verification Gate system. 
-                The IP and Patent modules will remain in standby until the Numerical Abstraction Layer confirms your design is physically viable. 
-                I have identified several geometric optimization paths based on your previous work profile.
+                ${timeOfDayGreeting}, ${user.name.split(' ')[0]}. The Forge is initialized. 
+                System confirms Ultra-tier authorization. All specialized lenses are currently in neutral. 
+                I have purged all previous project heuristics to ensure a clean slate for your session.
+                The IP and Patent modules are in standby, awaiting your next innovation concept.
                 DeVinci is online. What shall we build today?
             `;
             
@@ -41,11 +40,11 @@ export const useAppVoice = (tts: ReturnType<typeof useTts>, user: User | null, v
                 window.dispatchEvent(new CustomEvent('forge-status', { detail: 'ACTIVE_LISTENING' }));
             }, 18000);
         } else if (activeProjectName && domainFocus) {
-            briefing = `${timeOfDayGreeting}, Richard. Your vault for '${activeProjectName}' is initialized. 
-            I have successfully mapped the ${domainFocus} constraints to the Numerical Abstraction Layer. 
-            Proactive Suggestion mode is engaged. The Forge is ready.`;
+            briefing = `${timeOfDayGreeting}. Richard, the Forge is initialized for '${activeProjectName}'. 
+            All specialized lenses are in neutral. I am standing by for your next innovation concept. 
+            Physical and logical constraints for the ${domainFocus} domain are now reloaded.`;
         } else {
-            briefing = `${timeOfDayGreeting}. The Forge is initialized. Ultra-tier authorization verified. We are ready to innovate.`;
+            briefing = `${timeOfDayGreeting}. The Forge is initialized. Ultra-tier authorization verified. All previous engineering biases have been purged. We are ready to innovate.`;
         }
         
         tts.speak(briefing, 'Zephyr');

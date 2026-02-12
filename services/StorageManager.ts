@@ -1,3 +1,4 @@
+
 import { openDB, IDBPDatabase } from 'idb';
 
 const DB_NAME = 'SynapseForgeVault';
@@ -91,6 +92,51 @@ export const clearVaultBuffer = async () => {
     sessionStorage.clear();
     window.dispatchEvent(new CustomEvent('forge-log', { detail: '[I/O_GUARD]: File buffer cleared. Lens Selector unlocked.' }));
     notifyIoProgress('IDLE');
+};
+
+/**
+ * AGNOSTIC WIPE: Purges session specific context and scrubs proprietary strings.
+ * Ensures the platform is a "Blank Slate" for new innovation.
+ */
+export const performAgnosticWipe = async () => {
+    console.log("[SYSTEM]: Initiating Hard Reset of Inference Buffers...");
+    
+    // 1. Deep scrub of session bias
+    const biasKeywords = [
+        'nommo', 'alpha', 'aegis', 'intelligent shielding', 
+        'hydrographene', 'hyg', 'z-pinch', 'propulsion', 
+        'ignition', 'coil', 'fusion'
+    ];
+    
+    let purgedCount = 0;
+    const keysToRemove: string[] = [];
+    
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key) {
+            const val = localStorage.getItem(key)?.toLowerCase() || "";
+            if (biasKeywords.some(word => val.includes(word))) {
+                keysToRemove.push(key);
+            }
+        }
+    }
+    
+    keysToRemove.forEach(k => {
+        localStorage.removeItem(k);
+        purgedCount++;
+    });
+    
+    sessionStorage.clear();
+    
+    // 2. Reset Multi-Tenant isolation layers
+    await clearVaultBuffer();
+    
+    window.dispatchEvent(new CustomEvent('forge-log', { 
+        detail: `[AUDIT]: Agnostic Wipe complete. Purged ${purgedCount} biased records. System state: NEUTRAL.` 
+    }));
+    
+    // 3. Clear WebGL scene and GPU buffers
+    window.dispatchEvent(new CustomEvent('forge-webgl-reset'));
 };
 
 export const defrostSystem = async () => {

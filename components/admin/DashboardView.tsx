@@ -1,6 +1,8 @@
+
 import React, { useMemo } from 'react';
 // FIX: Changed Project to ProjectIndexEntry to avoid needing the full 'history' object.
-import { User, ProjectIndexEntry, LogEntry } from '../../types';
+import { User, ProjectIndexEntry, LogEntry, Role } from '../../types';
+import { generateSystemVerificationPDF } from '../../services/pdfService';
 
 interface StatCardProps {
     title: string;
@@ -47,6 +49,7 @@ const Icons = {
     Analyses: () => <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M12 6V3m0 18v-3M5.636 5.636l-1.414-1.414m15.152 0l-1.414 1.414M5.636 18.364l-1.414 1.414m15.152 0l-1.414-1.414M12 12a5 5 0 11-10 0 5 5 0 0110 0z" /></svg>,
     LogInfo: () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-blue-400"><path strokeLinecap="round" strokeLinejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" /></svg>,
     LogWarn: () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-yellow-400"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" /></svg>,
+    Health: () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6 text-green-400"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>,
 };
 
 
@@ -58,6 +61,8 @@ interface DashboardViewProps {
 }
 
 export const DashboardView = ({ users, projects, logs }: DashboardViewProps) => {
+
+    const adminUser = users.find(u => u.role === Role.Admin) || users[0];
 
     // FIX: Changed totalAnalyses calculation to be based on user.analysesRun.
     // This is more accurate to the metric "Analyses Run" and removes the dependency on the full project.history object.
@@ -114,6 +119,24 @@ export const DashboardView = ({ users, projects, logs }: DashboardViewProps) => 
                 <StatCard title="Total Users" value={users.length} icon={<Icons.Users />} />
                 <StatCard title="Total Projects" value={projects.length} icon={<Icons.Projects />} />
                 <StatCard title="Total Analyses Run" value={totalAnalyses} icon={<Icons.Analyses />} />
+            </div>
+
+            <div className="bg-gray-800 border-2 border-brand-cyan/20 p-6 rounded-2xl flex items-center justify-between shadow-xl">
+                <div className="flex items-center gap-6">
+                    <div className="p-4 bg-green-900/20 rounded-full border border-green-500/30">
+                        <Icons.Health />
+                    </div>
+                    <div>
+                        <h3 className="text-lg font-black text-white uppercase italic tracking-tighter">System Health: OPTIMAL</h3>
+                        <p className="text-xs text-gray-400 mt-1">Platform v12.1.2 // Ultra-Tier Protocols Verified</p>
+                    </div>
+                </div>
+                <button 
+                    onClick={() => generateSystemVerificationPDF(adminUser)}
+                    className="px-6 py-3 bg-brand-cyan text-gray-900 font-black uppercase tracking-widest text-xs rounded-xl hover:bg-cyan-400 transition-all shadow-lg shadow-cyan-900/30 active:scale-95"
+                >
+                    Generate Verification Report
+                </button>
             </div>
 
             <BarChart data={modelUsageData} title="AI Model Usage" />

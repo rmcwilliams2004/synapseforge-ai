@@ -51,6 +51,8 @@ interface AnalysisDisplayProps {
   isCadLoading: boolean;
   cadError: string | null;
   onOpenCadViewer: () => void;
+  // Added onAddLocalSnapshot to AnalysisDisplayProps to resolve TS error in App.tsx
+  onAddLocalSnapshot?: (dataUrl: string, prompt: string) => void;
   // Google Export props
   isGoogleExporterAuthenticated: boolean;
   googleExporterUser: { name: string; email: string } | null;
@@ -144,6 +146,8 @@ export const AnalysisDisplay = (props: AnalysisDisplayProps) => {
         isCadLoading={props.isCadLoading}
         cadError={props.cadError}
         onOpenCadViewer={props.onOpenCadViewer}
+        // Passed onAddLocalSnapshot down to ResultView
+        onAddLocalSnapshot={props.onAddLocalSnapshot}
         isGoogleExporterAuthenticated={props.isGoogleExporterAuthenticated}
         googleExporterUser={props.googleExporterUser}
         isGoogleAuthLoading={props.isGoogleAuthLoading}

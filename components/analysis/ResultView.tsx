@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { AnalysisResult, Faction, MaterialSuggestion, BillOfMaterials, TestPlan, ComplianceAndSafety, Project, User, GeneratedDrawing, CadData, ProjectVersion, EngineeringChangeOrder, PreliminaryCostEstimate, GeneratedImage, RotorModel, RotorShaftElement, RotorDiskElement, RotorBearingElement, RotorMaterial, GoogleDocContent, EngineeringBranch, FoundryCadResult, IoStatus, ProcessFmeaEntry } from '../../types';
 import { exportFullReportPDF } from '../../services/pdfService';
@@ -136,6 +135,8 @@ export interface ResultViewProps {
   isCadLoading: boolean;
   cadError: string | null;
   onOpenCadViewer: () => void;
+  // Added onAddLocalSnapshot to ResultViewProps interface to support prop-drilling for snapshots
+  onAddLocalSnapshot?: (dataUrl: string, prompt: string) => void;
   isGoogleExporterAuthenticated: boolean;
   googleExporterUser: { name: string; email: string } | null;
   isGoogleAuthLoading: boolean;
