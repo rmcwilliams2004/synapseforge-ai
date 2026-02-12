@@ -1,17 +1,30 @@
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { GoogleGenAI, Chat } from '@google/genai';
 import { AiChatState, ChatMessage, LogEntry, IngestedDocument } from '../types';
 import { parseApiError } from '../services/geminiService';
 
 export const useAiChat = (
   addLog: (level: LogEntry['level'], message: string) => void,
-  knowledgeBase: IngestedDocument[] = []
+  knowledgeBase: IngestedDocument[] = [],
+  activeProjectId?: string
 ) => {
     const [state, setState] = useState<AiChatState>('idle');
     const [history, setHistory] = useState<ChatMessage[]>([]);
     const [error, setError] = useState<string | null>(null);
     const chatSessionRef = useRef<Chat | null>(null);
+
+    // FIX 3: Purging "Idea Leakage" in AI Chat
+    useEffect(() => {
+        // When the project changes, end the chat session to maintain agnostic isolation
+        if (chatSessionRef.current) {
+            chatSessionRef.current = null;
+            setHistory([]);
+            window.dispatchEvent(new CustomEvent('forge-log', { 
+                detail: '[SYSTEM]: AI Chat buffers purged. Cross-tenant context neutralized.' 
+            }));
+        }
+    }, [activeProjectId]);
 
     const startChat = useCallback((baseSystemInstruction: string) => {
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });

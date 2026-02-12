@@ -73,7 +73,6 @@ import { useForgeController } from './hooks/useForgeController';
 import { useProjectExport } from './hooks/useProjectExport';
 import { useForgeVoice } from './hooks/useForgeVoice';
 import { MATERIAL_LIBRARY } from './constants/materialLibrary';
-// Added CadViewerModal import to App.tsx
 import { CadViewerModal } from './components/cad/CadViewerModal';
 
 const useRossAnalysis = (addLog: (level: LogEntry['level'], message: string) => void) => {
@@ -294,6 +293,7 @@ export function App() {
     addIngestedDocument,
     removeIngestedDocument,
     loadProject,
+    updateVersion // Ensure this exists in hook to support Fix 1
   } = useProjects();
   
   const [projectName, setProjectName] = useState('');
@@ -375,7 +375,8 @@ export function App() {
   const promptValidator = usePromptValidator();
   const liveCosting = useLiveCosting(addLog);
   const nextStepAssistant = useNextStepAssistant(addLog);
-  const aiChat = useAiChat(addLog, activeProject?.knowledgeBase || []);
+  // FIX 3: Pass activeProjectId to useAiChat hook
+  const aiChat = useAiChat(addLog, activeProject?.knowledgeBase || [], activeProject?.id);
   const patentGenerator = usePatentGenerator(addLog);
 
   const forgeController = useForgeController(authenticatedUser);
@@ -387,7 +388,7 @@ export function App() {
   
   const isViewer = authenticatedUser?.role === Role.Viewer;
 
-  // --- Handlers Moved Above useVoiceCommander/useForgeVoice hooks to fix variable usage before declaration errors ---
+  // --- Handlers ---
 
   const handleUpdateProfile = useCallback((updatedUser: User | Partial<User>) => {
     setAuthenticatedUser(prev => {
@@ -424,6 +425,33 @@ export function App() {
       });
       setDeVinciMode('creation');
   };
+
+  // FIX 1: Linking Snapshots to Reports
+  const handleAddLocalSnapshot = useCallback((dataUrl: string, prompt: string) => {
+    if (!activeProject || !activeVersion) {
+        addLog('ERROR', 'No active project or version selected to attach viewport capture.');
+        return;
+    }
+
+    const newDrawing: GeneratedDrawing = {
+        id: crypto.randomUUID(),
+        url: dataUrl,
+        prompt: `Viewport Capture: ${prompt}`,
+        isLoading: false,
+        error: null,
+        includeInReport: true // Default to true for Sovereign Bundle
+    };
+
+    // 1. Update transient workspace state
+    setDrawings(prev => [...prev, newDrawing]);
+
+    // 2. Persist directly to active version in hook store
+    updateVersion(activeVersion.versionId, {
+        drawings: [...(activeVersion.drawings || []), newDrawing]
+    });
+
+    addLog('INFO', `Local Viewport captured: ${prompt}`);
+  }, [activeProject, activeVersion, addLog, setDrawings, updateVersion]);
 
   const handleSetCover = useCallback((id: string, type: 'drawing' | 'image') => {
     setDrawings(prev => prev.map(d => ({
@@ -539,7 +567,6 @@ export function App() {
     }
   };
 
-  // ANALYSIS ENGAGEMENT (Extracted for voice trigger)
   const handleEngage = useCallback(async (isReanalysis = false, factionId?: string, promptOverride?: string) => {
     const finalFaction = factionId ? (ENGINEERING_PHILOSOPHIES.find(f => f.id === factionId) || selectedFaction) : selectedFaction;
     const finalPrompt = promptOverride || prompt;
@@ -618,7 +645,6 @@ export function App() {
     },
     onCreateProject: (args) => {
         const { name, description, tags, factionId } = args;
-        // Agnostic Wipe first to isolate context
         forgeController.agnosticWipe();
         const newId = onNewProject({ name, description, tags: tags || [] }, { factionId });
         onSelectProject(newId);
@@ -687,7 +713,6 @@ export function App() {
           document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
           addLog('INFO', `Voice navigation to: ${sectionId}`);
       },
-      // Fix: Added missing callback required by ForgeVoiceCallbacks
       onLaunchNewProjectWizard: handleLaunchCreationDeVinci,
       onAddLog: addLog,
       authenticatedUser
@@ -897,7 +922,6 @@ export function App() {
   };
 
   const handleConfigGateComplete = async (config: { name: string, category: DomainCategory, branch: EngineeringBranch, description: string }) => {
-      // AGNOSTIC WIPE TRIGGER: Purge previous session context for intellectual clarity
       await forgeController.agnosticWipe();
       
       const newId = onNewProject({ name: config.name, description: config.description, tags: [config.category] }, { factionId: FactionId.PRAGMATIC_PRODUCTION });
@@ -1173,7 +1197,7 @@ export function App() {
                 isCadLoading={isCadLoading}
                 cadError={cadError}
                 onOpenCadViewer={() => handleGatedAction(() => setIsCadViewerOpen(true))}
-                onAddLocalSnapshot={addLocalSnapshot}
+                onAddLocalSnapshot={handleAddLocalSnapshot}
                 isGoogleExporterAuthenticated={googleExporter.isAuthenticated}
                 googleExporterUser={googleExporter.authenticatedUser}
                 isGoogleAuthLoading={googleExporter.isAuthLoading}
@@ -1296,7 +1320,6 @@ export function App() {
         retryCount={creationDeVinci.retryCount}
       />
 
-      {/* Added missing CadViewerModal to App.tsx return to support Open Foundry Viewer functionality */}
       {isCadViewerOpen && cadData && (
         <CadViewerModal
           isOpen={isCadViewerOpen}
@@ -1304,7 +1327,7 @@ export function App() {
           cadData={cadData}
           isViewer={isViewer}
           foundryResult={foundryResult}
-          onAddSnapshot={addLocalSnapshot}
+          onAddSnapshot={handleAddLocalSnapshot}
         />
       )}
     </div>

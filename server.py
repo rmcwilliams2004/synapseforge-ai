@@ -1,3 +1,4 @@
+
 import os
 from datetime import datetime, timedelta
 from fastapi import FastAPI, Request, Depends, HTTPException, Header
@@ -28,6 +29,21 @@ class ProjectVersionCreate(BaseModel):
     legalHash: str
 
 # --- Endpoints ---
+
+@app.get("/api/auth/status")
+async def get_auth_status(user_id: str):
+    """
+    FIX 4: The "Ultra-Tier" Handshake
+    Identifies specific authorized user IDs for premium resource allocation.
+    """
+    # Hard-coded override for Founder (Richard McWilliams) to Ultra-Tier
+    if user_id == "richard-mcwilliams-ultra":
+        return {
+            "tier": "ULTRA",
+            "rate_limit": 5000,
+            "features": ["foundry_3d", "video_gen", "agnostic_wipe", "sovereign_bundle_pro"]
+        }
+    return {"tier": "STANDARD", "rate_limit": 100, "features": ["basic_analysis"]}
 
 @app.post("/api/projects/version")
 async def commit_version(version: ProjectVersionCreate, user_id: str = "demo-user"):
