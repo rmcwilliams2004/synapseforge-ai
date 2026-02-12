@@ -1,3 +1,4 @@
+
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { SystemState, Role, User, IoStatus, ExportStatus, VoiceInterfaceMode, NalPrecision } from '../types';
 import { defrostSystem } from '../services/StorageManager';
@@ -57,6 +58,8 @@ export const useForgeController = (user: User | null) => {
             
             if (targetPrecision === NalPrecision.FOUNDRY) {
                 transition(SystemState.DEEP_SOLVE);
+            } else {
+                transition(SystemState.STABLE);
             }
         }, 800);
     }, [targetPrecision, transition]);
@@ -68,6 +71,17 @@ export const useForgeController = (user: User | null) => {
             if (status === 'SOLVED') transition(SystemState.STABLE);
             if (status === 'LOCKED') transition(SystemState.LOCKED);
             if (status === 'THROTTLED') transition(SystemState.IDLE);
+            if (status === 'ACTIVE_LISTENING') {
+                // Interactive Handshake: Focus and pulse the main input
+                const mainInput = document.getElementById('tour-step-2') as HTMLTextAreaElement;
+                if (mainInput) {
+                    mainInput.focus();
+                    mainInput.classList.add('ring-4', 'ring-brand-cyan', 'animate-pulse');
+                    setTimeout(() => {
+                        mainInput.classList.remove('ring-4', 'ring-brand-cyan', 'animate-pulse');
+                    }, 3000);
+                }
+            }
         };
         const handleFlush = () => transition(SystemState.IDLE);
         const handleIo = (e: any) => setIoStatus(e.detail.status);

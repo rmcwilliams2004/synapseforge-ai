@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { Role, User, SystemState, IoStatus, ExportStatus, VoiceInterfaceMode, VoiceTranscriptEntry, NalPrecision } from '../types';
 import { useTts } from '../hooks/useTts';
@@ -137,6 +138,37 @@ export const DiagnosticsPanel: React.FC<DiagnosticsPanelProps> = ({
                 </div>
                 
                 <div className="flex gap-4">
+                    {/* Voice Dashboard Controls */}
+                    <div className="bg-gray-800 border border-gray-700 p-4 rounded-2xl w-64 shadow-xl">
+                        <div className="flex justify-between items-center mb-3">
+                            <span className="text-[10px] font-black text-purple-400 uppercase tracking-widest">Voice Dashboard</span>
+                            <span className="text-[8px] text-gray-500">ULTRA_API_ACTIVE</span>
+                        </div>
+                        <div className="space-y-2">
+                            <button 
+                                onClick={() => window.dispatchEvent(new CustomEvent('forge-voice-replay'))}
+                                className="w-full py-2 bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 rounded-lg text-[9px] font-black text-purple-300 uppercase tracking-widest transition-all"
+                            >
+                                Replay Health Report
+                            </button>
+                            <button 
+                                onClick={() => window.dispatchEvent(new CustomEvent('forge-voice-skip'))}
+                                className="w-full py-2 bg-gray-700 hover:bg-gray-600 border border-gray-600 rounded-lg text-[9px] font-black text-gray-300 uppercase tracking-widest transition-all"
+                            >
+                                Skip Orientation
+                            </button>
+                            <div className="flex items-center justify-between px-1 mt-2">
+                                <span className="text-[8px] font-bold text-gray-500 uppercase">Mute Intro</span>
+                                <input 
+                                    type="checkbox" 
+                                    checked={user?.isSilenced} 
+                                    onChange={(e) => onUpdateUser?.({ isSilenced: e.target.checked })} 
+                                    className="accent-brand-cyan" 
+                                />
+                            </div>
+                        </div>
+                    </div>
+
                     {/* NAL Precision Controller */}
                     <div className="bg-gray-800 border border-gray-700 p-4 rounded-2xl w-64 shadow-xl">
                          <div className="flex justify-between items-center mb-3">
@@ -161,28 +193,6 @@ export const DiagnosticsPanel: React.FC<DiagnosticsPanelProps> = ({
                                 <span className="text-[8px] font-black text-gray-600 uppercase">Balance</span>
                                 <span className="text-[8px] font-black text-gray-600 uppercase">IP-Ready</span>
                             </div>
-                        </div>
-                    </div>
-
-                    {/* Voice Controller */}
-                    <div className="bg-gray-800 border border-gray-700 p-4 rounded-2xl w-64 shadow-xl">
-                        <div className="flex justify-between items-center mb-3">
-                            <span className="text-[10px] font-black text-purple-400 uppercase tracking-widest">Voice Listener</span>
-                            <div className={`w-2 h-2 rounded-full ${voiceMode === 'ALWAYS_ON' ? 'bg-red-500 animate-pulse' : 'bg-gray-600'}`}></div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 mb-3">
-                            <button 
-                                onClick={() => setVoiceMode('ALWAYS_ON')}
-                                className={`py-1 text-[8px] font-black uppercase tracking-tighter border rounded-lg transition-all ${voiceMode === 'ALWAYS_ON' ? 'bg-purple-600 text-white border-purple-500' : 'bg-gray-900 text-gray-500 border-gray-700'}`}
-                            >
-                                Active Monitor
-                            </button>
-                            <button 
-                                onClick={() => setVoiceMode('MANUAL')}
-                                className={`py-1 text-[8px] font-black uppercase tracking-tighter border rounded-lg transition-all ${voiceMode === 'MANUAL' ? 'bg-purple-600 text-white border-purple-500' : 'bg-gray-900 text-gray-500 border-gray-700'}`}
-                            >
-                                Manual Only
-                            </button>
                         </div>
                     </div>
 
@@ -294,6 +304,13 @@ export const DiagnosticsPanel: React.FC<DiagnosticsPanelProps> = ({
                     </div>
                 </div>
             </div>
+            
+            <button 
+                onClick={() => window.dispatchEvent(new CustomEvent('forge-log', { detail: "[ADMIN]: Telemetry HUB closed." }))} 
+                className="fixed top-8 right-8 text-gray-500 hover:text-white transition"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-10 h-10"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
         </div>
     );
 };
