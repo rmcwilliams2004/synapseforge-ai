@@ -364,7 +364,24 @@ export interface AnalysisResult {
   safety_audit?: SafetyAuditFinding[];
 }
 
-export type SimulationType = 'FEA' | 'CFD' | 'THERMAL';
+export type SimulationType = 'FEA' | 'CFD' | 'THERMAL' | 'PHYSICS_VALIDATION';
+
+export interface FailureTelemetry {
+  type: string;
+  coordinates: { x: number; y: number; z: number };
+  magnitude?: number;
+  delta_t?: string;
+  description: string;
+}
+
+export interface PhysicsValidationResult {
+  simulation_id: string;
+  status: 'STABLE' | 'MESH_RUPTURE' | 'THERMAL_OVERLOAD' | 'CRITICAL_SYSTEM_FAILURE';
+  timestamp: string;
+  failure_telemetry: FailureTelemetry[] | null;
+  engine_handshake: string;
+  solver_path: string;
+}
 
 export interface SimulationResult {
     type: SimulationType;
@@ -375,6 +392,7 @@ export interface SimulationResult {
     imagePrompt: string;
     isLoading: boolean;
     error: string | null;
+    physicsTelemetry?: PhysicsValidationResult | null;
 }
 
 export interface GeneratedDrawing {

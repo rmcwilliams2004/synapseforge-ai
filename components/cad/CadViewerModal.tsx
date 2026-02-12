@@ -6,9 +6,9 @@ import { CadData, CadViewerTool, CadMeasurement, FoundryState, FoundryCadResult 
 import { CadViewerSidebar } from './CadComponentList';
 import { CadViewerToolbar } from './CadViewerToolbar';
 import { FoundryParamPanel } from '../foundry/FoundryParamPanel';
-import { MaterialComparisonModal } from '../foundry/MaterialComparisonModal';
 import { MATERIAL_LIBRARY } from '../../constants/materialLibrary';
-import { useDebounce } from '../../hooks/useDebounce';
+import { useWebXR } from '../../hooks/useWebXR';
+import { AetheriumIcon } from '../icons/AetheriumIcon';
 
 interface CadViewerModalProps {
   isOpen: boolean;
@@ -17,21 +17,31 @@ interface CadViewerModalProps {
   isViewer: boolean;
   foundryResult?: FoundryCadResult | null;
   onAddSnapshot?: (dataUrl: string, viewName: string) => void;
+  physicsResult?: any | null;
+  runPhysicsValidation?: (cadData: CadData, envId: string) => Promise<void>;
+  isPhysicsActive?: boolean;
 }
 
-const SNAP_RADIUS = 5;
-
+/**
+ * Maps a stress magnitude to a heatmap color range.
+ * 0.0 = Cyber Cyan (Safe)
+ * 1.0 = Breach Red (Failure)
+ */
 const getStressColor = (stress: number) => {
     const color = new THREE.Color();
-    color.setHSL(0.7 * (1 - stress), 1, 0.5);
+    color.setHSL((180 - (Math.min(1, stress) * 180)) / 360, 1, 0.5);
     return color;
 };
 
-export const CadViewerModal: React.FC<CadViewerModalProps> = ({ isOpen, onClose, cadData, isViewer, foundryResult, onAddSnapshot }) => {
+export const CadViewerModal: React.FC<CadViewerModalProps> = ({ 
+    isOpen, onClose, cadData, isViewer, foundryResult, onAddSnapshot, 
+    physicsResult, runPhysicsValidation, isPhysicsActive 
+}) => {
     const [activeTool, setActiveTool] = useState<CadViewerTool>('select');
+    const onToolChange = useCallback((tool: CadViewerTool) => setActiveTool(tool), []);
+
     const [visibleIds, setVisibleIds] = useState<Set<string>>(() => new Set(cadData.components.map(c => c.name)));
     const [selectedComponentName, setSelectedComponentName] = useState<string | null>(null);
-    const [showScad, setShowScad] = useState(false);
 
     const [isExploded, setIsExploded] = useState(false);
     const [explodeFactor, setExplodeFactor] = useState(0.5);
@@ -39,7 +49,6 @@ export const CadViewerModal: React.FC<CadViewerModalProps> = ({ isOpen, onClose,
     const [sectionPlaneConfig, setSectionPlaneConfig] = useState({ axis: 'x', constant: 0, inverted: false });
     const [isAutoRotate, setIsAutoRotate] = useState(false);
     const [showGrid, setShowGrid] = useState(true);
-    const [isComparisonOpen, setIsComparisonOpen] = useState(false);
     
     const [foundryState, setFoundryState] = useState<FoundryState>({
         selectedMaterial: MATERIAL_LIBRARY.find(m => m.name === foundryResult?.metadata.material) || MATERIAL_LIBRARY[0],
@@ -50,67 +59,75 @@ export const CadViewerModal: React.FC<CadViewerModalProps> = ({ isOpen, onClose,
         jurisdiction: 'USPTO'
     });
 
-    const debouncedParameters = useDebounce(foundryState.parameters, 500);
-
-    const [measurements, setMeasurements] = useState<(CadMeasurement & { line: THREE.Line; label: HTMLDivElement })[]>([]);
-    const isMeasuringRef = useRef(false);
-    const startPointRef = useRef<{ point: THREE.Vector3; type: 'vertex' | 'surface' } | null>(null);
-    const tempLabelRef = useRef<HTMLDivElement | null>(null);
-
     const mountRef = useRef<HTMLDivElement>(null);
-    const labelsRef = useRef<HTMLDivElement>(null);
     const threeRef = useRef<{
         scene?: THREE.Scene,
         camera?: THREE.PerspectiveCamera,
         renderer?: THREE.WebGLRenderer,
         controls?: OrbitControls,
         meshMap: Map<string, THREE.Mesh>,
-        originalPositions: Map<string, THREE.Vector3>,
-        clippingPlanes: THREE.Plane[],
-        planeHelper?: THREE.PlaneHelper,
         gridHelper?: THREE.GridHelper,
-        snapIndicator?: THREE.Mesh,
-        previewLine?: THREE.Line,
         animationFrameId?: number,
-    }>({ meshMap: new Map(), originalPositions: new Map(), clippingPlanes: [] });
+    }>({ meshMap: new Map() });
 
-    const handleResetMeasurements = useCallback(() => {
-        measurements.forEach(m => {
-            threeRef.current.scene?.remove(m.line);
-            m.line.geometry.dispose();
-            (m.line.material as THREE.Material).dispose();
-            if (m.label.parentElement) {
-                m.label.parentElement.removeChild(m.label);
-            }
-        });
-        setMeasurements([]);
-        startPointRef.current = null;
-        isMeasuringRef.current = false;
-        if (threeRef.current.previewLine) threeRef.current.previewLine.visible = false;
-        if (tempLabelRef.current) tempLabelRef.current.style.display = 'none';
-    }, [measurements]);
-
-    const onToolChange = (tool: CadViewerTool) => {
-        if (activeTool === 'measure' && tool !== 'measure') {
-            handleResetMeasurements(); 
-        }
-        setActiveTool(tool);
-    };
+    const { isXRSupported, isXRSessionActive, enterImmersiveFoundry } = useWebXR(null);
 
     /**
-     * SOVEREIGN DRAWING ENGINE: Local Snapshot Trigger
-     * Captures the WebGL buffer for a specific orthographic view.
+     * HOLODECK: Step 4 - High-Fidelity Physics Heat Map
+     * Recolors the vertex buffer based on Genesis MPM telemetry.
      */
+    useEffect(() => {
+        const t = threeRef.current;
+        if (!t.scene) return;
+
+        t.meshMap.forEach((mesh) => {
+            const geometry = mesh.geometry as THREE.BufferGeometry;
+            const mat = mesh.material as THREE.MeshStandardMaterial;
+            
+            if (physicsResult && physicsResult.failure_coordinates) {
+                const posAttr = geometry.getAttribute('position');
+                const colors = [];
+                const vertexPos = new THREE.Vector3();
+                
+                for (let i = 0; i < posAttr.count; i++) {
+                    vertexPos.fromBufferAttribute(posAttr, i);
+                    mesh.localToWorld(vertexPos);
+                    
+                    let maxInfluence = 0;
+                    physicsResult.failure_coordinates.forEach((fp: any) => {
+                        const failPoint = new THREE.Vector3(fp.x, fp.y, fp.z);
+                        const dist = vertexPos.distanceTo(failPoint);
+                        // Radius of influence for failure visualization
+                        const influence = Math.max(0, 1 - (dist / 120));
+                        if (influence > maxInfluence) maxInfluence = influence;
+                    });
+                    
+                    const stressColor = getStressColor(maxInfluence);
+                    colors.push(stressColor.r, stressColor.g, stressColor.b);
+                }
+                
+                geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+                mat.vertexColors = true;
+                mat.color.setHex(0xffffff); // Neutral base
+                mat.transparent = false;
+                mat.opacity = 1.0;
+                mat.needsUpdate = true;
+            } else {
+                geometry.deleteAttribute('color');
+                mat.vertexColors = false;
+                mat.color.setHex(0x06b6d4);
+                mat.opacity = 0.9;
+                mat.transparent = true;
+                mat.needsUpdate = true;
+            }
+        });
+    }, [physicsResult, cadData.components]);
+
     const handleCaptureView = useCallback((view: 'Top' | 'Front' | 'Side' | 'Isometric') => {
         const t = threeRef.current;
         if (!t.renderer || !t.camera || !t.scene || !onAddSnapshot) return;
 
-        // 1. Temporarily disable helpers for clean drawing
-        const gridPrev = t.gridHelper?.visible;
-        if (t.gridHelper) t.gridHelper.visible = false;
-
-        // 2. Position camera for the requested view
-        const distance = 400; // Calibrated for typical assemblies
+        const distance = 400;
         switch(view) {
             case 'Top': t.camera.position.set(0, distance, 0); break;
             case 'Front': t.camera.position.set(0, 0, distance); break;
@@ -120,121 +137,56 @@ export const CadViewerModal: React.FC<CadViewerModalProps> = ({ isOpen, onClose,
         t.camera.lookAt(0,0,0);
         t.controls?.update();
 
-        // 3. Render and Snap
         t.renderer.render(t.scene, t.camera);
         const dataUrl = t.renderer.domElement.toDataURL("image/png");
-
-        // 4. Restore state
-        if (t.gridHelper) t.gridHelper.visible = !!gridPrev;
-        
-        // 5. Emit to IP Ledger/Visual folder
-        onAddSnapshot(dataUrl, `${view} Orthographic View`);
-        
-        window.dispatchEvent(new CustomEvent('forge-log', { detail: `[VIS_DOC]: Captured ${view} view from local buffer.` }));
+        onAddSnapshot(dataUrl, `${view} View Capture`);
     }, [onAddSnapshot]);
 
     useEffect(() => {
-        const handleOpenComparison = () => setIsComparisonOpen(true);
-        window.addEventListener('material-comparison', handleOpenComparison);
-        return () => window.removeEventListener('material-comparison', handleOpenComparison);
-    }, []);
-
-    useEffect(() => {
-        const t = threeRef.current;
-        if (!t.scene) return;
-
-        const mainMesh = t.meshMap.get(cadData.components[0]?.name);
-        if (mainMesh) {
-            const { Length = 100, Width = 50, Thickness = 10 } = foundryState.parameters;
-            mainMesh.scale.set(Length / 100, Width / 50, Thickness / 10);
-        }
-    }, [foundryState.parameters, cadData.components]);
-
-    useEffect(() => {
-        const t = threeRef.current;
-        if (!t.scene) return;
-
-        const mainMesh = t.meshMap.get(cadData.components[0]?.name);
-        if (mainMesh) {
-            const { Width = 50, Thickness = 10 } = debouncedParameters;
-            const crossSection = (Width || 1) * (Thickness || 1);
-            const mockStress = 15000 / (crossSection || 1); 
-            const sf = foundryState.selectedMaterial.tensileStrength / mockStress;
-            
-            setFoundryState(prev => ({ ...prev, safetyFactor: sf }));
-            
-            const stressRatio = Math.min(1, 1 / sf);
-            const stressColor = getStressColor(stressRatio);
-            (mainMesh.material as THREE.MeshStandardMaterial).color.copy(stressColor);
-            (mainMesh.material as THREE.MeshStandardMaterial).emissive.copy(stressColor).multiplyScalar(0.1);
-        }
-    }, [debouncedParameters, foundryState.selectedMaterial, cadData.components]);
-
-    useEffect(() => {
-        if (!isOpen || !mountRef.current || !labelsRef.current) return;
-
+        if (!isOpen || !mountRef.current) return;
         const currentMount = mountRef.current;
         const t = threeRef.current;
 
         t.scene = new THREE.Scene();
-        t.scene.background = new THREE.Color(0x0f172a);
-        t.scene.fog = new THREE.FogExp2(0x0f172a, 0.001);
-
+        t.scene.background = new THREE.Color(0x030712); 
         t.camera = new THREE.PerspectiveCamera(75, currentMount.clientWidth / currentMount.clientHeight, 0.1, 10000);
-        
         t.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
         t.renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
         t.renderer.setPixelRatio(window.devicePixelRatio);
-        t.renderer.localClippingEnabled = true;
-        t.renderer.shadowMap.enabled = true;
         currentMount.appendChild(t.renderer.domElement);
         
         t.controls = new OrbitControls(t.camera, t.renderer.domElement);
         t.controls.enableDamping = true;
-        t.controls.dampingFactor = 0.05;
 
-        t.scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-        const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
-        dirLight.position.set(50, 100, 50);
+        t.scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(100, 200, 100);
         t.scene.add(dirLight);
-
-        const gridHelper = new THREE.GridHelper(2000, 50, 0x4b5563, 0x1f2937);
-        t.gridHelper = gridHelper;
-        t.scene.add(gridHelper);
 
         const group = new THREE.Group();
         t.meshMap.clear();
-        t.originalPositions.clear();
         
-        cadData.components.forEach((comp, index) => {
-            let geometry = new THREE.BoxGeometry(comp.dimensions.x, comp.dimensions.y, comp.dimensions.z);
-            const material = new THREE.MeshStandardMaterial({
+        cadData.components.forEach((comp) => {
+            // High segment count for high-fidelity vertex gradients
+            const geometry = new THREE.BoxGeometry(comp.dimensions.x, comp.dimensions.y, comp.dimensions.z, 16, 16, 16);
+            const material = new THREE.MeshStandardMaterial({ 
                 color: 0x06b6d4, 
                 transparent: true, 
-                opacity: 0.9, 
-                metalness: 0.2, 
-                roughness: 0.5,
-                side: THREE.DoubleSide
+                opacity: 0.9,
+                metalness: 0.8,
+                roughness: 0.2
             });
-            
             const mesh = new THREE.Mesh(geometry, material);
             mesh.position.set(comp.position.x, comp.position.y, comp.position.z);
             mesh.name = comp.name;
-            
             group.add(mesh);
             t.meshMap.set(comp.name, mesh);
-            t.originalPositions.set(comp.name, mesh.position.clone());
         });
         
         const box = new THREE.Box3().setFromObject(group);
         const center = box.getCenter(new THREE.Vector3());
         group.position.sub(center);
-        const size = box.getSize(new THREE.Vector3());
-        const maxDim = Math.max(size.x, size.y, size.z);
-        const cameraZ = Math.max(maxDim * 2, 100);
-        
-        t.camera.position.set(cameraZ, cameraZ * 0.8, cameraZ);
-        t.controls.target.set(0, 0, 0);
+        t.camera.position.set(300, 300, 300);
         t.scene.add(group);
 
         const animate = () => {
@@ -248,138 +200,110 @@ export const CadViewerModal: React.FC<CadViewerModalProps> = ({ isOpen, onClose,
             if (t.animationFrameId) cancelAnimationFrame(t.animationFrameId);
             t.controls?.dispose();
             t.renderer?.dispose();
-            if (currentMount && t.renderer) {
-                currentMount.removeChild(t.renderer.domElement);
-            }
+            if (currentMount && t.renderer) currentMount.removeChild(t.renderer.domElement);
         };
     }, [isOpen, cadData]);
 
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-40 animate-fade-in" style={{ animationDuration: '0.3s' }} onClick={onClose}>
-            <div className="bg-gray-900 rounded-lg shadow-xl w-[95vw] h-[90vh] flex flex-col border-2 border-gray-600" onClick={e => e.stopPropagation()}>
-                <header className="flex justify-between items-center p-4 border-b border-gray-700 flex-shrink-0">
-                    <div className="flex items-center gap-3">
-                        <svg className="w-6 h-6 text-brand-cyan" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-                        </svg>
+        <div className="fixed inset-0 bg-gray-950/95 flex items-center justify-center z-50 animate-fade-in" onClick={onClose}>
+            <div className="bg-gray-900 rounded-3xl shadow-2xl w-[98vw] h-[95vh] flex flex-col border border-gray-700 overflow-hidden" onClick={e => e.stopPropagation()}>
+                <header className="flex justify-between items-center p-6 border-b border-gray-800 bg-gray-900/50 backdrop-blur-xl flex-shrink-0">
+                    <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 bg-brand-cyan/20 rounded-xl flex items-center justify-center text-brand-cyan border border-brand-cyan/30 shadow-[0_0_15px_rgba(6,182,212,0.2)]">
+                            <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" /></svg>
+                        </div>
                         <div>
-                            <h2 className="text-xl font-bold text-brand-light leading-none">Engineering Foundry: {cadData.assemblyName}</h2>
-                            {foundryResult && <p className="text-[10px] text-brand-cyan uppercase tracking-widest mt-1 font-black">Foundry-Core AI Plugin Active</p>}
+                            <h2 className="text-xl font-black text-brand-light uppercase tracking-tighter italic leading-none">Engineering Foundry: {cadData.assemblyName}</h2>
+                            {physicsResult ? (
+                                <p className="text-[10px] text-purple-400 font-black uppercase tracking-[0.2em] mt-1 animate-pulse">
+                                    Reality Mode: 4D Stress Heat Map Active
+                                </p>
+                            ) : (
+                                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-[0.2em] mt-1">
+                                    Status: Analytical Standby // Engine: Genesis v2.4 Fork
+                                </p>
+                            )}
                         </div>
                     </div>
                     <div className="flex items-center gap-4">
-                        <button 
-                            onClick={() => setShowScad(!showScad)}
-                            className={`px-3 py-1 text-xs font-black uppercase rounded border transition-all ${showScad ? 'bg-brand-cyan text-gray-900 border-brand-cyan' : 'text-gray-400 border-gray-700 hover:text-brand-light'}`}
-                        >
-                            {showScad ? 'View Render' : 'View SCAD Source'}
-                        </button>
-                        <button onClick={onClose} className="text-gray-400 hover:text-white transition text-3xl font-bold leading-none">&times;</button>
+                        {runPhysicsValidation && (
+                            <button 
+                                onClick={() => runPhysicsValidation(cadData, 'SAA_LEO_ORBIT')}
+                                disabled={isPhysicsActive || isViewer}
+                                className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-black uppercase tracking-widest text-xs transition-all border ${isPhysicsActive ? 'bg-yellow-900/20 text-yellow-500 border-yellow-500/50 cursor-wait' : 'bg-brand-cyan/10 text-brand-cyan border-brand-cyan/30 hover:bg-brand-cyan hover:text-gray-900'}`}
+                            >
+                                <svg className={`w-4 h-4 ${isPhysicsActive ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="m3.75 13.5 10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z" />
+                                </svg>
+                                {isPhysicsActive ? 'Simulating...' : 'Verify Physics'}
+                            </button>
+                        )}
+                        <div className="h-8 w-px bg-gray-800 mx-2" />
+                        {isXRSupported && (
+                             <button 
+                                onClick={() => enterImmersiveFoundry(threeRef.current.renderer || null)}
+                                className={`flex items-center gap-3 px-6 py-2.5 rounded-xl font-black uppercase tracking-widest text-xs transition-all border-2 ${isXRSessionActive ? 'bg-purple-600 border-purple-400 text-white' : 'bg-white text-gray-900 border-white hover:bg-gray-100 shadow-[0_0_20px_rgba(255,255,255,0.25)]'}`}
+                            >
+                                <AetheriumIcon className="w-5 h-5" />
+                                {isXRSessionActive ? 'Immersed' : 'Enter Holodeck'}
+                            </button>
+                        )}
+                        <button onClick={onClose} className="text-gray-400 hover:text-white transition-all transform hover:rotate-90 text-4xl font-bold leading-none ml-4">&times;</button>
                     </div>
                 </header>
-                <main className="flex-1 flex overflow-hidden">
+                
+                <main className="flex-1 flex overflow-hidden relative">
                     <div className="flex-1 relative">
-                        {showScad ? (
-                             <div className="absolute inset-0 bg-gray-950 p-6 font-mono text-cyan-500 overflow-auto z-30">
-                                 <div className="flex justify-between items-center mb-4 border-b border-cyan-900 pb-2">
-                                     <span className="text-xs uppercase font-black tracking-[0.2em]">Deterministic OpenSCAD Ledger</span>
-                                     <span className="text-[10px] opacity-50">SHA-256::Verified_Lattice</span>
-                                 </div>
-                                 <pre className="text-sm leading-relaxed">
-                                     <code>{foundryState.scadString}</code>
-                                 </pre>
-                             </div>
-                        ) : null}
-                        
-                        <CadViewerToolbar
-                            activeTool={activeTool}
-                            onToolChange={onToolChange}
-                            onResetView={() => threeRef.current.controls?.reset()}
-                            isExploded={isExploded}
-                            onToggleExplode={() => setIsExploded(!isExploded)}
-                            isSectionEnabled={isSectionEnabled}
-                            onToggleSection={() => setIsSectionEnabled(!isSectionEnabled)}
-                            isAutoRotate={isAutoRotate}
-                            onToggleAutoRotate={() => setIsAutoRotate(!isAutoRotate)}
-                            showGrid={showGrid}
-                            onToggleGrid={() => setShowGrid(!showGrid)}
+                        <CadViewerToolbar 
+                            activeTool={activeTool} 
+                            onToolChange={onToolChange} 
+                            onResetView={() => threeRef.current.controls?.reset()} 
+                            isExploded={isExploded} 
+                            onToggleExplode={() => setIsExploded(!isExploded)} 
+                            isSectionEnabled={isSectionEnabled} 
+                            onToggleSection={() => setIsSectionEnabled(!isSectionEnabled)} 
+                            isAutoRotate={isAutoRotate} 
+                            onToggleAutoRotate={() => setIsAutoRotate(!isAutoRotate)} 
+                            showGrid={showGrid} 
+                            onToggleGrid={() => setShowGrid(!showGrid)} 
                         />
                          <div ref={mountRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
-                         <div ref={labelsRef} className="absolute top-0 left-0 pointer-events-none" />
+                         
+                         <div className="absolute bottom-8 right-8 flex flex-col gap-3">
+                             <button onClick={() => handleCaptureView('Top')} className="px-5 py-2 bg-gray-800/80 backdrop-blur-md border border-gray-600 rounded-xl text-[10px] font-black uppercase text-gray-300 hover:bg-brand-cyan hover:text-gray-900 transition-all shadow-xl">Snap Top View</button>
+                             <button onClick={() => handleCaptureView('Isometric')} className="px-5 py-2 bg-gray-800/80 backdrop-blur-md border border-gray-600 rounded-xl text-[10px] font-black uppercase text-gray-300 hover:bg-brand-cyan hover:text-gray-900 transition-all shadow-xl">Snap Isometric</button>
+                         </div>
                     </div>
                     
-                    <div className="flex flex-col border-l border-gray-700 w-80 bg-gray-800/30 overflow-y-auto overflow-x-hidden">
-                        <CadViewerSidebar
-                            components={cadData.components}
-                            visibleIds={visibleIds}
-                            selectedComponentName={selectedComponentName}
-                            onToggleVisibility={(name) => setVisibleIds(p => { const n = new Set(p); n.has(name) ? n.delete(name) : n.add(name); return n; })}
-                            onSelectComponent={setSelectedComponentName}
-                            onToggleAll={(v) => setVisibleIds(v ? new Set(cadData.components.map(c => c.name)) : new Set())}
-                            onToggleGroup={(names, v) => setVisibleIds(p => { const n = new Set(p); names.forEach(name => v ? n.add(name) : n.delete(name)); return n; })}
-                            isExploded={isExploded}
-                            onToggleExplode={() => setIsExploded(!isExploded)}
-                            explodeFactor={explodeFactor}
-                            onExplodeFactorChange={setExplodeFactor}
-                            isSectionEnabled={isSectionEnabled}
-                            onToggleSection={() => setIsSectionEnabled(!isSectionEnabled)}
-                            sectionPlaneConfig={sectionPlaneConfig}
-                            onSectionPlaneConfigChange={setSectionPlaneConfig}
-                            measurements={[]}
-                            onClearMeasurements={handleResetMeasurements}
-                            units={cadData.units}
-                            activeTool={activeTool}
-                            isMeasuring={isMeasuringRef.current}
+                    <div className="flex flex-col border-l border-gray-800 w-96 bg-gray-900/30 backdrop-blur-xl overflow-y-auto shadow-2xl">
+                        <CadViewerSidebar 
+                            components={cadData.components} 
+                            visibleIds={visibleIds} 
+                            selectedComponentName={selectedComponentName} 
+                            onToggleVisibility={(name) => setVisibleIds(p => { const n = new Set(p); n.has(name) ? n.delete(name) : n.add(name); return n; })} 
+                            onSelectComponent={setSelectedComponentName} 
+                            onToggleAll={(v) => setVisibleIds(v ? new Set(cadData.components.map(c => c.name)) : new Set())} 
+                            onToggleGroup={(names, v) => setVisibleIds(p => { const n = new Set(p); names.forEach(name => v ? n.add(name) : n.delete(name)); return n; })} 
+                            isExploded={isExploded} 
+                            onToggleExplode={() => setIsExploded(!isExploded)} 
+                            explodeFactor={explodeFactor} 
+                            onExplodeFactorChange={setExplodeFactor} 
+                            isSectionEnabled={isSectionEnabled} 
+                            onToggleSection={() => setIsSectionEnabled(!isSectionEnabled)} 
+                            sectionPlaneConfig={sectionPlaneConfig} 
+                            onSectionPlaneConfigChange={setSectionPlaneConfig} 
+                            measurements={[]} 
+                            onClearMeasurements={() => {}} 
+                            units={cadData.units} 
+                            activeTool={activeTool} 
+                            isMeasuring={false} 
                         />
-
-                        {/* Sovereign Drawing Engine Integration */}
-                        <div className="p-4 border-t border-gray-700 bg-gray-900/50">
-                            <h4 className="text-[10px] font-black text-brand-cyan uppercase tracking-widest mb-3">Sovereign Drawing Engine</h4>
-                            <div className="grid grid-cols-2 gap-2">
-                                <button 
-                                    onClick={() => handleCaptureView('Top')}
-                                    className="p-2 bg-gray-700 hover:bg-brand-cyan hover:text-gray-900 transition-all rounded text-[9px] font-black uppercase tracking-tighter"
-                                >
-                                    Snap Top View
-                                </button>
-                                <button 
-                                    onClick={() => handleCaptureView('Front')}
-                                    className="p-2 bg-gray-700 hover:bg-brand-cyan hover:text-gray-900 transition-all rounded text-[9px] font-black uppercase tracking-tighter"
-                                >
-                                    Snap Front View
-                                </button>
-                                <button 
-                                    onClick={() => handleCaptureView('Side')}
-                                    className="p-2 bg-gray-700 hover:bg-brand-cyan hover:text-gray-900 transition-all rounded text-[9px] font-black uppercase tracking-tighter"
-                                >
-                                    Snap Side View
-                                </button>
-                                <button 
-                                    onClick={() => handleCaptureView('Isometric')}
-                                    className="p-2 bg-gray-700 hover:bg-brand-cyan hover:text-gray-900 transition-all rounded text-[9px] font-black uppercase tracking-tighter"
-                                >
-                                    Snap Isometric
-                                </button>
-                            </div>
-                            <p className="text-[8px] text-gray-500 mt-2 text-center uppercase tracking-widest">Maps directly to project visuals</p>
-                        </div>
+                        <FoundryParamPanel state={foundryState} onUpdate={(u) => setFoundryState(s => ({ ...s, ...u }))} isViewer={isViewer} />
                     </div>
-
-                    <FoundryParamPanel 
-                        state={foundryState}
-                        onUpdate={(u) => setFoundryState(s => ({ ...s, ...u }))}
-                        isViewer={isViewer}
-                    />
                 </main>
             </div>
-
-            <MaterialComparisonModal 
-                isOpen={isComparisonOpen} 
-                onClose={() => setIsComparisonOpen(false)} 
-                foundryState={foundryState}
-            />
         </div>
     );
 };

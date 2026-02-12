@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { AnalysisResult, Faction, MaterialSuggestion, BillOfMaterials, TestPlan, ComplianceAndSafety, Project, User, GeneratedDrawing, CadData, ProjectVersion, EngineeringChangeOrder, PreliminaryCostEstimate, GeneratedImage, RotorModel, RotorShaftElement, RotorDiskElement, RotorBearingElement, RotorMaterial, GoogleDocContent, EngineeringBranch, FoundryCadResult, IoStatus, ProcessFmeaEntry } from '../../types';
 import { exportFullReportPDF } from '../../services/pdfService';
@@ -32,8 +33,6 @@ const defaultDrawingViews = {
     'Exploded': false,
     'Cross-Section': false,
 };
-
-// --- Missing Constants & Sub-Components ---
 
 const TTS_VOICES = [
     { id: 'Zephyr', name: 'Zephyr (Professional)' },
@@ -91,7 +90,6 @@ const ExportDropdown = ({ onExportPDF, onExportGoogle, onGoogleSignIn, onGoogleS
                             {isGoogleAuthLoading ? 'Connecting...' : 'Sign in to Google Drive'}
                         </button>
                     )}
-                    {/* Fix: Resolved truncated code and fixed call to onOpenGoogleDocPreview (line 97) */}
                     {googleDocContent && (
                         <button onClick={() => { onOpenGoogleDocPreview(); setIsOpen(false); }} className="w-full text-left px-4 py-2 hover:bg-gray-700 rounded text-sm text-brand-cyan">Preview Google Doc</button>
                     )}
@@ -135,7 +133,6 @@ export interface ResultViewProps {
   isCadLoading: boolean;
   cadError: string | null;
   onOpenCadViewer: () => void;
-  // Added onAddLocalSnapshot to ResultViewProps interface to support prop-drilling for snapshots
   onAddLocalSnapshot?: (dataUrl: string, prompt: string) => void;
   isGoogleExporterAuthenticated: boolean;
   googleExporterUser: { name: string; email: string } | null;
@@ -172,7 +169,6 @@ export interface ResultViewProps {
   patentGenerator: ReturnType<typeof usePatentGenerator>;
 }
 
-// Fix: Exported ResultView correctly to resolve AnalysisDisplay.tsx import error.
 export const ResultView: React.FC<ResultViewProps> = (props) => {
     const { projectName, result, tts, authenticatedUser } = props;
     const [activeSection, setActiveSection] = useState<string | null>(null);
@@ -345,6 +341,10 @@ export const ResultView: React.FC<ResultViewProps> = (props) => {
                 <LiveCostingDashboard liveCosting={props.liveCosting} isViewer={props.authenticatedUser.role === 'Viewer'} />
             </Section>
 
+            <Section id="advanced_simulation" title="Advanced Simulation Studio" actions={<CommentButton sectionId="advanced_simulation" sectionTitle="Simulation" count={commentCounts['advanced_simulation'] || 0} onToggle={toggleComments} isOpen={activeSection === 'advanced_simulation'} />}>
+                <AdvancedSimulation bom={result.billOfMaterials} simulation={props.simulation} productContext={result.executive_summary} isViewer={props.authenticatedUser.role === 'Viewer'} cadData={props.cadData} />
+            </Section>
+
             <Section id="fabrication_planner" title="Fabrication Planner" actions={<CommentButton sectionId="fabrication_planner" sectionTitle="Fabrication Planner" count={commentCounts['fabrication_planner'] || 0} onToggle={toggleComments} isOpen={activeSection === 'fabrication_planner'} />}>
                 <FabricationPlanner fabricationPlanner={props.fabricationPlanner} analysisResult={result} isViewer={props.authenticatedUser.role === 'Viewer'} gcodeVisualizer={props.gcodeVisualizer} />
             </Section>
@@ -393,7 +393,7 @@ export const ResultView: React.FC<ResultViewProps> = (props) => {
                     patentGenerator={props.patentGenerator} 
                     isViewer={props.authenticatedUser.role === 'Viewer'} 
                     authenticatedUser={props.authenticatedUser} 
-                    onUpdateUser={() => {}} // Integration handled via higher-level state in full app context
+                    onUpdateUser={() => {}} 
                     project={props.activeProject} 
                     foundryState={props.foundryResult ? {
                         selectedMaterial: MATERIAL_LIBRARY.find(m => m.name === props.foundryResult?.metadata.material) || MATERIAL_LIBRARY[0],
@@ -418,6 +418,20 @@ export const ResultView: React.FC<ResultViewProps> = (props) => {
                 comments={comments} 
                 onAddComment={addComment} 
             />
+
+            {props.isCadViewerOpen && props.cadData && (
+                <CadViewerModal
+                isOpen={props.isCadViewerOpen}
+                onClose={props.onOpenCadViewer}
+                cadData={props.cadData}
+                isViewer={props.authenticatedUser.role === 'Viewer'}
+                foundryResult={props.foundryResult}
+                onAddSnapshot={props.onAddLocalSnapshot}
+                physicsResult={props.simulation.physicsResult}
+                runPhysicsValidation={props.simulation.runGenesisVerification}
+                isPhysicsActive={props.simulation.isPhysicsActive}
+                />
+            )}
         </div>
     );
 };

@@ -19,7 +19,8 @@ export const FabricationPlanner: React.FC<FabricationPlannerProps> = ({ fabricat
 
     // FIX 2: Implementation of "State-Gates" (Stopping the 429 Storm)
     const handleRunPlanner = () => {
-        if (fabricationPlanner.isLoading) return; // Logic Gate: Prevent spamming while thinking
+        // Logic Gate: Prevent spamming while thinking
+        if (fabricationPlanner.isLoading) return; 
 
         const productContext = `
         Product: ${analysisResult.product_name}.
@@ -28,7 +29,7 @@ export const FabricationPlanner: React.FC<FabricationPlannerProps> = ({ fabricat
         Key Components: ${analysisResult.designDocument.component_designs.map(c => `${c.component_name}: ${c.design_details}`).join('; ')}.
         `;
         
-        // Use the Debounce logic to ensure clean submission
+        // Apply a manual debounce to ensure clean submission and avoid 429s from rapid clicking
         setTimeout(() => {
             fabricationPlanner.runPlanner(selectedProcess, selectedMaterial, productContext);
         }, 500); 

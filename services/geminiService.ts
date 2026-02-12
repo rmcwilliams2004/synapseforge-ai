@@ -1217,3 +1217,62 @@ export const engageAnalysisFunctionDeclaration: FunctionDeclaration = {
     name: 'engage_analysis',
     parameters: { type: Type.OBJECT, properties: {} }
 };
+
+/**
+ * REALITY FILTER: run_genesis_verification
+ * High-fidelity 4D physical stress test tool.
+ */
+export const runGenesisVerificationFunctionDeclaration: FunctionDeclaration = {
+  name: 'run_genesis_verification',
+  description: 'Executes a high-fidelity 4D physical stress test on a component geometry. Use this when the user asks if a design "works in the real world."',
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      target_mesh: { 
+        type: Type.OBJECT, 
+        description: 'The current 3D geometry and NAL constants of the part to be verified.' 
+      },
+      physics_domain: { 
+        type: Type.STRING, 
+        description: 'The environmental context (e.g., Relativistic_Vacuum, High_Pressure, Deep_Sea).' 
+      },
+      safety_threshold: { 
+        type: Type.NUMBER, 
+        description: 'The minimum factor of safety required (e.g. 1.5).' 
+      }
+    },
+    required: ["target_mesh", "physics_domain", "safety_threshold"]
+  }
+};
+
+/**
+ * REALITY FILTER: run_foundry_simulation
+ * Specialized 4D physics simulation for engineering viability.
+ */
+export const runFoundrySimulationFunctionDeclaration: FunctionDeclaration = {
+  name: 'run_foundry_simulation',
+  description: 'Executes a 4D physics simulation using the Genesis engine to verify real-world viability of a design.',
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      project_domain: {
+        type: Type.STRING,
+        description: "The engineering domain, e.g., 'AEROSPACE_LEO', 'PROPULSION', or 'SOLID_STRUCTURES'."
+      },
+      engineering_specs: {
+        type: Type.STRING,
+        description: "Key numerical constants extracted from the NAL, such as magnetic field strength (Tesla) or yield strength (GPa)."
+      },
+      simulation_type: {
+        type: Type.STRING,
+        enum: ["STRESS_TO_FAILURE", "THERMAL_STABILITY", "PARTICLE_CAPTURE"],
+        description: "The specific physics test to perform on the mesh."
+      },
+      environment_id: {
+        type: Type.STRING,
+        description: "The environmental preset, e.g., 'SAA_ORBIT' or 'STP_GROUND'."
+      }
+    },
+    required: ["project_domain", "engineering_specs", "simulation_type"]
+  }
+};

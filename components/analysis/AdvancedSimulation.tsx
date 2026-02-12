@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { BillOfMaterialsItem, SimulationResult, SimulationType, User } from '../../types';
+import { BillOfMaterialsItem, SimulationResult, SimulationType, User, CadData } from '../../types';
 import { useSimulation } from '../../hooks/useSimulation';
 
 interface AdvancedSimulationProps {
@@ -8,6 +8,7 @@ interface AdvancedSimulationProps {
     simulation: ReturnType<typeof useSimulation>;
     productContext: string;
     isViewer: boolean;
+    cadData: CadData | null;
 }
 
 const SimulationTypeButton = ({ type, currentType, setType }: { type: SimulationType, currentType: SimulationType, setType: (type: SimulationType) => void }) => {
@@ -22,7 +23,7 @@ const SimulationTypeButton = ({ type, currentType, setType }: { type: Simulation
 };
 
 
-export const AdvancedSimulation: React.FC<AdvancedSimulationProps> = ({ bom, simulation, productContext, isViewer }) => {
+export const AdvancedSimulation: React.FC<AdvancedSimulationProps> = ({ bom, simulation, productContext, isViewer, cadData }) => {
     const [selectedType, setSelectedType] = useState<SimulationType>('FEA');
     const [selectedComponents, setSelectedComponents] = useState<Set<string>>(new Set());
     const [status, setStatus] = useState<string[]>([]);
@@ -45,8 +46,9 @@ export const AdvancedSimulation: React.FC<AdvancedSimulationProps> = ({ bom, sim
                 'FEA': ['Initializing mesh generator...', 'Applying boundary conditions...', 'Solving for stress and strain...', 'Post-processing results...'],
                 'CFD': ['Building fluid volume...', 'Meshing surfaces...', 'Solving Navier-Stokes equations...', 'Visualizing flow vectors...'],
                 'THERMAL': ['Applying thermal loads...', 'Calculating heat transfer coefficients...', 'Solving for temperature distribution...', 'Generating thermal map...'],
+                'PHYSICS_VALIDATION': ['Handshaking Genesis Engine...', 'Mapping lattice tensors...', 'Executing MPM solver...', 'Synthesizing telemetry...']
             };
-            setStatus(prev => prev.length < messages[selectedType].length ? [...prev, messages[selectedType][prev.length]] : prev);
+            setStatus(prev => prev.length < (messages[selectedType] || []).length ? [...prev, (messages[selectedType] || [])[prev.length]] : prev);
         }, 1500);
 
         await simulation.runSimulation(selectedType, componentNames, productContext);
@@ -54,13 +56,32 @@ export const AdvancedSimulation: React.FC<AdvancedSimulationProps> = ({ bom, sim
         clearInterval(updateInterval);
         setStatus([]);
     };
+
+    const handleRunRealWorldTest = () => {
+        if (!cadData) {
+            alert("Lock geometry and synthesize CAD before running Real-World Physics Validation.");
+            return;
+        }
+        // Environment preset: South Atlantic Anomaly Low Earth Orbit
+        simulation.runGenesisVerification(cadData, 'SAA_LEO_ORBIT');
+    };
     
-    const { simulationResult } = simulation;
+    const { simulationResult, isPhysicsActive, physicsResult } = simulation;
 
     return (
         <div className="mb-6 animate-fade-in" style={{ animationDelay: '150ms' }}>
             <div className="flex justify-between items-center mb-3 pb-2 border-b-2 border-cyan-500/30 dark:border-cyan-800/50">
                 <h3 className="text-xl font-bold text-brand-cyan">Advanced Simulation Studio</h3>
+                {cadData && !isViewer && (
+                    <button 
+                        onClick={handleRunRealWorldTest}
+                        disabled={isPhysicsActive}
+                        className="flex items-center gap-2 px-4 py-1.5 bg-brand-cyan/20 text-brand-cyan border border-brand-cyan/40 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-brand-cyan hover:text-white transition-all shadow-lg animate-pulse"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3.5 h-3.5"><path strokeLinecap="round" strokeLinejoin="round" d="m3.75 13.5 10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z" /></svg>
+                        Run Real-World Test (Genesis Engine)
+                    </button>
+                )}
             </div>
             <div className="pl-8">
                  <div className="bg-white dark:bg-gray-800/50 p-6 rounded-lg border border-gray-200 dark:border-gray-700 space-y-6 transition-colors duration-300">
@@ -99,21 +120,53 @@ export const AdvancedSimulation: React.FC<AdvancedSimulationProps> = ({ bom, sim
                         </button>
                     )}
 
-                    {simulationResult && (
+                    {(simulationResult || physicsResult || isPhysicsActive) && (
                          <div className="pt-6 border-t border-gray-200 dark:border-gray-700">
-                             <h4 className="text-xl font-semibold text-gray-900 dark:text-brand-light mb-4">Simulation Results: {simulationResult.type} on {simulationResult.componentName}</h4>
-                             {simulationResult.isLoading && (
+                             <h4 className="text-xl font-semibold text-gray-900 dark:text-brand-light mb-4">
+                                {isPhysicsActive ? 'Physics Engine Busy...' : 
+                                 physicsResult ? `Physical Reality Status: ${physicsResult.status}` : 
+                                 `Simulation Results: ${simulationResult?.type}`}
+                             </h4>
+                             {(simulationResult?.isLoading || isPhysicsActive) && (
                                 <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg text-center">
                                     <svg className="animate-spin h-8 w-8 text-purple-400 mx-auto mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                                    <p className="text-purple-600 dark:text-purple-300 font-semibold">Running Simulation...</p>
+                                    <p className="text-purple-600 dark:text-purple-300 font-semibold uppercase tracking-widest text-xs">Awaiting Physical Truth...</p>
                                     <p className="text-sm text-gray-500 dark:text-gray-400 font-mono mt-2 h-6">{status[status.length - 1]}</p>
                                 </div>
                              )}
-                             {simulationResult.error && (
-                                 <p className="text-red-500 dark:text-red-400 p-4 bg-red-100 dark:bg-red-900/30 rounded-lg">{simulationResult.error}</p>
+                             
+                             {physicsResult && (
+                                <div className="p-6 bg-black/40 rounded-2xl border border-brand-cyan/20 animate-fade-in">
+                                    <div className="flex justify-between items-center mb-6">
+                                        <h5 className="text-[10px] font-black text-brand-cyan uppercase tracking-widest">Genesis Physical Telemetry</h5>
+                                        <span className="text-[8px] font-mono text-gray-600">{physicsResult.timestamp}</span>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-6 text-xs mb-6">
+                                        <div className="bg-gray-900/50 p-3 rounded-lg border border-gray-800">
+                                            <span className="text-gray-500 block mb-1">Status</span>
+                                            <span className={`font-black uppercase ${physicsResult.status === 'VERIFIED' ? 'text-green-400' : 'text-red-400'}`}>{physicsResult.status}</span>
+                                        </div>
+                                        <div className="bg-gray-900/50 p-3 rounded-lg border border-gray-800">
+                                            <span className="text-gray-500 block mb-1">Max Stress Magnitude</span>
+                                            <span className="text-white font-mono">{physicsResult.telemetry?.max_stress?.toFixed(4)} GPa</span>
+                                        </div>
+                                    </div>
+                                    {physicsResult.failure_coordinates && (
+                                        <div className="space-y-2">
+                                            <h6 className="text-[9px] font-black text-red-500 uppercase tracking-widest ml-1 mb-2">Failure Nodal Matrix</h6>
+                                            {physicsResult.failure_coordinates.map((fail: any, i: number) => (
+                                                <div key={i} className="p-3 bg-red-900/10 border border-red-500/30 rounded-xl text-[10px] flex justify-between group hover:bg-red-900/20 transition-all">
+                                                    <span className="text-red-400 font-bold">{fail.type} @ [{fail.x}, {fail.y}, {fail.z}]</span>
+                                                    <span className="text-gray-500 italic group-hover:text-gray-300">Rupture confirmed via MPM.</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
                              )}
-                             {!simulationResult.isLoading && !simulationResult.error && (
-                                <div className="space-y-6 animate-fade-in">
+
+                             {simulationResult && !simulationResult.isLoading && !simulationResult.error && (
+                                <div className="space-y-6 animate-fade-in mt-6">
                                     <div className="space-y-4">
                                         <div>
                                             <h5 className="font-semibold text-gray-700 dark:text-gray-300 mb-1">Summary</h5>
@@ -127,10 +180,8 @@ export const AdvancedSimulation: React.FC<AdvancedSimulationProps> = ({ bom, sim
                                         </div>
                                     </div>
                                     <div>
-                                        {simulationResult.imageUrl ? (
+                                        {simulationResult.imageUrl && (
                                              <img src={simulationResult.imageUrl} alt={`Simulation result for ${simulationResult.componentName}`} className="w-full rounded-lg border-2 border-gray-200 dark:border-gray-600" />
-                                        ) : (
-                                            <div className="aspect-video bg-gray-200 dark:bg-gray-700 rounded-lg flex items-center justify-center text-gray-500">Visualization not available</div>
                                         )}
                                     </div>
                                 </div>

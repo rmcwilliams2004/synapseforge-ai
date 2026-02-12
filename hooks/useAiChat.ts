@@ -16,12 +16,12 @@ export const useAiChat = (
 
     // FIX 3: Purging "Idea Leakage" in AI Chat
     useEffect(() => {
-        // When the project changes, end the chat session to maintain agnostic isolation
+        // When the component unmounts or the project changes, hard-purge the chat session buffers
         if (chatSessionRef.current) {
             chatSessionRef.current = null;
             setHistory([]);
             window.dispatchEvent(new CustomEvent('forge-log', { 
-                detail: '[SYSTEM]: AI Chat buffers purged. Cross-tenant context neutralized.' 
+                detail: '[SYSTEM]: AI Chat session terminated and history purged for agnostic isolation.' 
             }));
         }
     }, [activeProjectId]);
@@ -34,7 +34,7 @@ export const useAiChat = (
         let finalInstruction = baseSystemInstruction;
         if (knowledgeBase.length > 0) {
             const knowledgeContext = knowledgeBase.map(doc => `[SOURCE: ${doc.name}]\n${doc.content}`).join('\n\n---\n\n');
-            finalInstruction += `\n\n### PROJECT KNOWLEDGE BASE (INGESTED DOCUMENTS)\nUse the following technical reference data to answer specific questions accurately. If information is found in these sources, prioritize it over generic knowledge. If a document mentions a product like 'Aegis', use the specifications from that document.\n\n${knowledgeContext}`;
+            finalInstruction += `\n\n### PROJECT KNOWLEDGE BASE (INGESTED DOCUMENTS)\nUse the following technical reference data to answer specific questions accurately. If information is found in these sources, prioritize it over generic knowledge.\n\n${knowledgeContext}`;
         }
 
         chatSessionRef.current = ai.chats.create({
@@ -83,7 +83,7 @@ export const useAiChat = (
                     return newHistory;
                 });
             }
-            addLog('INFO', 'AI Chat received a response (Context-Aware).');
+            addLog('INFO', 'AI Chat response received.');
         } catch (e) {
             const errorMessage = parseApiError(e);
             setError(errorMessage);
