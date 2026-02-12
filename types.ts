@@ -1,9 +1,16 @@
+
 import React from 'react';
 
 export enum FactionId {
   ADVANCED_MATERIALS = 'advanced_materials',
   PRAGMATIC_PRODUCTION = 'pragmatic_production',
   SYSTEMS_AUTOMATION = 'systems_automation',
+}
+
+export enum DomainCategory {
+  APPLIED_PHYSICS = 'Applied Physics',
+  LOGIC_SYSTEMS = 'Logic Systems',
+  GENERAL_INNOVATION = 'General Innovation'
 }
 
 export enum EngineeringBranch {
@@ -24,6 +31,24 @@ export enum Role {
   Viewer = 'Viewer',
 }
 
+export enum SystemState {
+  IDLE = 'IDLE',
+  CALIBRATING = 'CALIBRATING',
+  STABLE = 'STABLE',
+  LOCKED = 'LOCKED',
+  ERROR = 'ERROR',
+  DEEP_SOLVE = 'DEEP_SOLVE'
+}
+
+export enum NalPrecision {
+  DRAFT = 0.1,
+  ANALYSIS = 0.01,
+  FOUNDRY = 0.001
+}
+
+export type IoStatus = 'IDLE' | 'READING' | 'WRITING' | 'VERIFYING' | 'JAMMED';
+export type ExportStatus = 'IDLE' | 'PACKAGING' | 'HASHING' | 'READY' | 'FAILED';
+
 export enum SubscriptionStatus {
   FREE = 'FREE',
   PRO_TRIAL = 'PRO_TRIAL',
@@ -33,6 +58,68 @@ export enum SubscriptionStatus {
 }
 
 export type ProtectionTypePref = 'PATENT' | 'COPYRIGHT' | 'TRADEMARK' | 'AI_RECOMMENDED';
+export type LegalJurisdiction = 'USPTO' | 'EPO' | 'WIPO' | 'JPO' | 'CNIPA';
+
+export interface NoveltyPoint {
+  text: string;
+  rationale: string;
+}
+
+export type VoiceInterfaceMode = 'ALWAYS_ON' | 'MANUAL';
+
+export interface VoiceTranscriptEntry {
+    id: string;
+    text: string;
+    intent?: string;
+    timestamp: string;
+    status: 'PENDING' | 'EXECUTED' | 'FAILED' | 'REJECTED';
+}
+
+export interface Milestone {
+    id: string;
+    title: string;
+    description: string;
+    timestamp: string;
+    type: 'STRUCTURAL' | 'LEGAL' | 'LOGIC' | 'SYSTEM';
+}
+
+export interface MaterialPreset {
+  id: string;
+  name: string;
+  category: 'Metals' | 'Polymers' | 'Ceramics' | 'Composites' | 'Exotic';
+  density: number; // kg/m3
+  youngsModulus: number; // GPa
+  tensileStrength: number; // MPa
+  thermalConductivity: number; // W/mK
+  costPerKg: number; // USD
+}
+
+export interface FoundryCadResult {
+  plugin: string;
+  action: string;
+  metadata: {
+    project_id: string;
+    material: string;
+    geometric_hash_required: boolean;
+  };
+  scad_params: {
+    base_dimensions: [number, number, number];
+    parameters: Record<string, number>;
+    raw_scad: string;
+  };
+  suggested_fix?: string;
+}
+
+export interface FoundryState {
+  selectedMaterial: MaterialPreset;
+  parameters: Record<string, number>;
+  scadString: string;
+  safetyFactor: number;
+  isLocked: boolean;
+  jurisdiction: LegalJurisdiction;
+  designHash?: string;
+  cadResult?: FoundryCadResult;
+}
 
 export interface User {
   id: string;
@@ -53,6 +140,8 @@ export interface User {
   hasAcceptedLegal?: boolean;
   lastAcceptedLegal?: string;
   hasSignedPartnerProtocol?: boolean;
+  is_first_login?: boolean;
+  isSilenced?: boolean;
 }
 
 export interface InnovationCertificate {
@@ -94,9 +183,22 @@ export interface MaterialSuggestion {
   properties: MaterialProperties;
 }
 
+export interface ProcessFmeaEntry {
+  failure_mode: string;
+  potential_effects: string;
+  severity: number;
+  potential_causes: string;
+  occurrence: number;
+  current_controls: string;
+  detection: number;
+  rpn: number;
+  recommended_action: string;
+}
+
 export interface ManufacturingProcess {
   name: string;
   description: string;
+  fmea: ProcessFmeaEntry[];
 }
 
 export interface ComparativeAnalysis {
@@ -224,11 +326,12 @@ export interface PatentApplication {
   summary: string;
   independent_claims: IndependentClaim[];
   dependent_claims: string[];
-  novelty_points: string[];
+  novelty_points: NoveltyPoint[];
   inventive_step_rationale: string;
   owner_of_record?: string;
   protection_type?: ProtectionTypePref;
   legal_hash?: string;
+  jurisdiction?: LegalJurisdiction;
 }
 
 export interface SafetyAuditFinding {
@@ -386,6 +489,7 @@ export interface ProjectIndexEntry {
   createdAt: string;
   updatedAt: string;
   searchKeywords?: string;
+  domainCategory?: DomainCategory;
 }
 
 export interface Project extends ProjectIndexEntry {
@@ -536,6 +640,7 @@ export interface InProgressState {
   result: AnalysisResult;
   drawings: GeneratedDrawing[];
   inspirationalImages: GeneratedImage[];
+  domainCategory?: DomainCategory;
 }
 
 export interface Faction {
@@ -551,9 +656,6 @@ export interface Faction {
   icon: React.FC<{ className?: string }>;
 }
 
-/**
- * Interface representing a material entry in the tool suite.
- */
 export interface Material {
     id: string;
     name: string;
@@ -561,9 +663,6 @@ export interface Material {
     properties: Record<string, string>;
 }
 
-/**
- * Interface representing a standard component (like a screw or bearing).
- */
 export interface StandardComponent {
     id: string;
     name: string;
@@ -572,9 +671,6 @@ export interface StandardComponent {
     specifications: Record<string, string>;
 }
 
-/**
- * Interface representing an engineering standard.
- */
 export interface Standard {
     id: string;
     name: string;
@@ -584,9 +680,6 @@ export interface Standard {
     status: 'Active' | 'Withdrawn';
 }
 
-/**
- * Interface representing a project artifact in revision control.
- */
 export interface ProjectArtifact {
     id: string;
     name: string;
@@ -596,9 +689,6 @@ export interface ProjectArtifact {
     modifiedAt: string;
 }
 
-/**
- * Interface for an item in a Failure Mode and Effects Analysis (FMEA).
- */
 export interface FmeaItem {
     id: number;
     processStep: string;
@@ -614,17 +704,11 @@ export interface FmeaItem {
     actionStatus: 'Pending' | 'In Progress' | 'Complete';
 }
 
-/**
- * A data point for Statistical Process Control (SPC) charts.
- */
 export interface SpcDataPoint {
     sample: number;
     value: number;
 }
 
-/**
- * Status of an individual design or safety requirement.
- */
 export enum RequirementStatus {
     Draft = 'Draft',
     Approved = 'Approved',
@@ -632,9 +716,6 @@ export enum RequirementStatus {
     Obsolete = 'Obsolete'
 }
 
-/**
- * Interface for a specific design requirement.
- */
 export interface Requirement {
     id: string;
     text: string;
@@ -642,9 +723,6 @@ export interface Requirement {
     linkedTo: string[];
 }
 
-/**
- * Data structure for Root Cause Analysis (RCA) including 5 Whys and Fishbone.
- */
 export interface RcaData {
     problem: string;
     fiveWhys: string[];
@@ -658,9 +736,6 @@ export interface RcaData {
     };
 }
 
-/**
- * Represents a single run of a simulation (e.g., FEA or CFD results).
- */
 export interface SimulationRun {
     id: string;
     name: string;
@@ -668,9 +743,6 @@ export interface SimulationRun {
     plotData: any;
 }
 
-/**
- * A script that can be executed in the automation engine.
- */
 export interface Script {
     id: string;
     name: string;
@@ -678,9 +750,6 @@ export interface Script {
     code: string;
 }
 
-/**
- * Data format for various engineering charts in the viz console.
- */
 export interface ChartData {
     id: string;
     name: string;

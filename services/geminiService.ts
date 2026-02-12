@@ -1,5 +1,6 @@
+
 import { GoogleGenAI, Part, Type, FunctionDeclaration, Modality, GenerateContentResponse } from '@google/genai';
-import { Faction, AnalysisResult, CadData, FactionId, SetupSuggestions, CadComparisonResult, FabricationPlan, GCodeSummary, SimulationType, ManufacturingProcessType, BillOfMaterialsItem, ProcurementInfo, PreliminaryCostEstimate, PromptValidationResult, NextStepSuggestion, GeneratedDrawing, ManufacturingProcess, PatentApplication, IngestedDocument, EngineeringBranch, User, ProtectionTypePref } from '../types';
+import { Faction, AnalysisResult, CadData, FactionId, SetupSuggestions, CadComparisonResult, FabricationPlan, GCodeSummary, SimulationType, ManufacturingProcessType, BillOfMaterialsItem, ProcurementInfo, PreliminaryCostEstimate, PromptValidationResult, NextStepSuggestion, GeneratedDrawing, ManufacturingProcess, PatentApplication, IngestedDocument, EngineeringBranch, User, ProtectionTypePref, LegalJurisdiction, FoundryCadResult } from '../types';
 
 const getAiClient = () => new GoogleGenAI({ apiKey: process.env.API_KEY! });
 
@@ -102,8 +103,29 @@ const fullAnalysisSchema = {
             type: Type.ARRAY,
             items: {
                 type: Type.OBJECT,
-                properties: { name: { type: Type.STRING }, description: { type: Type.STRING } },
-                required: ["name", "description"]
+                properties: { 
+                    name: { type: Type.STRING }, 
+                    description: { type: Type.STRING },
+                    fmea: {
+                        type: Type.ARRAY,
+                        items: {
+                            type: Type.OBJECT,
+                            properties: {
+                                failure_mode: { type: Type.STRING },
+                                potential_effects: { type: Type.STRING },
+                                severity: { type: Type.INTEGER, description: 'Severity score 1-10' },
+                                potential_causes: { type: Type.STRING },
+                                occurrence: { type: Type.INTEGER, description: 'Occurrence probability 1-10' },
+                                current_controls: { type: Type.STRING },
+                                detection: { type: Type.INTEGER, description: 'Ease of detection 1-10' },
+                                rpn: { type: Type.INTEGER, description: 'Risk Priority Number (Sev * Occ * Det)' },
+                                recommended_action: { type: Type.STRING }
+                            },
+                            required: ["failure_mode", "potential_effects", "severity", "potential_causes", "occurrence", "current_controls", "detection", "rpn", "recommended_action"]
+                        }
+                    }
+                },
+                required: ["name", "description", "fmea"]
             }
         },
         comparative_analysis: {
@@ -318,13 +340,52 @@ const patentSchema = {
             }
         },
         dependent_claims: { type: Type.ARRAY, items: { type: Type.STRING } },
-        novelty_points: { type: Type.ARRAY, items: { type: Type.STRING } },
+        novelty_points: { 
+            type: Type.ARRAY, 
+            items: {
+                type: Type.OBJECT,
+                properties: {
+                    text: { type: Type.STRING, description: 'Specific technical differentiator from prior art.' },
+                    rationale: { type: Type.STRING, description: 'Brief technical rationale explaining why this is novel.' }
+                },
+                required: ["text", "rationale"]
+            },
+            description: "3-5 specific technical aspects that differentiate this invention from existing prior art."
+        },
         inventive_step_rationale: { type: Type.STRING, description: 'High-level synthesis of non-obviousness.' },
         owner_of_record: { type: Type.STRING, description: 'Determined from user metadata provided in prompt.' },
         protection_type: { type: Type.STRING, enum: ['PATENT', 'COPYRIGHT', 'TRADEMARK'] },
         legal_hash: { type: Type.STRING, description: 'Simulated blockchain/encrypted ledger fingerprint.' }
     },
     required: ["title", "abstract", "background", "summary", "independent_claims", "dependent_claims", "novelty_points", "inventive_step_rationale", "owner_of_record", "protection_type", "legal_hash"]
+};
+
+const foundryCadSchema = {
+  type: Type.OBJECT,
+  properties: {
+    plugin: { type: Type.STRING },
+    action: { type: Type.STRING },
+    metadata: {
+      type: Type.OBJECT,
+      properties: {
+        project_id: { type: Type.STRING },
+        material: { type: Type.STRING },
+        geometric_hash_required: { type: Type.BOOLEAN }
+      },
+      required: ["project_id", "material", "geometric_hash_required"]
+    },
+    scad_params: {
+      type: Type.OBJECT,
+      properties: {
+        base_dimensions: { type: Type.ARRAY, items: { type: Type.NUMBER }, minItems: 3, maxItems: 3 },
+        parameters: { type: Type.OBJECT, description: "Key-value pairs for parametric CAD controls" },
+        raw_scad: { type: Type.STRING, description: "Deterministic OpenSCAD code" }
+      },
+      required: ["base_dimensions", "parameters", "raw_scad"]
+    },
+    suggested_fix: { type: Type.STRING, nullable: true }
+  },
+  required: ["plugin", "action", "metadata", "scad_params"]
 };
 
 export const parseApiError = (error: any): string => {
@@ -404,7 +465,14 @@ ${technicalContext}
     return result;
 };
 
-export const generatePatentDraft = async (result: AnalysisResult, user: User, protectionType: ProtectionTypePref, knowledgeBase: IngestedDocument[] = []): Promise<PatentApplication> => {
+export const generatePatentDraft = async (
+    result: AnalysisResult, 
+    user: User, 
+    protectionType: ProtectionTypePref, 
+    jurisdiction: LegalJurisdiction, 
+    designHash: string, 
+    knowledgeBase: IngestedDocument[] = []
+): Promise<PatentApplication> => {
     const ai = getAiClient();
     const branchContext = result.branch || EngineeringBranch.GENERAL;
     const attributionOwner = user.use_company_attribution ? (user.company_name || user.name) : (user.legal_identity || user.name);
@@ -417,44 +485,65 @@ Use these documents to verify novelty and ensure standard compliance:
 ${patentContext}
 ` : '';
 
-    const branchSafetyContext = branchContext === EngineeringBranch.NUCLEAR 
-        ? "GROUND all claims in IAEA Safety Standards. IDENTIFY materials susceptible to neutron embrittlement. FLAG novelty violating thermodynamics."
-        : branchContext === EngineeringBranch.AEROSPACE
-        ? "GROUND claims in FAA/EASA airworthiness. VERIFY flight-readiness per MIL-HDBK-5. AUDIT for power-to-weight optimization."
-        : "GROUND claims in applicable industry standards and PhD-level physical principles.";
-
     const response = await ai.models.generateContent({
         model: 'gemini-3-pro-preview',
         contents: `Act as a Specialist Patent Attorney and a PhD Research Lead in ${branchContext} Engineering.
-          You are operating in a multi-tenant PLaaS (Platform as a Service) environment. Ensure data isolation by only utilizing the provided context.
           
-          Draft a formal Intellectual Property specification for:
-          
+          Generate a formal IP specification for:
           Product: ${result.product_name}
           Executive Summary: ${result.executive_summary}
-          Material Innovations: ${JSON.stringify(result.material_suggestions)}
-          System Architecture: ${JSON.stringify(result.designDocument)}
+          Design Fingerprint: ${designHash}
+          Target Jurisdiction: ${jurisdiction}
           
           Owner of Record: ${attributionOwner}
-          User Preference for Protection: ${protectionType}
-          
-          Regulatory Context: ${branchSafetyContext}
+          Protection Type: ${protectionType}
           
           ${retrievalBlock}
           
-          ### CORE DIRECTIVES
-          1. INNOVATION CLASSIFICATION: Tailor the output to the User Preference (${protectionType}). If 'AI_RECOMMENDED', determine if the innovation is primarily a Patentable utility, a Copyrightable software/process architecture, or a Trademarkable brand concept. 
-          2. FORMAL CONSTRUCTION: If drafting a Utility Patent, each 'independent_claim' MUST be a single long sentence with three parts: [PREAMBLE], [TRANSITION] 'comprising', and [BODY] with functional 'wherein' clauses. If Copyright, focus on creative expression and structural logic.
-          3. SYNERGISTIC RATIONALE: Explain the 'Inventive Step' or 'Original Expression'—why the combination of elements produces an effect greater than the sum of its parts.
-          4. NOVELTY VECTORS: Clearly state the technical differentiators.
-          5. LEGAL HASH: Generate a simulated unique fingerprint (SHA-256 style string) for this IP disclosure based on the project name and owner.
-          
-          Output must strictly follow the provided JSON schema.`,
+          ### JURISDICTIONAL CONSTRAINTS
+          - If ${jurisdiction} is USPTO: Focus on utility, non-obviousness, and enablement per 35 U.S.C. 101/102/103.
+          - If ${jurisdiction} is EPO: Focus on 'Technical Character' and the problem-solution approach.
+          - If ${jurisdiction} is WIPO: Ensure PCT-compliant formalisms.
+
+          Draft strictly based on the provided JSON schema. Identify 3-5 specific technical aspects that differentiate this invention from existing prior art and provide brief, high-level rationales for each.`,
         config: {
             responseMimeType: "application/json",
             responseSchema: patentSchema,
             maxOutputTokens: 10000,
             thinkingConfig: { thinkingBudget: 4000 }
+        }
+    });
+    const parsed = JSON.parse(response.text!);
+    parsed.jurisdiction = jurisdiction;
+    return parsed;
+};
+
+export const generateFoundryCad = async (
+    projectName: string,
+    prompt: string,
+    material: string,
+    projectId: string
+): Promise<FoundryCadResult> => {
+    const ai = getAiClient();
+    const response = await ai.models.generateContent({
+        model: 'gemini-3-pro-preview',
+        contents: `You are the Sovereign Foundry Architect. Translate requirements into a CADAM JSON payload.
+        
+        Project: ${projectName}
+        Material: ${material}
+        User Intent: ${prompt}
+        
+        Rules:
+        - Output strictly JSON for the 'foundry-core' plugin.
+        - Plugin action must be 'AUTO_GENERATE'.
+        - 'raw_scad' must be valid deterministic OpenSCAD code.
+        - Ensure base dimensions are derived from physical requirements.
+        - Calibrate parameters like 'wall_thickness' and 'lattice_density' for ${material}.`,
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: foundryCadSchema,
+            maxOutputTokens: 5000,
+            thinkingConfig: { thinkingBudget: 2000 }
         }
     });
     return JSON.parse(response.text!);
@@ -1074,4 +1163,27 @@ export const showSectionFunctionDeclaration: FunctionDeclaration = {
         properties: { sectionId: { type: Type.STRING, enum: ['executive_summary', 'faction_rationale', 'ai_suggestions', 'visual_documentation', 'cad_export', 'bom', 'live_costing', 'advanced_simulation', 'rotordynamics_studio', 'fabrication_planner', 'test_plan', 'compliance_safety', 'change_orders', 'patent_application'] } },
         required: ["sectionId"]
     }
+};
+
+export const switchAppViewFunctionDeclaration: FunctionDeclaration = {
+    name: 'switch_app_view',
+    parameters: {
+        type: Type.OBJECT,
+        properties: { view: { type: Type.STRING, enum: ['app', 'admin', 'suite', 'account', 'pricing'] } },
+        required: ["view"]
+    }
+};
+
+export const toggleDocumentationFunctionDeclaration: FunctionDeclaration = {
+    name: 'toggle_documentation',
+    parameters: {
+        type: Type.OBJECT,
+        properties: { doc_type: { type: Type.STRING, enum: ['manual', 'technical'] }, open: { type: Type.BOOLEAN } },
+        required: ["doc_type", "open"]
+    }
+};
+
+export const engageAnalysisFunctionDeclaration: FunctionDeclaration = {
+    name: 'engage_analysis',
+    parameters: { type: Type.OBJECT, properties: {} }
 };

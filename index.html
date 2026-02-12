@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -118,6 +117,27 @@
       .animate-pulse-mic {
         animation: pulse-mic 1.5s ease-in-out infinite;
       }
+
+      /* Pulse states for upload bar */
+      .bg-blue-pulse {
+        background-color: #3b82f6;
+        animation: pulseBlue 1.5s infinite;
+      }
+      @keyframes pulseBlue {
+        0% { background-color: #3b82f6; }
+        50% { background-color: #60a5fa; }
+        100% { background-color: #3b82f6; }
+      }
+
+      .bg-gold-pulse {
+        background-color: #d97706;
+        animation: pulseGold 1.5s infinite;
+      }
+      @keyframes pulseGold {
+        0% { background-color: #d97706; }
+        50% { background-color: #fbbf24; }
+        100% { background-color: #d97706; }
+      }
     </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
@@ -134,7 +154,9 @@
     "three": "https://cdn.jsdelivr.net/npm/three@0.166.1/build/three.module.js",
     "three/examples/jsm/controls/OrbitControls.js": "https://cdn.jsdelivr.net/npm/three@0.166.1/examples/jsm/controls/OrbitControls.js",
     "three/": "https://aistudiocdn.com/three@^0.180.0/",
-    "idb": "https://cdn.jsdelivr.net/npm/idb@8/+esm"
+    "idb": "https://cdn.jsdelivr.net/npm/idb@8/+esm",
+    "@pdfme/generator": "https://cdn.jsdelivr.net/npm/@pdfme/generator@5.1.0/+esm",
+    "@pdfme/common": "https://cdn.jsdelivr.net/npm/@pdfme/common@5.1.0/+esm"
   }
 }
 </script>

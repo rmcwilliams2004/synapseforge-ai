@@ -13,7 +13,9 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "three": "^0.180.0",
-    "idb": "8"
+    "idb": "8",
+    "@pdfme/generator": "5.1.0",
+    "@pdfme/common": "5.1.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Faction, ProjectVersion, Project, AnalysisResult, User, LogEntry, Role, GeneratedDrawing, FactionId, GeneratedImage, EditorState, RotorModel, CadData, InProgressState, IngestedDocument, ProjectIndexEntry, SubscriptionStatus, EngineeringBranch } from './types';
+import { Faction, ProjectVersion, Project, AnalysisResult, User, LogEntry, Role, GeneratedDrawing, FactionId, GeneratedImage, EditorState, RotorModel, CadData, InProgressState, IngestedDocument, ProjectIndexEntry, SubscriptionStatus, EngineeringBranch, DomainCategory, SystemState, FoundryCadResult, NalPrecision } from './types';
 import { ENGINEERING_PHILOSOPHIES, TOUR_STEPS, MOCK_USERS } from './constants';
 import { useAnalysis } from './hooks/useAnalysis';
 import { useVideoGenerator } from './hooks/useVideoGenerator';
@@ -54,6 +54,7 @@ import { useNextStepAssistant } from './hooks/useNextStepAssistant';
 import { useVoiceCommander } from './hooks/useVoiceCommander';
 import { useAppVoice } from './hooks/useAppVoice';
 import { createDrawingsZip } from './services/zipService';
+import { persistProjectData } from './services/StorageManager';
 import { useAiChat } from './hooks/useAiChat';
 import { AiChatModal } from './components/AiChatModal';
 import { ToolSuite } from './components/suite/ToolSuite';
@@ -65,6 +66,13 @@ import { AccountPage } from './components/AccountPage';
 import { LegalGuard } from './components/LegalGuard';
 import { Footer } from './components/Footer';
 import { PartnerIndemnityModal } from './components/PartnerIndemnityModal';
+import { SystemStatusIndicator, DiagnosticsPanel } from './components/SystemActivationOverlay';
+import { SystemToast } from './components/SystemToast';
+import { ConfigurationGateModal } from './components/ConfigurationGateModal';
+import { useForgeController } from './hooks/useForgeController';
+import { useProjectExport } from './hooks/useProjectExport';
+import { useForgeVoice } from './hooks/useForgeVoice';
+import { MATERIAL_LIBRARY } from './constants/materialLibrary';
 
 const useRossAnalysis = (addLog: (level: LogEntry['level'], message: string) => void) => {
     const workerRef = useRef<Worker | null>(null);
@@ -85,6 +93,7 @@ const useRossAnalysis = (addLog: (level: LogEntry['level'], message: string) => 
           try {
             if (!pyodide) {
               self.postMessage({ type: 'STATUS', message: 'Loading Pyodide environment...' });
+              importScripts("https://cdn.plot.ly/plotly-latest.min.js");
               importScripts("https://cdn.jsdelivr.net/pyodide/v0.25.1/full/pyodide.js");
               pyodide = await loadPyodide();
               self.postMessage({ type: 'STATUS', message: 'Pyodide loaded. Loading micropip...' });
@@ -282,6 +291,7 @@ export function App() {
     revertToVersion,
     addIngestedDocument,
     removeIngestedDocument,
+    loadProject,
   } = useProjects();
   
   const [projectName, setProjectName] = useState('');
@@ -308,6 +318,7 @@ export function App() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
 
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
+  const [isConfigGateOpen, setIsConfigGateOpen] = useState(false);
   const [projectToEdit, setProjectToEdit] = useState<Project | null>(null);
   const [initialProjectData, setInitialProjectData] = useState<ExtractedProjectDetails | null>(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -322,12 +333,26 @@ export function App() {
   const [isAiChatOpen, setIsAiChatOpen] = useState(false);
   const [isVideoImportModalOpen, setIsVideoImportModalOpen] = useState(false);
   const [isPartnerModalOpen, setIsPartnerModalOpen] = useState(false);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
 
   const addLog = useCallback((level: LogEntry['level'], message: string, overrideContext?: { user?: string, project?: string }) => {
     const user = overrideContext?.user || authenticatedUser?.name || 'System';
     const project = overrideContext?.project || activeProject?.name || '';
     setLogs(prev => [...prev, { id: Date.now(), timestamp: new Date().toISOString(), level, message, user, context: project }]);
   }, [authenticatedUser, activeProject]);
+
+  const { result, isLoading, error, generateAnalysis: performAnalysis, clearAnalysis, setResult } = useAnalysis(addLog);
+  const { saveInProgressAnalysis, loadInProgressAnalysis, clearInProgressAnalysis } = useAnalysisPersistence();
+  
+  const activeVersion: ProjectVersion | null = useMemo(() => {
+    if (!activeProject) return null;
+    return (activeProject.history || [])[activeVersionIndex] || (activeProject.history || [])[0];
+  }, [activeProject, activeVersionIndex]);
+  
+  const displayedResult = result || activeVersion?.result || null;
+
+  const { isSummaryLoading, generateSummary, clearSummary } = useSummaryGenerator(addLog);
+  const { cadData, foundryResult, isCadLoading, cadError, generateCad, clearCad } = useCadGenerator(addLog);
 
   const creationDeVinci = useDeVinci();
   const [deVinciMode, setDeVinciMode] = useState<'creation' | 'brainstorm' | null>(null);
@@ -350,6 +375,9 @@ export function App() {
   const nextStepAssistant = useNextStepAssistant(addLog);
   const aiChat = useAiChat(addLog, activeProject?.knowledgeBase || []);
   const patentGenerator = usePatentGenerator(addLog);
+
+  const forgeController = useForgeController(authenticatedUser);
+  const projectExport = useProjectExport(addLog, tts);
 
   const { drawings, requestDrawing, requestDrawingFromImage, removeDrawing, setDrawings, clearAllDrawings, toggleDrawingReportInclusion } = useDrawingGenerator(addLog);
   const { inspirationalImages, requestInspirationalImage, removeInspirationalImage, setInspirationalImages, clearAllInspirationalImages, toggleImageReportInclusion } = useInspirationalImageGenerator(addLog);
@@ -391,6 +419,57 @@ export function App() {
 
   }, [files, generateVideo, addLog, isViewer]);
 
+  // ANALYSIS ENGAGEMENT (Extracted for voice trigger)
+  const handleEngage = useCallback(async (isReanalysis = false) => {
+    if (!selectedFaction || !prompt.trim() || !projectName.trim()) {
+      addLog('WARN', 'Engagement failed: Missing lens, name, or prompt.');
+      return;
+    }
+
+    const newResult = await performAnalysis(projectName, prompt, selectedFaction, { 
+        files, 
+        fileUrls: activeProject?.knowledgeBase?.map(d => d.id) ? [] : activeVersion?.fileUrls,
+        knowledgeBase: activeProject?.knowledgeBase || []
+    });
+
+    if (newResult) {
+      const commitMessage = isReanalysis ? `Re-analyzed with ${selectedFaction.name}` : 'New analysis from workspace';
+      const fileUrls = files.length > 0 ? await Promise.all(files.map(fileToDataUrl)) : activeVersion?.fileUrls || [];
+
+      const versionData: Omit<ProjectVersion, 'versionId' | 'createdAt' | 'commitMessage'> = {
+          prompt,
+          factionId: selectedFaction.id,
+          result: newResult,
+          fileUrls: fileUrls,
+          drawings: [],
+          inspirationalImages: [],
+      };
+
+      if (!activeProject) {
+         onNewProject({ name: projectName, description: 'New Analysis', tags }, { 
+            prompt, 
+            factionId: selectedFaction.id,
+            result: newResult,
+            fileUrls: fileUrls
+         });
+      } else {
+          saveNewVersion(versionData, commitMessage);
+      }
+
+      setActiveVersionIndex(0);
+      clearAllDrawings();
+      clearAllInspirationalImages();
+      clearVideo();
+      clearCad();
+      clearSummary();
+      liveCosting.initialize(newResult);
+      patentGenerator.clearPatent();
+      setRotorModel(undefined);
+      setHasUnsavedChanges(false);
+      clearInProgressAnalysis();
+    }
+  }, [selectedFaction, prompt, projectName, activeProject, files, activeVersion, saveNewVersion, clearAllDrawings, clearAllInspirationalImages, clearVideo, clearCad, clearSummary, liveCosting, clearInProgressAnalysis, onNewProject, tags, patentGenerator, addLog, performAnalysis]);
+
   const voiceCommander = useVoiceCommander({
     onNavigate: (sectionId: string) => {
         document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -398,23 +477,83 @@ export function App() {
     },
     onDownloadDrawings: handleDownloadDrawings,
     onGenerateVideo: handleGenerateVideoCommand,
+    onSwitchView: (view: any) => {
+        setViewMode(view);
+        addLog('INFO', `Voice Trigger: Switched view to ${view}`);
+    },
+    onToggleDoc: (type, open) => {
+        if (type === 'manual') setIsUserManualOpen(open);
+        else if (type === 'technical') setIsTechDocOpen(open);
+        addLog('INFO', `Voice Trigger: ${open ? 'Opened' : 'Closed'} ${type} documentation`);
+    },
+    onEngageAnalysis: () => {
+        handleEngage();
+        addLog('INFO', 'Voice Trigger: Engaging project analysis');
+    }
   });
-  useAppVoice(tts, authenticatedUser);
+
+  const handleVoiceSetMaterial = useCallback((materialName: string) => {
+      const preset = MATERIAL_LIBRARY.find(m => m.name.toLowerCase().includes(materialName.toLowerCase()));
+      if (preset) {
+          window.dispatchEvent(new CustomEvent('forge-voice-material', { detail: preset.id }));
+          addLog('INFO', `Voice Trigger: Set material to ${preset.name}`);
+      }
+  }, [addLog]);
+
+  const forgeVoice = useForgeVoice(forgeController.voiceMode, tts, {
+      onSwitchLens: (factionId) => {
+          const faction = ENGINEERING_PHILOSOPHIES.find(f => f.id === factionId) || null;
+          setEditorState({ ...editorState, selectedFaction: faction });
+          addLog('INFO', `Voice Trigger: Switched lens to ${faction?.name}`);
+      },
+      onSetMaterial: handleVoiceSetMaterial,
+      onUpdateParam: (param, delta) => {
+          window.dispatchEvent(new CustomEvent('forge-voice-param', { detail: { param, delta } }));
+          addLog('INFO', `Voice Trigger: Adjusted ${param} by ${delta}`);
+      },
+      onGenerateCertificate: () => {
+          window.dispatchEvent(new CustomEvent('forge-voice-secure-ip'));
+          addLog('INFO', 'Voice Trigger: IP Synthesis initialized.');
+      },
+      onSealBundle: () => {
+          if (activeProject) projectExport.exportSovereignBundle(activeProject, drawings, inspirationalImages);
+          addLog('INFO', 'Voice Trigger: Sovereign Bundle sealed.');
+      },
+      onStartAnalysis: () => handleEngage(),
+      onOpenManual: () => setIsUserManualOpen(true),
+      onOpenTechDoc: () => setIsTechDocOpen(true),
+      onSwitchView: (view) => setViewMode(view),
+      onNavigateSection: (sectionId) => {
+          document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          addLog('INFO', `Voice navigation to: ${sectionId}`);
+      },
+      onAddLog: addLog
+  });
+  
+  const handleUpdateProfile = useCallback((updatedUser: User | Partial<User>) => {
+    setAuthenticatedUser(prev => {
+        if (!prev) return null;
+        const next = { ...prev, ...updatedUser } as User;
+        setUsers(usersPrev => usersPrev.map(u => u.id === next.id ? next : u));
+        return next;
+    });
+    addLog('INFO', `User profile updated: ${authenticatedUser?.name}`);
+  }, [addLog, authenticatedUser]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+        if (authenticatedUser?.role === Role.Admin && e.ctrlKey && (e.key === '~' || e.key === '`')) {
+            e.preventDefault();
+            setShowDiagnostics(prev => !prev);
+        }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [authenticatedUser]);
+
+  const { isActivating } = useAppVoice(tts, authenticatedUser, viewMode, (u) => handleUpdateProfile(u), activeProject?.name, activeProject?.domainCategory);
 
   const googleExporter = useGoogleExporter(addLog);
-
-  const { result, isLoading, error, generateAnalysis: performAnalysis, clearAnalysis, setResult } = useAnalysis(addLog);
-  const { saveInProgressAnalysis, loadInProgressAnalysis, clearInProgressAnalysis } = useAnalysisPersistence();
-  
-  const activeVersion: ProjectVersion | null = useMemo(() => {
-    if (!activeProject) return null;
-    return (activeProject.history || [])[activeVersionIndex] || (activeProject.history || [])[0];
-  }, [activeProject, activeVersionIndex]);
-  
-  const displayedResult = result || activeVersion?.result || null;
-
-  const { isSummaryLoading, generateSummary, clearSummary } = useSummaryGenerator(addLog);
-  const { cadData, isCadLoading, cadError, generateCad, clearCad } = useCadGenerator(addLog);
 
   useEffect(() => {
     const restoreSession = async () => {
@@ -445,13 +584,14 @@ export function App() {
                 factionId: selectedFaction.id,
                 result: displayedResult,
                 drawings,
-                inspirationalImages
+                inspirationalImages,
+                domainCategory: activeProject?.domainCategory
             });
         }
     };
     const interval = setInterval(autoSave, 30000); 
     return () => clearInterval(interval);
-  }, [projectName, prompt, selectedFaction, displayedResult, drawings, inspirationalImages, tags, saveInProgressAnalysis]);
+  }, [projectName, prompt, selectedFaction, displayedResult, drawings, inspirationalImages, tags, saveInProgressAnalysis, activeProject]);
 
   const handleGoogleAuth = async () => {
     try {
@@ -463,7 +603,6 @@ export function App() {
             setUsers(prev => prev.map(u => u.id === user!.id ? user! : u));
             setAuthenticatedUser(user);
         } else {
-            // New user registration flow
             const newUser: User = {
                 id: `user-${Date.now()}`,
                 name: googleData.name,
@@ -475,6 +614,8 @@ export function App() {
                 subscriptionStatus: SubscriptionStatus.FREE,
                 hasAcceptedLegal: false,
                 hasSignedPartnerProtocol: false,
+                is_first_login: true,
+                isSilenced: false,
             };
             setUsers(prev => [...prev, newUser]);
             setAuthenticatedUser(newUser);
@@ -499,6 +640,8 @@ export function App() {
         subscriptionStatus: SubscriptionStatus.FREE,
         hasAcceptedLegal: false,
         hasSignedPartnerProtocol: false,
+        is_first_login: true,
+        isSilenced: false,
     };
     
     setUsers(prev => [...prev, newUser]);
@@ -553,12 +696,6 @@ export function App() {
         addLog('INFO', `Demo user logged in: ${userName}`, { user: userName });
     }
   };
-  
-  const handleUpdateProfile = (updatedUser: User) => {
-    setAuthenticatedUser(updatedUser);
-    setUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
-    addLog('INFO', `User profile updated: ${updatedUser.name}`, { user: updatedUser.name });
-  }
 
   const handleDeVinciProjectCreation = async (functionCall: { name: string, args: any, id: string }) => {
       if (functionCall.name === 'create_project') {
@@ -585,65 +722,6 @@ export function App() {
       });
       setDeVinciMode('creation');
   };
-
-  const handleEngage = useCallback(async (isReanalysis = false) => {
-    if (!selectedFaction || !prompt.trim() || !projectName.trim()) {
-      alert("Please select a lens, project name, and provide a prompt.");
-      return;
-    }
-
-    const newResult = await performAnalysis(projectName, prompt, selectedFaction, { 
-        files, 
-        fileUrls: activeVersion?.fileUrls,
-        knowledgeBase: activeProject?.knowledgeBase || []
-    });
-
-    if (newResult) {
-      const commitMessage = isReanalysis ? `Re-analyzed with ${selectedFaction.name}` : 'New analysis from workspace';
-      const fileUrls = files.length > 0 ? await Promise.all(files.map(fileToDataUrl)) : activeVersion?.fileUrls || [];
-
-      const versionData: Omit<ProjectVersion, 'versionId' | 'createdAt' | 'commitMessage'> = {
-          prompt,
-          factionId: selectedFaction.id,
-          result: newResult,
-          fileUrls: fileUrls,
-          drawings: [],
-          inspirationalImages: [],
-      };
-
-      if (!activeProject) {
-         onNewProject({ name: projectName, description: 'New Analysis', tags }, { 
-            prompt, 
-            factionId: selectedFaction.id,
-            result: newResult,
-            fileUrls: fileUrls
-         });
-      } else {
-          saveNewVersion(versionData, commitMessage);
-          // PRODUCTION SYNC
-          if (authenticatedUser) {
-              projectApi.commitVersion(authenticatedUser.id, {
-                  ...versionData,
-                  versionId: `ver-${Date.now()}`,
-                  createdAt: new Date().toISOString(),
-                  commitMessage
-              } as ProjectVersion);
-          }
-      }
-
-      setActiveVersionIndex(0);
-      clearAllDrawings();
-      clearAllInspirationalImages();
-      clearVideo();
-      clearCad();
-      clearSummary();
-      liveCosting.initialize(newResult);
-      patentGenerator.clearPatent();
-      setRotorModel(undefined);
-      setHasUnsavedChanges(false);
-      clearInProgressAnalysis();
-    }
-  }, [selectedFaction, prompt, projectName, activeProject, performAnalysis, files, activeVersion, saveNewVersion, clearAllDrawings, clearAllInspirationalImages, clearVideo, clearCad, clearSummary, liveCosting, clearInProgressAnalysis, onNewProject, tags, patentGenerator, authenticatedUser]);
 
   const handleLoadVersion = useCallback((index: number) => {
     if (!activeProject) return;
@@ -674,7 +752,6 @@ export function App() {
     gcodeVisualizer.closeModal();
     suggestionExplorer.clearExploration();
     patentGenerator.clearPatent();
-    clearCad strolling();
     clearCad();
     clearSummary();
     
@@ -689,9 +766,16 @@ export function App() {
   }, [activeProject, onSelectProject]);
 
   const handleNewProjectClick = () => {
-    setProjectToEdit(null);
-    setInitialProjectData(null);
-    setIsProjectModalOpen(true);
+    setIsConfigGateOpen(true);
+  };
+
+  const handleConfigGateComplete = (config: { name: string, category: DomainCategory, branch: EngineeringBranch, description: string }) => {
+      const newId = onNewProject({ name: config.name, description: config.description, tags: [config.category] }, { factionId: FactionId.PRAGMATIC_PRODUCTION });
+      updateProjectDetails(newId, { domainCategory: config.category });
+      onSelectProject(newId);
+      setProjectName(config.name);
+      setIsConfigGateOpen(false);
+      addLog('INFO', `Forged blank environment for '${config.name}' [${config.category}] with PhD [${config.branch}] Agent active.`);
   };
 
   const handleSaveProjectDetails = (details: {name: string, description: string, tags: string[]}) => {
@@ -706,6 +790,21 @@ export function App() {
     setIsProjectModalOpen(false);
     setProjectToEdit(null);
     setInitialProjectData(null);
+  };
+
+  const handleExportAsset = () => {
+      if (activeProject) {
+          projectExport.exportSovereignBundle(activeProject, drawings, inspirationalImages);
+      }
+  };
+
+  const handleImportAsset = async (file: File) => {
+      try {
+          const content = await persistProjectData(file);
+          addLog('INFO', `Imported Sovereign Asset: ${file.name}. Identity established.`);
+      } catch (e) {
+          addLog('ERROR', `Asset import failed: Invalid bundle format.`);
+      }
   };
 
   const handleStartFromImage = async (file: File) => {
@@ -820,26 +919,25 @@ export function App() {
       setViewMode('app');
   };
 
-  // High-fidelity gating logic for advanced features
-  // Fix: Generic handleGatedAction to allow returning values from actions (like Promises)
   const handleGatedAction = <T,>(action: () => T): T | void => {
       if (!authenticatedUser) return;
-      
-      // Free users are blocked from CAD/Fabrication export
       if (authenticatedUser.subscriptionStatus === SubscriptionStatus.FREE) {
           setViewMode('pricing');
           addLog('WARN', 'Professional tier required for advanced engineering exports.');
           return;
       }
-
-      // Pro users must sign the partner protocol once
       if (!authenticatedUser.hasSignedPartnerProtocol) {
           setIsPartnerModalOpen(true);
           return;
       }
-
       return action();
   };
+
+  const toggleDiagnostics = useCallback(() => {
+    if (authenticatedUser?.role === Role.Admin) {
+        setShowDiagnostics(prev => !prev);
+    }
+  }, [authenticatedUser]);
 
   useEffect(() => {
     if (activeProject) {
@@ -882,6 +980,27 @@ export function App() {
 
   return (
     <div className="flex flex-col h-screen bg-gray-50 dark:bg-brand-dark text-gray-900 dark:text-brand-light overflow-hidden transition-colors duration-300">
+      <SystemStatusIndicator isVoiceActive={voiceCommander.state === 'listening'} />
+      <DiagnosticsPanel 
+        isOpen={showDiagnostics} 
+        user={authenticatedUser} 
+        tts={tts} 
+        onUpdateUser={handleUpdateProfile} 
+        systemState={forgeController.systemState}
+        ioStatus={forgeController.ioStatus}
+        exportStatus={forgeController.exportStatus}
+        voiceMode={forgeController.voiceMode}
+        setVoiceMode={forgeController.setVoiceMode}
+        voiceTranscripts={forgeVoice.transcripts}
+        nalPrecision={forgeController.nalPrecision}
+        targetPrecision={forgeController.targetPrecision}
+        setTargetPrecision={forgeController.setTargetPrecision}
+        onForceFlush={forgeController.forceFlush}
+        onForceStable={forgeController.forceStable}
+        onDefrost={forgeController.performDefrost}
+      />
+      <SystemToast />
+      
       <Header
         onStartTour={() => setIsTourOpen(true)}
         onOpenUserManual={() => setIsUserManualOpen(true)}
@@ -890,6 +1009,7 @@ export function App() {
         onOpenProfile={() => setIsProfileModalOpen(true)}
         viewMode={viewMode === 'app' || viewMode === 'pricing' || viewMode === 'account' ? 'app' : viewMode}
         onSwitchView={(v) => setViewMode(v as any)}
+        onMobileDiagnostics={toggleDiagnostics}
       />
 
       <div className="flex-1 flex flex-col overflow-y-auto">
@@ -902,8 +1022,8 @@ export function App() {
                     activeVersionIndex={activeVersionIndex}
                     onSelectProject={handleProjectSelect}
                     onNewProject={handleNewProjectClick}
-                    onOpenFile={() => {}}
-                    onSaveProject={() => {}}
+                    onOpenFile={handleImportAsset}
+                    onSaveProject={handleExportAsset}
                     hasUnsavedChanges={hasUnsavedChanges}
                     onCommitVersion={() => setIsCommitModalOpen(true)}
                     onStartWithDeVinci={handleLaunchCreationDeVinci}
@@ -997,7 +1117,7 @@ export function App() {
                 isSummaryLoading={isSummaryLoading}
                 summaryError={null}
                 cadData={cadData}
-                // Fix: Return a Promise.resolve(null) if the action is gated to match expected Promise type
+                foundryResult={foundryResult}
                 onGenerateCad={(d, r) => handleGatedAction(() => generateCad(d, r)) || Promise.resolve(null)}
                 isCadLoading={isCadLoading}
                 cadError={cadError}
@@ -1053,6 +1173,11 @@ export function App() {
       <Tour isOpen={isTourOpen} stepIndex={tourStep} steps={TOUR_STEPS} onClose={() => setIsTourOpen(false)} onNext={() => setTourStep(s => s + 1)} onPrev={() => setTourStep(s => s - 1)} tts={tts} />
       <UserManualModal isOpen={isUserManualOpen} onClose={() => setIsUserManualOpen(false)} />
       <TechnicalDocumentModal isOpen={isTechDocOpen} onClose={() => setIsTechDocOpen(false)} />
+      <ConfigurationGateModal 
+          isOpen={isConfigGateOpen}
+          onClose={() => setIsConfigGateOpen(false)}
+          onForge={handleConfigGateComplete}
+      />
       <ProjectModal 
         isOpen={isProjectModalOpen}
         onClose={() => setIsProjectModalOpen(false)}
@@ -1096,7 +1221,11 @@ export function App() {
               onCancel={() => setIsPartnerModalOpen(false)} 
           />
       )}
-      <VoiceCommanderWidget state={voiceCommander.state} startListening={voiceCommander.startListening} stopListening={voiceCommander.stopListening} />
+      <VoiceCommanderWidget 
+        state={voiceCommander.state} 
+        startListening={voiceCommander.startListening} 
+        stopListening={voiceCommander.stopListening} 
+      />
       <DeVinciModal 
         isOpen={deVinciMode === 'creation'}
         onClose={() => { creationDeVinci.stopConversation(); setDeVinciMode(null); }}

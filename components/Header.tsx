@@ -10,6 +10,7 @@ interface HeaderProps {
     onOpenProfile: () => void;
     viewMode: 'app' | 'admin' | 'suite' | 'pricing' | 'account';
     onSwitchView: (view: 'app' | 'admin' | 'suite' | 'pricing' | 'account') => void;
+    onMobileDiagnostics?: () => void;
 }
 
 const ViewToggle = ({ mode, currentMode, onSwitch, icon, label }: { mode: 'app' | 'admin' | 'suite' | 'pricing' | 'account', currentMode: string, onSwitch: (v: any) => void, icon: React.ReactNode, label: string }) => {
@@ -31,10 +32,30 @@ const ViewToggle = ({ mode, currentMode, onSwitch, icon, label }: { mode: 'app' 
     );
 };
 
-export const Header = ({ onStartTour, onOpenUserManual, authenticatedUser, onLogout, onOpenProfile, viewMode, onSwitchView }: HeaderProps) => {
+export const Header = ({ onStartTour, onOpenUserManual, authenticatedUser, onLogout, onOpenProfile, viewMode, onSwitchView, onMobileDiagnostics }: HeaderProps) => {
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [hasKey, setHasKey] = useState(false);
     const profileRef = useRef<HTMLDivElement>(null);
+    // Fix: Changed NodeJS.Timeout to number to resolve "Cannot find namespace 'NodeJS'" error in browser environment
+    const longPressTimer = useRef<number | null>(null);
+
+    const handleTouchStart = () => {
+        if (authenticatedUser?.role === Role.Admin && onMobileDiagnostics) {
+            // Fix: Use window.setTimeout for number return type in browser
+            longPressTimer.current = window.setTimeout(() => {
+                onMobileDiagnostics();
+                // Vibration feedback if supported
+                if ('vibrate' in navigator) navigator.vibrate(50);
+            }, 1000);
+        }
+    };
+
+    const handleTouchEnd = () => {
+        if (longPressTimer.current) {
+            clearTimeout(longPressTimer.current);
+            longPressTimer.current = null;
+        }
+    };
 
     const checkKeyStatus = async () => {
         if (typeof (window as any).aistudio !== 'undefined') {
@@ -158,7 +179,12 @@ export const Header = ({ onStartTour, onOpenUserManual, authenticatedUser, onLog
             </div>
 
             <div className="relative" ref={profileRef}>
-                <button onClick={() => setIsProfileOpen(!isProfileOpen)} className="flex items-center gap-2.5 p-1 pr-2.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-all border border-transparent hover:border-gray-200 dark:hover:border-gray-700">
+                <button 
+                    onClick={() => setIsProfileOpen(!isProfileOpen)} 
+                    onTouchStart={handleTouchStart}
+                    onTouchEnd={handleTouchEnd}
+                    className="flex items-center gap-2.5 p-1 pr-2.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-all border border-transparent hover:border-gray-200 dark:hover:border-gray-700"
+                >
                     <img src={authenticatedUser.picture} alt={authenticatedUser.name} className="w-8 h-8 rounded-full border-2 border-brand-cyan shadow-[0_0_10px_rgba(6,182,212,0.3)]" />
                     <span className="hidden sm:inline font-bold text-gray-700 dark:text-brand-light text-sm">{authenticatedUser.name.split(' ')[0]}</span>
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className={`w-3.5 h-3.5 text-gray-400 transition-transform ${isProfileOpen ? 'rotate-180' : ''}`}><path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>

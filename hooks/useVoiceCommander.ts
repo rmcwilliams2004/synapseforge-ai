@@ -1,7 +1,15 @@
+
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { GoogleGenAI, LiveServerMessage, Modality, Blob } from '@google/genai';
 import { VoiceCommanderState } from '../types';
-import { showSectionFunctionDeclaration, downloadDrawingsFunctionDeclaration, generateVideoFunctionDeclaration } from '../services/geminiService';
+import { 
+    showSectionFunctionDeclaration, 
+    downloadDrawingsFunctionDeclaration, 
+    generateVideoFunctionDeclaration,
+    switchAppViewFunctionDeclaration,
+    toggleDocumentationFunctionDeclaration,
+    engageAnalysisFunctionDeclaration
+} from '../services/geminiService';
 
 function encode(bytes: Uint8Array): string {
     let binary = '';
@@ -56,9 +64,19 @@ interface VoiceCommanderCallbacks {
     onNavigate: (sectionId: string) => void;
     onDownloadDrawings: () => string;
     onGenerateVideo: (prompt: string, useUploadedImage: boolean) => string;
+    onSwitchView: (view: any) => void;
+    onToggleDoc: (type: 'manual' | 'technical', open: boolean) => void;
+    onEngageAnalysis: () => void;
 }
 
-export const useVoiceCommander = ({ onNavigate, onDownloadDrawings, onGenerateVideo }: VoiceCommanderCallbacks) => {
+export const useVoiceCommander = ({ 
+    onNavigate, 
+    onDownloadDrawings, 
+    onGenerateVideo,
+    onSwitchView,
+    onToggleDoc,
+    onEngageAnalysis
+}: VoiceCommanderCallbacks) => {
     const [state, setState] = useState<VoiceCommanderState>('idle');
     const sessionPromise = useRef<Promise<any> | null>(null);
     const audioRefs = useRef<{
@@ -71,11 +89,11 @@ export const useVoiceCommander = ({ onNavigate, onDownloadDrawings, onGenerateVi
         sources: Set<AudioBufferSourceNode>
     }>({ nextStartTime: 0, sources: new Set() });
     
-    const callbacksRef = useRef({ onNavigate, onDownloadDrawings, onGenerateVideo });
+    const callbacksRef = useRef({ onNavigate, onDownloadDrawings, onGenerateVideo, onSwitchView, onToggleDoc, onEngageAnalysis });
     
     useEffect(() => {
-        callbacksRef.current = { onNavigate, onDownloadDrawings, onGenerateVideo };
-    }, [onNavigate, onDownloadDrawings, onGenerateVideo]);
+        callbacksRef.current = { onNavigate, onDownloadDrawings, onGenerateVideo, onSwitchView, onToggleDoc, onEngageAnalysis };
+    }, [onNavigate, onDownloadDrawings, onGenerateVideo, onSwitchView, onToggleDoc, onEngageAnalysis]);
 
     const stopListening = useCallback(() => {
         audioRefs.current.mediaStream?.getTracks().forEach(track => track.stop());
@@ -149,8 +167,17 @@ export const useVoiceCommander = ({ onNavigate, onDownloadDrawings, onGenerateVi
             config: {
                 responseModalities: ['AUDIO'],
                 speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } },
-                systemInstruction: "Voice assistant. Command: 'show_section', 'download_drawings', or 'generate_video'. Concise audio responses only.",
-                tools: [{ functionDeclarations: [showSectionFunctionDeclaration, downloadDrawingsFunctionDeclaration, generateVideoFunctionDeclaration] }],
+                systemInstruction: "You are the SynapseForge Voice Assistant. You can help the user navigate the app, access documentation, start project analysis, generate drawings/videos, and scroll to report sections. Be concise and professional.",
+                tools: [{ 
+                    functionDeclarations: [
+                        showSectionFunctionDeclaration, 
+                        downloadDrawingsFunctionDeclaration, 
+                        generateVideoFunctionDeclaration,
+                        switchAppViewFunctionDeclaration,
+                        toggleDocumentationFunctionDeclaration,
+                        engageAnalysisFunctionDeclaration
+                    ] 
+                }],
             },
             callbacks: {
                 onopen: () => {
@@ -173,7 +200,7 @@ export const useVoiceCommander = ({ onNavigate, onDownloadDrawings, onGenerateVi
                         setState('thinking');
                         for (const fc of message.toolCall.functionCalls) {
                             let responseResult = 'ok';
-                            const { onNavigate, onDownloadDrawings, onGenerateVideo } = callbacksRef.current;
+                            const { onNavigate, onDownloadDrawings, onGenerateVideo, onSwitchView, onToggleDoc, onEngageAnalysis } = callbacksRef.current;
                             
                             if (fc.name === 'show_section' && fc.args.sectionId) {
                                 onNavigate(fc.args.sectionId);
@@ -182,6 +209,15 @@ export const useVoiceCommander = ({ onNavigate, onDownloadDrawings, onGenerateVi
                                 responseResult = onDownloadDrawings();
                             } else if (fc.name === 'generate_video' && fc.args.prompt) {
                                 responseResult = onGenerateVideo(fc.args.prompt, fc.args.useUploadedImage || false);
+                            } else if (fc.name === 'switch_app_view' && fc.args.view) {
+                                onSwitchView(fc.args.view);
+                                responseResult = `Switching to ${fc.args.view} view.`;
+                            } else if (fc.name === 'toggle_documentation' && fc.args.doc_type) {
+                                onToggleDoc(fc.args.doc_type, fc.args.open !== undefined ? fc.args.open : true);
+                                responseResult = `${fc.args.open === false ? 'Closing' : 'Opening'} ${fc.args.doc_type} documentation.`;
+                            } else if (fc.name === 'engage_analysis') {
+                                onEngageAnalysis();
+                                responseResult = 'Initiating project analysis.';
                             }
                             
                             livePromise.then(session => {

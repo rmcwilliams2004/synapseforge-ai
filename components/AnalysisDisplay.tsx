@@ -1,5 +1,6 @@
 import React from 'react';
-import { AnalysisResult, Faction, GeneratedDrawing, Project, User, CadData, ProjectVersion, GeneratedImage, RotorModel, GoogleDocContent } from '../types';
+// Added FoundryCadResult to the imported types
+import { AnalysisResult, Faction, GeneratedDrawing, Project, User, CadData, ProjectVersion, GeneratedImage, RotorModel, GoogleDocContent, FoundryCadResult } from '../types';
 import { InitialView } from './analysis/InitialView';
 import { LoadingView } from './analysis/LoadingView';
 import { ErrorView } from './analysis/ErrorView';
@@ -44,6 +45,8 @@ interface AnalysisDisplayProps {
   isSummaryLoading: boolean;
   summaryError: string | null;
   cadData: CadData | null;
+  // Added foundryResult to AnalysisDisplayProps
+  foundryResult: FoundryCadResult | null;
   onGenerateCad: (drawings: GeneratedDrawing[], result: AnalysisResult) => Promise<CadData | null>;
   isCadLoading: boolean;
   cadError: string | null;
@@ -135,6 +138,8 @@ export const AnalysisDisplay = (props: AnalysisDisplayProps) => {
         isSummaryLoading={props.isSummaryLoading}
         summaryError={props.summaryError}
         cadData={props.cadData}
+        // Passed foundryResult to ResultView
+        foundryResult={props.foundryResult}
         onGenerateCad={props.onGenerateCad}
         isCadLoading={props.isCadLoading}
         cadError={props.cadError}

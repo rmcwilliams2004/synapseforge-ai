@@ -1,4 +1,3 @@
-
 import { useState, useRef, useCallback } from 'react';
 import { generateSpeech as performTextToSpeech, parseApiError } from '../services/geminiService';
 import { LogEntry } from '../types';
@@ -38,13 +37,15 @@ export const useTts = (addLog: (level: LogEntry['level'], message: string) => vo
     const [isPlaying, setIsPlaying] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [speakingText, setSpeakingText] = useState<string | null>(null);
+    const [volume, setVolume] = useState(1.0); // Default to full volume
 
     const audioContextRef = useRef<AudioContext | null>(null);
     const sourceNodeRef = useRef<AudioBufferSourceNode | null>(null);
+    const gainNodeRef = useRef<GainNode | null>(null);
 
     const stop = useCallback(() => {
         if (sourceNodeRef.current) {
-            sourceNodeRef.current.onended = null; // Prevent onended from firing on manual stop
+            sourceNodeRef.current.onended = null;
             try { sourceNodeRef.current.stop(); } catch(e) { /* ignore */ }
             sourceNodeRef.current = null;
         }
@@ -60,6 +61,7 @@ export const useTts = (addLog: (level: LogEntry['level'], message: string) => vo
             }
         }
         audioContextRef.current = null;
+        gainNodeRef.current = null;
         
         setIsPlaying(false);
         setIsLoading(false);
@@ -69,19 +71,14 @@ export const useTts = (addLog: (level: LogEntry['level'], message: string) => vo
     const speak = useCallback(async (text: string, voice: string = 'Kore') => {
         const wasPlayingThisText = speakingText === text && (isPlaying || isLoading);
         
-        // Always stop the current playback/loading process first.
         if (isPlaying || isLoading) {
             stop();
         }
 
-        // If the user just clicked the button for the audio that was already playing,
-        // treat it as a 'stop' action and don't restart.
         if (wasPlayingThisText) {
             return;
         }
         
-        // Use a timeout to give the browser a moment to release audio resources
-        // before we try to create a new AudioContext.
         await new Promise(resolve => setTimeout(resolve, 100));
 
         setIsLoading(true);
@@ -92,7 +89,14 @@ export const useTts = (addLog: (level: LogEntry['level'], message: string) => vo
         try {
             const base64Audio = await performTextToSpeech(text, voice);
             
-            audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+            const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+            audioContextRef.current = new AudioContextClass({ sampleRate: 24000 });
+            
+            // Resume context in case it was suspended by browser policy
+            if (audioContextRef.current.state === 'suspended') {
+                await audioContextRef.current.resume();
+            }
+
             const audioBuffer = await decodeAudioData(
                 decode(base64Audio),
                 audioContextRef.current,
@@ -102,7 +106,14 @@ export const useTts = (addLog: (level: LogEntry['level'], message: string) => vo
 
             sourceNodeRef.current = audioContextRef.current.createBufferSource();
             sourceNodeRef.current.buffer = audioBuffer;
-            sourceNodeRef.current.connect(audioContextRef.current.destination);
+
+            // Add GainNode for volume control
+            const gainNode = audioContextRef.current.createGain();
+            gainNode.gain.value = volume;
+            gainNodeRef.current = gainNode;
+
+            sourceNodeRef.current.connect(gainNode);
+            gainNode.connect(audioContextRef.current.destination);
             
             sourceNodeRef.current.onended = () => {
                 stop();
@@ -121,7 +132,14 @@ export const useTts = (addLog: (level: LogEntry['level'], message: string) => vo
             stop();
         }
 
-    }, [addLog, isLoading, isPlaying, stop, speakingText]);
+    }, [addLog, isLoading, isPlaying, stop, speakingText, volume]);
 
-    return { speak, stop, isLoading, isPlaying, error, speakingText };
+    const updateVolume = useCallback((newVolume: number) => {
+        setVolume(newVolume);
+        if (gainNodeRef.current) {
+            gainNodeRef.current.gain.setTargetAtTime(newVolume, audioContextRef.current?.currentTime || 0, 0.1);
+        }
+    }, []);
+
+    return { speak, stop, isLoading, isPlaying, error, speakingText, volume, setVolume: updateVolume };
 };

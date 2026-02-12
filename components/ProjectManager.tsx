@@ -65,7 +65,6 @@ export const ProjectManager = ({
     hasUnsavedChanges, onCommitVersion, onStartWithDeVinci, onStartFromImage, isParsingImage, onStartFromPdf, isParsingPdf, 
     onStartBrainstormFromPdf, isParsingForBrainstorm, onIdentifyImage, isIdentifyingImage, onOpenVideoImport, isParsingVideo, 
     onEditProject, onDeleteProject, onLoadVersion, onRevertVersion, onCompareVersions, disabled, authenticatedUser,
-    onSaveToDrive, onOpenFromDrive, isSavingToDrive, isDriveAuthenticated,
     onAddDocument, onRemoveDocument, addLog
 }: ProjectManagerProps) => {
     const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
@@ -92,7 +91,6 @@ export const ProjectManager = ({
         if (!activeProject || !isKnowledgeLibraryOpen) return;
         const interval = setInterval(() => {
             setLastSyncTime(new Date().toLocaleTimeString());
-            // In a real app, this would trigger a background diff check with ISO/ASTM
         }, 15000);
         return () => clearInterval(interval);
     }, [activeProject, isKnowledgeLibraryOpen]);
@@ -167,7 +165,18 @@ export const ProjectManager = ({
     return (
         <div className="space-y-4">
             <div className="flex justify-between items-center mb-3">
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-brand-light">Project Management</h2>
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-brand-light">Foundry Management</h2>
+                <div className="flex gap-2">
+                    {activeProject && (
+                        <button 
+                            onClick={onSaveProject}
+                            className="flex items-center gap-2 px-3 py-1.5 bg-brand-cyan/20 text-brand-cyan border border-brand-cyan/40 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-brand-cyan hover:text-white transition-all shadow-lg shadow-cyan-900/10"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3 h-3"><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>
+                            Export Sovereign Asset
+                        </button>
+                    )}
+                </div>
             </div>
             
             {!isViewer && (
@@ -178,62 +187,62 @@ export const ProjectManager = ({
                             const file = e.target.files?.[0];
                             if (file) onOpenFile(file);
                             if (e.target) e.target.value = '';
-                        }} accept=".sfp.json" className="hidden" disabled={disabled} />
+                        }} accept=".sfa,.json" className="hidden" disabled={disabled} />
                         <button onClick={() => openFileInputRef.current?.click()} disabled={disabled} className="py-2.5 px-3 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white font-black uppercase tracking-widest rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-300 dark:hover:bg-gray-600 transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-xs flex items-center justify-center gap-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 9.75h16.5m-16.5 4.5h16.5m-16.5 4.5h16.5m-16.5-1.5a1.5 1.5 0 0 1-1.5-1.5V6.75a1.5 1.5 0 0 1 1.5-1.5h16.5a1.5 1.5 0 0 1 1.5 1.5v10.5a1.5 1.5 0 0 1-1.5 1.5H3.75Z" /></svg>
-                            Open File
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>
+                            Import Asset
                         </button>
                         <button onClick={onNewProject} disabled={disabled} className="py-2.5 px-3 bg-brand-cyan text-white font-black uppercase tracking-widest rounded-lg hover:bg-cyan-500 transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-xs">
-                            + New Project
+                            + Forge Environment
                         </button>
                     </div>
 
                     {/* Neural Toolbelt Section */}
                     <div className="bg-gray-100 dark:bg-gray-800/30 p-3 rounded-2xl border border-gray-200 dark:border-gray-700">
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 px-1">Neural Analysis Protocols</p>
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 px-1">Synthesis Protocols</p>
                         <div className="grid grid-cols-3 gap-3">
                             <ToolButton 
-                                label="DeVinci Assistant" 
+                                label="Synthesis Assistant" 
                                 icon={Icons.Sparkles} 
                                 onClick={onStartWithDeVinci} 
                                 color="bg-purple-100 dark:bg-purple-900/20"
                             />
                             
-                            <input type="file" ref={startImageInputRef} className="hidden" accept="image/*" onChange={e => { if(e.target.files?.[0]) onStartFromImage(e.target.files[0]); e.target.value = ''; }} />
+                            <input type="file" accept="image/*" className="hidden" ref={startImageInputRef} onChange={e => { if(e.target.files?.[0]) onStartFromImage(e.target.files[0]); e.target.value = ''; }} />
                             <ToolButton 
-                                label="Image Import" 
+                                label="Image Synthesis" 
                                 icon={Icons.Photo} 
                                 onClick={() => startImageInputRef.current?.click()} 
                                 loading={isParsingImage}
                             />
                             
-                            <input type="file" ref={startPdfInputRef} className="hidden" accept="application/pdf" onChange={e => { if(e.target.files?.[0]) onStartFromPdf(e.target.files[0]); e.target.value = ''; }} />
+                            <input type="file" accept="application/pdf" className="hidden" ref={startPdfInputRef} onChange={e => { if(e.target.files?.[0]) onStartFromPdf(e.target.files[0]); e.target.value = ''; }} />
                             <ToolButton 
-                                label="PDF Import" 
+                                label="Technical Intake" 
                                 icon={Icons.Pdf} 
                                 onClick={() => startPdfInputRef.current?.click()} 
                                 loading={isParsingPdf}
                             />
 
                             <ToolButton 
-                                label="Video Import" 
+                                label="Visual Intake" 
                                 icon={Icons.Video} 
                                 onClick={onOpenVideoImport} 
                                 loading={isParsingVideo}
                             />
 
-                            <input type="file" ref={brainstormPdfInputRef} className="hidden" accept="application/pdf" onChange={e => { if(e.target.files?.[0]) onStartBrainstormFromPdf(e.target.files[0]); e.target.value = ''; }} />
+                            <input type="file" accept="application/pdf" className="hidden" ref={brainstormPdfInputRef} onChange={e => { if(e.target.files?.[0]) onStartBrainstormFromPdf(e.target.files[0]); e.target.value = ''; }} />
                             <ToolButton 
-                                label="Brainstorm PDF" 
+                                label="Recursive Logic" 
                                 icon={Icons.Lightbulb} 
                                 onClick={() => brainstormPdfInputRef.current?.click()} 
                                 loading={isParsingForBrainstorm}
                                 color="bg-yellow-100 dark:bg-yellow-900/20"
                             />
 
-                            <input type="file" ref={identifyImageInputRef} className="hidden" accept="image/*" onChange={e => { if(e.target.files?.[0]) onIdentifyImage(e.target.files[0]); e.target.value = ''; }} />
+                            <input type="file" accept="image/*" className="hidden" ref={identifyImageInputRef} onChange={e => { if(e.target.files?.[0]) onIdentifyImage(e.target.files[0]); e.target.value = ''; }} />
                             <ToolButton 
-                                label="Identify & Research" 
+                                label="System Mapping" 
                                 icon={Icons.Research} 
                                 onClick={() => identifyImageInputRef.current?.click()} 
                                 loading={isIdentifyingImage}
@@ -252,7 +261,7 @@ export const ProjectManager = ({
                 >
                     <div className="flex items-center gap-2">
                         <Icons.Brain />
-                        Knowledge Library (Agent-Sync)
+                        Context library (NAL Layer)
                         {activeProject.knowledgeBase && activeProject.knowledgeBase.length > 0 && (
                             <span className="bg-brand-cyan/20 text-brand-cyan text-[10px] px-1.5 rounded-full">{activeProject.knowledgeBase.length}</span>
                         )}
@@ -263,10 +272,10 @@ export const ProjectManager = ({
                 {isKnowledgeLibraryOpen && (
                     <div className="mt-3 space-y-3 animate-fade-in">
                         <div className="flex justify-between items-center text-[10px] font-bold">
-                            <p className="text-gray-500 uppercase tracking-tighter">PhD Agent Synchronization Active</p>
+                            <p className="text-gray-500 uppercase tracking-tighter">Sovereign Data Isolation Active</p>
                             <div className="flex items-center gap-1 text-green-500">
                                 <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
-                                <span>LIVE POLLING: {lastSyncTime}</span>
+                                <span>POLLING ENGINE: {lastSyncTime}</span>
                             </div>
                         </div>
                         {!isViewer && (
@@ -278,8 +287,8 @@ export const ProjectManager = ({
                                 className="w-full py-2 bg-brand-cyan/10 hover:bg-brand-cyan/20 text-brand-cyan border border-brand-cyan/30 rounded-md text-xs font-bold transition flex items-center justify-center gap-2"
                             >
                                 {ingestingCount > 0 ? (
-                                    <><svg className="animate-spin h-3 w-3" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Agent-Ingesting {ingestingCount} Files...</>
-                                ) : '+ Agentic Synchronization'}
+                                    <><svg className="animate-spin h-3 w-3" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Calibrating {ingestingCount} Blocks...</>
+                                ) : '+ Import Context Ore'}
                             </button>
                             </>
                         )}
@@ -303,7 +312,6 @@ export const ProjectManager = ({
                                         {doc.phd_metadata.governing_physics.slice(0, 2).map((p, i) => (
                                             <span key={i} className="text-[8px] bg-brand-cyan/10 text-brand-cyan px-1 rounded-sm whitespace-nowrap">{p}</span>
                                         ))}
-                                        {doc.phd_metadata.governing_physics.length > 2 && <span className="text-[8px] text-gray-500">+{doc.phd_metadata.governing_physics.length - 2} more</span>}
                                     </div>
                                 </div>
                             ))}
@@ -315,7 +323,7 @@ export const ProjectManager = ({
 
             <div className="bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-lg p-2 max-h-48 overflow-y-auto">
                 {processedProjects.length === 0 ? (
-                    <p className="text-gray-500 text-center p-4 text-xs">{searchTerm ? 'No matches found.' : 'No projects in session.'}</p>
+                    <p className="text-gray-500 text-center p-4 text-xs">{searchTerm ? 'No matches found.' : 'Blank Forge.'}</p>
                 ) : (
                     <ul className="space-y-1">
                         {processedProjects.map((project) => (
@@ -339,16 +347,15 @@ export const ProjectManager = ({
                 )}
             </div>
 
-            {/* Branch Selection Modal */}
             <Modal
                 isOpen={isBranchModalOpen}
                 onClose={() => setIsBranchModalOpen(false)}
-                title="Select Engineering Branch"
-                confirmText="Sync with PhD Agent"
+                title="Select Disciplinary Domain"
+                confirmText="Calibrate PhD Agent"
                 onConfirm={confirmIngestion}
             >
                 <div className="space-y-4">
-                    <p className="text-sm text-gray-400">Choose the primary engineering branch to deploy the specialized Research Agent.</p>
+                    <p className="text-sm text-gray-400">Choose the primary synthesis branch to deploy the specialized Research Agent for this context ore.</p>
                     <div className="grid grid-cols-2 gap-2">
                         {Object.values(EngineeringBranch).map(branch => (
                             <button
@@ -363,8 +370,8 @@ export const ProjectManager = ({
                 </div>
             </Modal>
 
-            <Modal isOpen={!!projectToDelete} onClose={() => setProjectToDelete(null)} onConfirm={() => { if(projectToDelete) {onDeleteProject(projectToDelete.id); setProjectToDelete(null);} }} title="Confirm Deletion" confirmText="Delete">
-                Are you sure you want to permanently delete the project "<strong>{projectToDelete?.name}</strong>"?
+            <Modal isOpen={!!projectToDelete} onClose={() => setProjectToDelete(null)} onConfirm={() => { if(projectToDelete) {onDeleteProject(projectToDelete.id); setProjectToDelete(null);} }} title="Confirm Disposal" confirmText="Dispose">
+                Are you sure you want to permanently dispose of the vault data for "<strong>{projectToDelete?.name}</strong>"?
             </Modal>
         </div>
     );
