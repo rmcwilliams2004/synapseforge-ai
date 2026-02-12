@@ -10,7 +10,7 @@ import {
     toggleDocumentationFunctionDeclaration,
     engageAnalysisFunctionDeclaration,
     createProjectFunctionDeclaration,
-    analyzeFileFunctionDeclaration,
+    analyze_fileFunctionDeclaration,
     triggerFullAnalysisFunctionDeclaration
 } from '../services/geminiService';
 
@@ -209,7 +209,7 @@ Be professional, concise, and proactive. If information is ambiguous, ask the us
                         toggleDocumentationFunctionDeclaration,
                         engageAnalysisFunctionDeclaration,
                         createProjectFunctionDeclaration,
-                        analyzeFileFunctionDeclaration,
+                        analyze_fileFunctionDeclaration,
                         triggerFullAnalysisFunctionDeclaration
                     ] 
                 }],

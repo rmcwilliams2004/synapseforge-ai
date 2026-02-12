@@ -1119,7 +1119,7 @@ export const triggerFullAnalysisFunctionDeclaration: FunctionDeclaration = {
     }
 };
 
-export const analyzeFileFunctionDeclaration: FunctionDeclaration = {
+export const analyze_fileFunctionDeclaration: FunctionDeclaration = {
     name: 'analyze_file',
     description: 'Triggers a specific intake workflow for an uploaded file (Image, PDF, or Video).',
     parameters: {
