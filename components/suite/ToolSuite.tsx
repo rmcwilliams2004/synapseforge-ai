@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { SuiteSidebar } from './SuiteSidebar';
 import { MaterialSelector } from './cm1/MaterialSelector';
@@ -13,10 +12,15 @@ import { UniversalPrePostProcessor } from './cm3/UniversalPrePostProcessor';
 import { ScriptingEngine } from './cm3/ScriptingEngine';
 import { DataVisualizationConsole } from './cm3/DataVisualizationConsole';
 import { StructuralAnalysis } from './cm3/StructuralAnalysis';
-import { Material, FmeaItem } from '../../types';
+import { Material, FmeaItem, User } from '../../types';
 import { MOCK_FMEA_ITEMS } from '../../constants';
 
-export const ToolSuite: React.FC = () => {
+interface ToolSuiteProps {
+    user?: User;
+    onUpdateUser?: (user: User) => void;
+}
+
+export const ToolSuite: React.FC<ToolSuiteProps> = ({ user, onUpdateUser }) => {
     const [activeTool, setActiveTool] = useState('cm1/material-selector');
     
     // --- MASTER DATA MODEL STATE ---
@@ -58,7 +62,7 @@ export const ToolSuite: React.FC = () => {
         switch (activeTool) {
             // CM-1
             case 'cm1/material-selector':
-                return <MaterialSelector onSelectForAnalysis={handleSelectMaterialForAnalysis} />;
+                return <MaterialSelector user={user} onUpdateUser={onUpdateUser} onSelectForAnalysis={handleSelectMaterialForAnalysis} />;
             case 'cm1/standards-library':
                 return <StandardsLibrary />;
             case 'cm1/drc':
@@ -84,7 +88,7 @@ export const ToolSuite: React.FC = () => {
             case 'cm3/analysis':
                 return <StructuralAnalysis activeMaterial={activeMaterial} />;
             default:
-                return <MaterialSelector onSelectForAnalysis={handleSelectMaterialForAnalysis} />;
+                return <MaterialSelector user={user} onUpdateUser={onUpdateUser} onSelectForAnalysis={handleSelectMaterialForAnalysis} />;
         }
     };
 

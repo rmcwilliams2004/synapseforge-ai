@@ -6,8 +6,18 @@ export const useInspirationalImageGenerator = (addLog: (level: LogEntry['level']
   const [inspirationalImages, setInspirationalImages] = useState<GeneratedImage[]>([]);
 
   const requestInspirationalImage = useCallback(async (prompt: string, aspectRatio: string = '16:9'): Promise<GeneratedImage | null> => {
+    // Pro models (gemini-3-pro-image-preview) REQUIRE user-selected API key
+    if (typeof (window as any).aistudio !== 'undefined') {
+        const hasKey = await (window as any).aistudio.hasSelectedApiKey();
+        if (!hasKey) {
+            addLog('INFO', 'High-quality synthesis requires a paid API key. Launching selection dialog...');
+            await (window as any).aistudio.openSelectKey();
+            // Proceed assuming selection success per guidelines
+        }
+    }
+
     const imageId = `insp-img-${Date.now()}`;
-    addLog('INFO', `Starting inspirational image generation for "${prompt}".`);
+    addLog('INFO', `Initializing high-fidelity concept synthesis for: "${prompt.substring(0, 40)}..." [Ratio: ${aspectRatio}]`);
 
     const newImage: GeneratedImage = {
         id: imageId,
@@ -19,18 +29,26 @@ export const useInspirationalImageGenerator = (addLog: (level: LogEntry['level']
         includeInReport: true,
         isCoverImage: false,
     };
+    
     setInspirationalImages(prev => [...prev, newImage]);
 
     try {
       const url = await generateInspirationalImage(prompt, aspectRatio);
       const successfulImage = { ...newImage, url, isLoading: false };
       setInspirationalImages(prev => prev.map(img => img.id === imageId ? successfulImage : img));
-      addLog('INFO', `Inspirational image generation for "${prompt}" succeeded.`);
+      addLog('INFO', `Concept synthesis finalized. Image buffer cached.`);
       return successfulImage;
     } catch (e) {
       const errorMessage = parseApiError(e);
       setInspirationalImages(prev => prev.map(img => img.id === imageId ? { ...img, error: errorMessage, isLoading: false } : img));
-      addLog('ERROR', `Inspirational image generation for "${prompt}" failed: ${errorMessage}`);
+      addLog('ERROR', `Concept synthesis failed: ${errorMessage}`);
+      
+      if (errorMessage.includes("Requested entity was not found.")) {
+          addLog('WARN', 'API key validation failed. Please re-select a valid paid API key.');
+          if (typeof (window as any).aistudio !== 'undefined') {
+             await (window as any).aistudio.openSelectKey();
+          }
+      }
       return null;
     }
   }, [addLog]);

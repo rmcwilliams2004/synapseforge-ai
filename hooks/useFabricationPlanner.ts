@@ -7,14 +7,14 @@ export const useFabricationPlanner = (addLog: (level: LogEntry['level'], message
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const runPlanner = useCallback(async (process: ManufacturingProcessType, material: string, productContext: string) => {
+    const runPlanner = useCallback(async (process: ManufacturingProcessType, material: string, productContext: string, prioritizedChecks: string[] = []) => {
         setIsLoading(true);
         setError(null);
         setPlan(null);
-        addLog('INFO', `Starting Fabrication Planner for ${process} with ${material}.`);
+        addLog('INFO', `Starting Fabrication Planner for ${process} with ${material}. Priority Checks: ${prioritizedChecks.join(', ') || 'None'}`);
 
         try {
-            const result = await generateFabricationPlan(process, material, productContext);
+            const result = await generateFabricationPlan(process, material, productContext, prioritizedChecks);
             setPlan(result);
             addLog('INFO', `Fabrication Plan generated successfully.`);
         } catch (e) {

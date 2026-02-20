@@ -1,6 +1,5 @@
-
 import React from 'react';
-import { Faction, User, FactionId } from '../types';
+import { Faction, User, FactionId, Role } from '../types';
 import { ENGINEERING_PHILOSOPHIES } from '../constants';
 
 interface FactionSelectorProps {
@@ -64,7 +63,8 @@ const FactionCard: React.FC<FactionCardProps> = ({ faction, isSelected, onSelect
 };
 
 export const FactionSelector = ({ selectedFaction, onSelectFaction, disabled, authenticatedUser }: FactionSelectorProps) => {
-  const isViewer = authenticatedUser.role === 'Viewer';
+  // Fix: Use Role.Viewer from enum instead of string literal to resolve "unintentional comparison" type error.
+  const isViewer = authenticatedUser.role === Role.Viewer;
   return (
     <div id="tour-step-1">
       <h2 className="text-xl font-semibold text-gray-900 dark:text-brand-light mb-3">1. Select an Analytical Lens</h2>

@@ -1,17 +1,22 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { GoogleGenAI, LiveServerMessage, Modality, Blob, FunctionDeclaration } from '@google/genai';
-import { Faction, ProjectVersion, DeVinciState, TranscriptEntry, DeVinciVoice, User } from '../types';
-import { MOCK_USERS } from '../constants';
+import { DeVinciState, TranscriptEntry, DeVinciVoice, User, CadData } from '../types';
 
-function encode(bytes: Uint8Array): string {
-    let binary = '';
-    const len = bytes.byteLength;
-    for (let i = 0; i < len; i++) {
-        binary += String.fromCharCode(bytes[i]);
+// Helper to encode audio data for the API
+function createBlob(data: Float32Array): Blob {
+    const l = data.length;
+    const int16 = new Int16Array(l);
+    for (let i = 0; i < l; i++) {
+        int16[i] = data[i] * 32768; // Convert float to 16-bit PCM
     }
-    return btoa(binary);
+    const binary = String.fromCharCode(...new Uint8Array(int16.buffer));
+    return {
+        data: btoa(binary),
+        mimeType: 'audio/pcm;rate=16000',
+    };
 }
 
+// Helper to decode audio from the API
 function decode(base64: string): Uint8Array {
     const binaryString = atob(base64);
     const len = binaryString.length;
@@ -22,11 +27,12 @@ function decode(base64: string): Uint8Array {
     return bytes;
 }
 
+// Helper to prepare audio for playback
 async function decodeAudioData(
     data: Uint8Array,
     ctx: AudioContext,
-    sampleRate: number,
-    numChannels: number,
+    sampleRate: number = 24000,
+    numChannels: number = 1,
 ): Promise<AudioBuffer> {
     const dataInt16 = new Int16Array(data.buffer);
     const frameCount = dataInt16.length / numChannels;
@@ -40,46 +46,26 @@ async function decodeAudioData(
     return buffer;
 }
 
-function createBlob(data: Float32Array): Blob {
-    const l = data.length;
-    const int16 = new Int16Array(l);
-    for (let i = 0; i < l; i++) {
-        int16[i] = data[i] * 32768;
-    }
-    return {
-        data: encode(new Uint8Array(int16.buffer)),
-        mimeType: 'audio/pcm;rate=16000',
-    };
-}
-
-const fileToSessionBlob = async (file: File): Promise<Blob> => {
-    const base64Data = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = () => resolve((reader.result as string).split(',')[1]);
-        reader.onerror = (error) => reject(error);
-    });
-    return {
-        data: base64Data,
-        mimeType: file.type,
-    };
-};
-
 interface StartConversationConfig {
     systemInstruction: string;
     voice: DeVinciVoice;
     tools?: { functionDeclarations: FunctionDeclaration[] }[];
     onFunctionCall?: (fc: { name: string, args: any, id: string }) => Promise<any>;
     authenticatedUser: User;
+    activeCad?: CadData | null;
+    initialMessages?: TranscriptEntry[];
 }
 
 export const useDeVinci = () => {
     const [state, setState] = useState<DeVinciState>('idle');
     const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
     const [analyzableFile, setAnalyzableFile] = useState<File | null>(null);
-    const [knownSpeakers, setKnownSpeakers] = useState<User[]>([]);
     const [retryCount, setRetryCount] = useState(0);
+
+    const lastConfig = useRef<StartConversationConfig | null>(null);
     const sessionPromise = useRef<Promise<any> | null>(null);
+    
+    // Audio Context Refs
     const audioRefs = useRef<{
         inputAudioContext?: AudioContext,
         outputAudioContext?: AudioContext,
@@ -89,208 +75,123 @@ export const useDeVinci = () => {
         nextStartTime: number,
         sources: Set<AudioBufferSourceNode>
     }>({ nextStartTime: 0, sources: new Set() });
-    const previousStateRef = useRef<DeVinciState>('listening');
-    const configRef = useRef<StartConversationConfig | null>(null);
-    const transcriptRef = useRef(transcript);
-    useEffect(() => { transcriptRef.current = transcript; }, [transcript]);
 
-    const stopConversation = useCallback(() => {
+    const cleanupAudio = useCallback(() => {
+        // Stop all tracks
         audioRefs.current.mediaStream?.getTracks().forEach(track => track.stop());
+        
+        // Disconnect processor
         if (audioRefs.current.scriptProcessor) {
             audioRefs.current.scriptProcessor.disconnect();
             audioRefs.current.scriptProcessor = undefined;
         }
+        
+        // Disconnect source
         if (audioRefs.current.source) {
             audioRefs.current.source.disconnect();
             audioRefs.current.source = undefined;
         }
 
+        // Stop all playing sources
+        audioRefs.current.sources.forEach(source => {
+            try { source.stop(); } catch (e) { }
+        });
+        audioRefs.current.sources.clear();
+
+        // Close contexts
+        const inputCtx = audioRefs.current.inputAudioContext;
+        if (inputCtx && inputCtx.state !== 'closed') inputCtx.close().catch(() => {});
+        audioRefs.current.inputAudioContext = undefined;
+
+        const outputCtx = audioRefs.current.outputAudioContext;
+        if (outputCtx && outputCtx.state !== 'closed') outputCtx.close().catch(() => {});
+        audioRefs.current.outputAudioContext = undefined;
+    }, []);
+    
+    const stopConversation = useCallback(async () => {
+        cleanupAudio();
+
         if (sessionPromise.current) {
-            sessionPromise.current.then(session => {
+            try {
+                const session = await sessionPromise.current;
                 session?.close();
-            });
+            } catch (e) {
+                console.warn("Session close error:", e);
+            }
             sessionPromise.current = null;
         }
         
-        audioRefs.current.sources.forEach(source => {
-            try {
-                source.stop();
-            } catch (e) { }
-        });
-        audioRefs.current.sources.clear();
-        
-        const inputCtx = audioRefs.current.inputAudioContext;
-        if (inputCtx) {
-            try {
-                if (inputCtx.state !== 'closed') {
-                    inputCtx.close().catch(e => console.warn("Safe close DeVinci inputCtx:", e));
-                }
-            } catch (e) {
-                console.warn("Error closing DeVinci input audio context:", e);
-            }
-        }
-        
-        const outputCtx = audioRefs.current.outputAudioContext;
-        if (outputCtx) {
-            try {
-                if (outputCtx.state !== 'closed') {
-                    outputCtx.close().catch(e => console.warn("Safe close DeVinci outputCtx:", e));
-                }
-            } catch (e) {
-                console.warn("Error closing DeVinci output audio context:", e);
-            }
-        }
-        
-        setAnalyzableFile(null);
-        setKnownSpeakers([]);
         setState('idle');
-    }, []);
-
-    const pauseConversation = useCallback(() => {
-        if (state === 'listening' || state === 'speaking') {
-            previousStateRef.current = state;
-            setState('paused');
-            audioRefs.current.source?.disconnect(audioRefs.current.scriptProcessor!);
-            audioRefs.current.outputAudioContext?.suspend();
-        }
-    }, [state]);
-
-    const resumeConversation = useCallback(() => {
-        if (state === 'paused') {
-            setState(previousStateRef.current);
-            audioRefs.current.source?.connect(audioRefs.current.scriptProcessor!);
-            audioRefs.current.outputAudioContext?.resume();
-        }
-    }, [state]);
-
-    const sendFile = useCallback(async (file: File) => {
-        if (!sessionPromise.current) {
-            console.error("DeVinci session is not active to send a file.");
-            return;
-        }
-
-        if (file.type.startsWith('image/')) {
-            setAnalyzableFile(file);
-        } else {
-            setAnalyzableFile(null);
-        }
-
-        const session = await sessionPromise.current;
-        const userPromptText = `(Uploaded file: ${file.name}) Please analyze this file and provide a detailed description.`;
-        setTranscript(prev => {
-            const last = prev[prev.length - 1];
-            const speakerName = knownSpeakers[0]?.name;
-            if (last?.source === 'user' && !last.isFinal) {
-                const finalLast = { ...last, isFinal: true };
-                return [...prev.slice(0, -1), finalLast, { source: 'user', text: userPromptText, isFinal: true, speakerName }];
-            }
-            return [...prev, { source: 'user', text: userPromptText, isFinal: true, speakerName }];
-        });
-        
-        const mediaBlob = await fileToSessionBlob(file);
-        session.sendRealtimeInput({ media: mediaBlob });
-        session.sendRealtimeInput({ text: "Please analyze the file I just uploaded and provide a detailed description." });
-    }, [knownSpeakers]);
-
-    const sendImageRegion = useCallback(async (croppedFile: File, originalFileName: string) => {
-        if (!sessionPromise.current) {
-            console.error("DeVinci session is not active to send an image region.");
-            return;
-        }
-
-        const session = await sessionPromise.current;
-        const userPromptText = `(Selected a region from ${originalFileName}) Analyze this specific part.`;
-        
-        setTranscript(prev => {
-            const last = prev[prev.length - 1];
-            const speakerName = knownSpeakers[0]?.name;
-            if (last?.source === 'user' && !last.isFinal) {
-                const finalLast = { ...last, isFinal: true };
-                return [...prev.slice(0, -1), finalLast, { source: 'user', text: userPromptText, isFinal: true, speakerName }];
-            }
-            return [...prev, { source: 'user', text: userPromptText, isFinal: true, speakerName }];
-        });
-
-        const mediaBlob = await fileToSessionBlob(croppedFile);
-        session.sendRealtimeInput({ media: mediaBlob });
-        session.sendRealtimeInput({ text: "Please analyze the selected region of the image I just sent." });
-
-    }, [knownSpeakers]);
-
-    const simulateNewSpeaker = useCallback(() => {
-        const unintroducedUsers = MOCK_USERS.filter(mockUser => !knownSpeakers.some(known => known.id === mockUser.id));
-        if (unintroducedUsers.length === 0) return;
-        const newSpeaker = unintroducedUsers[Math.floor(Math.random() * unintroducedUsers.length)];
-
-        setTranscript(prev => [
-            ...prev,
-            { source: 'devinci', text: "I'm detecting a new voice in the conversation. Could you please introduce yourself?", isFinal: true },
-            { source: 'user', text: `Hi DeVinci, this is ${newSpeaker.name.split(' ')[0]}.`, isFinal: true, speakerName: newSpeaker.name },
-            { source: 'devinci', text: `Welcome, ${newSpeaker.name.split(' ')[0]}! Glad to have you in the discussion.`, isFinal: true },
-        ]);
-        setKnownSpeakers(prev => [...prev, newSpeaker]);
-    }, [knownSpeakers]);
+    }, [cleanupAudio]);
 
     const startConversation = useCallback(async (config: StartConversationConfig) => {
-        if (state !== 'idle' && state !== 'error' && state !== 'reconnect_failed') {
-            stopConversation();
+        // Ensure clean state before starting
+        await stopConversation();
+        
+        lastConfig.current = config;
+        setState('connecting');
+        setTranscript(config.initialMessages || []);
+
+        // API Key Validation - MUST obtain from process.env.API_KEY
+        const apiKey = process.env.API_KEY;
+        if (!apiKey) {
+            console.error("CRITICAL: Missing API_KEY in environment");
+            setTranscript([{ source: 'devinci', text: "System Error: Missing Neural API Key. Check configuration.", isFinal: true }]);
+            setState('error');
+            return;
         }
-        
-        configRef.current = config;
-        
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
 
-        const connect = async (currentConfig: StartConversationConfig, attempt: number) => {
-            if (attempt === 1) { 
-                setState('connecting');
-                setTranscript([]);
-                setAnalyzableFile(null);
-                setKnownSpeakers([currentConfig.authenticatedUser]);
-                audioRefs.current = { nextStartTime: 0, sources: new Set() };
-                setRetryCount(0);
-            } else {
-                setState('reconnecting');
-            }
+        const ai = new GoogleGenAI({ apiKey });
 
-            audioRefs.current.scriptProcessor?.disconnect();
-            audioRefs.current.source?.disconnect();
-            if(sessionPromise.current) await sessionPromise.current.then(s => s.close());
+        try {
+            // Initialize Audio Contexts
+            const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+            audioRefs.current.inputAudioContext = new AudioContextClass({ sampleRate: 16000 }); // Input requires 16k for Gemini
+            audioRefs.current.outputAudioContext = new AudioContextClass({ sampleRate: 24000 }); // Output is usually 24k
 
-            if (!audioRefs.current.inputAudioContext || audioRefs.current.inputAudioContext.state === 'closed') {
-                audioRefs.current.inputAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
-            }
-            if (!audioRefs.current.outputAudioContext || audioRefs.current.outputAudioContext.state === 'closed') {
-                audioRefs.current.outputAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-            }
-            const outputNode = audioRefs.current.outputAudioContext.createGain();
-            outputNode.connect(audioRefs.current.outputAudioContext.destination);
+            // Request Microphone Access
+            audioRefs.current.mediaStream = await navigator.mediaDevices.getUserMedia({ 
+                audio: {
+                    channelCount: 1,
+                    sampleRate: 16000
+                } 
+            });
+        } catch (err) {
+            console.error("Microphone Access Denied:", err);
+            setTranscript([{ source: 'devinci', text: "Access Denied: I cannot hear you. Please allow microphone access.", isFinal: true }]);
+            setState('error');
+            return;
+        }
 
-            if (!audioRefs.current.mediaStream || audioRefs.current.mediaStream.getTracks().every(t => t.readyState === 'ended')) {
-                try {
-                    audioRefs.current.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                } catch (err) {
-                    console.error('Microphone access denied:', err);
-                    setState('error');
-                    stopConversation();
-                    return;
-                }
-            }
-
+        // Connect to Gemini Live API
+        try {
             const livePromise = ai.live.connect({
                 model: 'gemini-2.5-flash-native-audio-preview-12-2025', 
                 config: {
-                    responseModalities: ['AUDIO'],
-                    speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: currentConfig.voice } } },
-                    systemInstruction: currentConfig.systemInstruction,
-                    // Note: Combinations of tools and transcription are gated in some preview models.
-                    // Prioritizing tools for this disciplinary workspace.
-                    tools: currentConfig.tools,
+                    responseModalities: [Modality.AUDIO],
+                    speechConfig: { 
+                        voiceConfig: { 
+                            prebuiltVoiceConfig: { 
+                                voiceName: config.voice || 'Aoede' // Default to Aoede if undefined
+                            } 
+                        } 
+                    },
+                    systemInstruction: config.systemInstruction,
+                    tools: config.tools,
                 },
                 callbacks: {
                     onopen: () => {
-                        const inputCtx = audioRefs.current.inputAudioContext!;
-                        const stream = audioRefs.current.mediaStream!;
+                        console.log("DeVinci: Connection Established");
+                        const inputCtx = audioRefs.current.inputAudioContext;
+                        const stream = audioRefs.current.mediaStream;
+                        
+                        if (!inputCtx || !stream) {
+                            console.warn("DeVinci: Audio context or stream missing on open. Connection likely closed.");
+                            return;
+                        }
+                        
                         audioRefs.current.source = inputCtx.createMediaStreamSource(stream);
+                        // Use ScriptProcessor for broad compatibility
                         const scriptProcessor = inputCtx.createScriptProcessor(4096, 1, 1);
                         audioRefs.current.scriptProcessor = scriptProcessor;
 
@@ -298,133 +199,189 @@ export const useDeVinci = () => {
                             const inputData = audioProcessingEvent.inputBuffer.getChannelData(0);
                             const pcmBlob = createBlob(inputData);
                             livePromise.then((session) => {
-                               session.sendRealtimeInput({ media: pcmBlob });
+                                session.sendRealtimeInput({ media: pcmBlob });
                             });
                         };
+
                         audioRefs.current.source.connect(scriptProcessor);
                         scriptProcessor.connect(inputCtx.destination);
+                        
                         setState('listening');
                     },
                     onmessage: async (message: LiveServerMessage) => {
-                        if (message.toolCall && currentConfig.onFunctionCall) {
+                        // Handle Function Calls
+                        if (message.toolCall && config.onFunctionCall) {
                             setState('thinking');
+                            const responses = [];
                             for (const fc of message.toolCall.functionCalls) {
-                                const result = await currentConfig.onFunctionCall(fc);
-                                livePromise.then(session => {
-                                    if (session) {
-                                        session.sendToolResponse({
-                                            functionResponses: { id: fc.id, name: fc.name, response: { result: JSON.stringify(result) } }
-                                        });
+                                try {
+                                    const result = await config.onFunctionCall(fc);
+                                    responses.push({
+                                        id: fc.id,
+                                        name: fc.name,
+                                        response: { result: JSON.stringify(result) }
+                                    });
+                                } catch (e: any) {
+                                    responses.push({
+                                        id: fc.id,
+                                        name: fc.name,
+                                        response: { error: e.message }
+                                    });
+                                }
+                            }
+                            
+                            livePromise.then(session => {
+                                session?.sendToolResponse({ functionResponses: responses });
+                            });
+                            setState('speaking'); 
+                        }
+
+                        // Handle Transcriptions
+                        if (message.serverContent?.inputTranscription) {
+                            const { text } = message.serverContent.inputTranscription;
+                            if (text) {
+                                setTranscript(prev => {
+                                    const last = prev[prev.length - 1];
+                                    if (last?.source === 'user' && !last.isFinal) {
+                                        return [...prev.slice(0, -1), { source: 'user', text: last.text + text, isFinal: false, speakerName: config.authenticatedUser.name }];
                                     }
+                                    return [...prev, { source: 'user', text, isFinal: false, speakerName: config.authenticatedUser.name }];
+                                });
+                            }
+                        } else if (message.serverContent?.outputTranscription) {
+                            setState('speaking'); 
+                            const { text } = message.serverContent.outputTranscription;
+                            if (text) {
+                                setTranscript(prev => {
+                                    const last = prev[prev.length - 1];
+                                    if (last?.source === 'devinci' && !last.isFinal) {
+                                        return [...prev.slice(0, -1), { source: 'devinci', text: last.text + text, isFinal: false }];
+                                    }
+                                    return [...prev, { source: 'devinci', text, isFinal: false }];
                                 });
                             }
                         }
-                        // Transcription handling is fallback for models that support it without gating conflicts
-                        if (message.serverContent?.inputTranscription) {
-                            const { text } = message.serverContent.inputTranscription;
-                            setTranscript(prev => {
-                                const last = prev[prev.length - 1];
-                                const speakerName = knownSpeakers[0]?.name;
-                                if (last?.source === 'user' && !last.isFinal) {
-                                    return [...prev.slice(0, -1), { source: 'user', text: last.text + text, isFinal: false, speakerName }];
-                                }
-                                return [...prev, { source: 'user', text, isFinal: false, speakerName }];
-                            });
-                        } else if (message.serverContent?.outputTranscription) {
-                            setState('speaking'); 
-                            setTranscript(prev => {
-                                const last = prev[prev.length - 1];
-                                if (last?.source === 'user' && !last.isFinal) {
-                                    return [...prev.slice(0, -1), { ...last, isFinal: true }];
-                                }
-                                return prev;
-                            });
-                            const { text } = message.serverContent.outputTranscription;
-                            setTranscript(prev => {
-                                const last = prev[prev.length - 1];
-                                if (last?.source === 'devinci' && !last.isFinal) {
-                                    return [...prev.slice(0, -1), { source: 'devinci', text: last.text + text, isFinal: false }];
-                                }
-                                return [...prev, { source: 'devinci', text, isFinal: false }];
-                            });
-                        }
+
                         if (message.serverContent?.turnComplete) {
-                            setTranscript(prev => {
-                                const last = prev[prev.length - 1];
-                                if (last && !last.isFinal) {
-                                    return [...prev.slice(0, -1), { ...last, isFinal: true }];
-                                }
-                                return prev;
-                            });
+                            setTranscript(prev => prev.map(t => ({ ...t, isFinal: true })));
                             setState('listening');
                         }
+
+                        // Handle Audio Output
                         const base64Audio = message.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
                         if (base64Audio) {
                             const outputCtx = audioRefs.current.outputAudioContext!;
-                            audioRefs.current.nextStartTime = Math.max(audioRefs.current.nextStartTime, outputCtx.currentTime);
+                            
+                            // Ensure time creates a smooth queue
+                            if (audioRefs.current.nextStartTime < outputCtx.currentTime) {
+                                audioRefs.current.nextStartTime = outputCtx.currentTime;
+                            }
+
                             const audioBuffer = await decodeAudioData(decode(base64Audio), outputCtx, 24000, 1);
                             const sourceNode = outputCtx.createBufferSource();
                             sourceNode.buffer = audioBuffer;
-                            sourceNode.connect(outputNode);
+                            
+                            sourceNode.connect(outputCtx.destination);
+                            
                             sourceNode.addEventListener('ended', () => audioRefs.current.sources.delete(sourceNode));
                             sourceNode.start(audioRefs.current.nextStartTime);
+                            
                             audioRefs.current.nextStartTime += audioBuffer.duration;
                             audioRefs.current.sources.add(sourceNode);
                         }
                     },
-                    onerror: (e: ErrorEvent) => {
-                        const errorMessage = (e as any).message || '';
-                        const isServiceUnavailable = errorMessage.includes('The service is currently unavailable.');
-                        const isNetworkError = errorMessage.includes('Network error');
-                        
-                        if ((isServiceUnavailable || isNetworkError) && attempt < 4) {
-                            setRetryCount(attempt);
-                            const delay = Math.min(1000 * (2 ** (attempt - 1)), 8000);
-                            setTimeout(() => {
-                                const originalConfig = configRef.current;
-                                if (!originalConfig) {
-                                    setState('error');
-                                    stopConversation();
-                                    return;
-                                }
-                                const transcriptHistory = transcriptRef.current.map(t => `${t.speakerName || (t.source === 'user' ? originalConfig.authenticatedUser.name.split(' ')[0] : 'DeVinci')}: ${t.text}`).join('\n');
-                                const augmentedSystemInstruction = `${originalConfig.systemInstruction}\n\n--- CONVERSATION RECOVERY ---\nYour previous session was interrupted. Reconnected based on history: ${transcriptHistory}`;
-                                connect({ ...originalConfig, systemInstruction: augmentedSystemInstruction }, attempt + 1);
-                            }, delay);
-                        } else {
-                            console.error('Session error:', e);
-                            stopConversation(); 
-                            if (isServiceUnavailable || isNetworkError) {
-                                setState('reconnect_failed');
-                            } else {
-                                setState('error');
-                            }
-                        }
+                    onerror: (e: any) => {
+                        console.error('Gemini Session Error:', e);
+                        setTranscript(prev => [...prev, { source: 'devinci', text: "[Signal Lost]", isFinal: true }]);
+                        setState('error');
                     },
-                    onclose: (e: CloseEvent) => {
-                        if (state !== 'reconnecting' && state !== 'error' && state !== 'reconnect_failed') {
-                           setState('idle');
-                        }
+                    onclose: () => {
+                        console.log("DeVinci: Connection Closed");
+                        setState('idle');
                     },
                 },
             });
             sessionPromise.current = livePromise;
-        };
-        
-        connect(config, 1);
-    }, [state, stopConversation]);
-    
-    useEffect(() => {
-        return () => {
-            stopConversation();
+        } catch (e) {
+            console.error("Connection Failed:", e);
+            setState('error');
         }
     }, [stopConversation]);
 
+    // Send File Logic (Images/PDFs)
+    const sendFile = useCallback(async (file: File) => {
+        if (!sessionPromise.current) return;
+        setAnalyzableFile(file);
+        
+        try {
+            const base64 = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve((reader.result as string).split(',')[1]);
+                reader.onerror = reject;
+            });
+            
+            const session = await sessionPromise.current;
+            session.sendRealtimeInput({
+                media: { data: base64, mimeType: file.type }
+            });
+            
+            setTranscript(prev => [...prev, { source: 'user', text: `[Uploaded: ${file.name}]`, isFinal: true, speakerName: 'Operator' }]);
+        } catch (e) {
+            console.error("File upload failed", e);
+        }
+    }, []);
+
+    const sendImageRegion = useCallback(async (croppedFile: File, originalFileName: string) => {
+        if (!sessionPromise.current) return;
+        
+        try {
+            const base64 = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(croppedFile);
+                reader.onload = () => resolve((reader.result as string).split(',')[1]);
+                reader.onerror = reject;
+            });
+
+            const session = await sessionPromise.current;
+            session.sendRealtimeInput({
+                media: { data: base64, mimeType: croppedFile.type }
+            });
+            setTranscript(prev => [...prev, { source: 'user', text: `[Focus Region: ${originalFileName}]`, isFinal: true, speakerName: 'Operator' }]);
+        } catch (e) {
+            console.error("Region upload failed", e);
+        }
+    }, []);
+
+    const simulateNewSpeaker = useCallback(() => {
+        if (sessionPromise.current) {
+            sessionPromise.current.then(session => {
+                session.sendRealtimeInput({
+                    media: { mimeType: "text/plain", data: btoa("A new speaker has joined the conversation. Please acknowledge them.") }
+                });
+            });
+        }
+    }, []);
+
     const manualRetry = useCallback(() => {
-        if (configRef.current) {
-            startConversation(configRef.current);
+        setRetryCount(prev => prev + 1);
+        if (lastConfig.current) {
+            startConversation(lastConfig.current);
         }
     }, [startConversation]);
-
-    return { state, transcript, startConversation, stopConversation, sendFile, pauseConversation, resumeConversation, analyzableFile, sendImageRegion, simulateNewSpeaker, manualRetry, retryCount };
+    
+    return { 
+        state, 
+        transcript, 
+        startConversation, 
+        stopConversation, 
+        pauseConversation: () => {}, 
+        resumeConversation: () => {}, 
+        retryCount,
+        sendFile,
+        analyzableFile,
+        sendImageRegion,
+        simulateNewSpeaker,
+        manualRetry
+    };
 };

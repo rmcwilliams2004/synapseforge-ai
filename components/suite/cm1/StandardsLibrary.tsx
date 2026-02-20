@@ -14,7 +14,8 @@ export const StandardsLibrary: React.FC = () => {
         return () => clearTimeout(timer);
     }, [filters]);
 
-    const organizations = useMemo(() => ['All', ...Array.from(new Set(MOCK_STANDARDS.map(s => s.organization)))], []);
+    // FIX: Explicitly typed the memoized organizations array to string[] to resolve type-checking errors in the map function.
+    const organizations = useMemo<string[]>(() => ['All', ...Array.from(new Set(MOCK_STANDARDS.map(s => s.organization)))], []);
 
     const filteredStandards = useMemo(() =>
         MOCK_STANDARDS.filter(s =>

@@ -28,6 +28,7 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({ result }) =>
   const costChartRef = useRef<HTMLDivElement>(null);
   const materialChartRef = useRef<HTMLDivElement>(null);
   const riskChartRef = useRef<HTMLDivElement>(null);
+  const materialBarChartRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!result || typeof Plotly === 'undefined') return;
@@ -37,8 +38,9 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({ result }) =>
     const gridColor = isDarkMode ? '#334155' : '#e2e8f0';
 
     // 1. Cost Distribution (Donut)
-    const costLabels = result.preliminaryCostEstimate.breakdown.map(item => item.item);
-    const costValues = result.preliminaryCostEstimate.breakdown.map(item => parseNumericValue(item.cost_estimate));
+    const breakdown = result.preliminaryCostEstimate?.breakdown || [];
+    const costLabels = breakdown.map(item => item.item);
+    const costValues = breakdown.map(item => parseNumericValue(item.cost_estimate));
 
     Plotly.newPlot(costChartRef.current, [{
       values: costValues,
@@ -61,7 +63,7 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({ result }) =>
     }, { responsive: true, displayModeBar: false });
 
     // 2. Material Performance (Radar)
-    const materials = result.material_suggestions.slice(0, 4);
+    const materials = (result.material_suggestions || []).slice(0, 4);
     const materialData = materials.map(mat => ({
       type: 'scatterpolar',
       r: [
@@ -91,7 +93,7 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({ result }) =>
     }, { responsive: true, displayModeBar: false });
 
     // 3. Risk Matrix (Bubble)
-    const risks = result.complianceAndSafety.safety_risks;
+    const risks = result.complianceAndSafety?.safety_risks || [];
     Plotly.newPlot(riskChartRef.current, [{
       x: risks.map(r => getRiskValue(r.likelihood)),
       y: risks.map(r => getRiskValue(r.impact)),
@@ -127,18 +129,77 @@ export const ProjectDashboard: React.FC<ProjectDashboardProps> = ({ result }) =>
       margin: { l: 60, r: 20, t: 40, b: 60 }
     }, { responsive: true, displayModeBar: false });
 
+    // 4. Material Comparison (Bar Chart)
+    const sortedMaterials = [...(result.material_suggestions || [])].sort((a, b) => 
+        parseNumericValue(b.properties.tensile_strength) - parseNumericValue(a.properties.tensile_strength)
+    ).slice(0, 5);
+
+    Plotly.newPlot(materialBarChartRef.current, [{
+        x: sortedMaterials.map(m => m.name),
+        y: sortedMaterials.map(m => parseNumericValue(m.properties.tensile_strength)),
+        type: 'bar',
+        marker: {
+            color: '#06b6d4'
+        }
+    }], {
+        title: { text: 'Strength Comparison (MPa)', font: { color: textColor, size: 16, weight: 'bold' } },
+        paper_bgcolor: 'transparent',
+        plot_bgcolor: 'transparent',
+        font: { color: textColor },
+        xaxis: { gridcolor: 'transparent', color: textColor },
+        yaxis: { gridcolor: gridColor, color: textColor },
+        height: 300,
+        margin: { l: 60, r: 20, t: 40, b: 60 }
+    }, { responsive: true, displayModeBar: false });
+
   }, [result]);
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
-      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 shadow-sm transition-colors duration-300">
-        <div ref={costChartRef} />
+    <div className="space-y-6 mb-10">
+      {/* Executive Visual Summary */}
+      <div className="bg-gradient-to-r from-brand-cyan/20 to-indigo-500/10 border border-brand-cyan/30 rounded-2xl p-8 flex flex-col md:flex-row items-center gap-8 shadow-sm transition-all animate-fade-in">
+        <div className="w-20 h-20 bg-brand-cyan/20 rounded-3xl flex items-center justify-center text-brand-cyan border border-brand-cyan/30 shadow-lg shadow-cyan-900/10 flex-shrink-0">
+          <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="m3.75 13.5 10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z" /></svg>
+        </div>
+        <div className="flex-1 space-y-4">
+            <div>
+                <h3 className="text-2xl font-black text-gray-900 dark:text-white uppercase italic tracking-tighter leading-none mb-2">Technical Archetype: {result.product_name}</h3>
+                <div className="flex flex-wrap gap-2">
+                    <span className="px-3 py-1 bg-brand-cyan/10 border border-brand-cyan/30 rounded-lg text-[10px] font-black text-brand-cyan uppercase tracking-widest">Physics-Agnostic</span>
+                    <span className="px-3 py-1 bg-indigo-500/10 border border-indigo-500/30 rounded-lg text-[10px] font-black text-indigo-400 uppercase tracking-widest">{(result.preliminaryCostEstimate?.confidence || 'Medium')} Confidence</span>
+                    <span className="px-3 py-1 bg-amber-500/10 border border-amber-500/30 rounded-lg text-[10px] font-black text-amber-500 uppercase tracking-widest">{(result.material_suggestions?.[0]?.name || 'N/A')} Primary</span>
+                </div>
+            </div>
+            <p className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed line-clamp-3 italic">
+                "{result.executive_summary}"
+            </p>
+        </div>
+        <div className="grid grid-cols-2 gap-3 w-full md:w-auto">
+            <div className="p-4 bg-white dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-800 text-center">
+                <span className="block text-[10px] font-black text-gray-400 uppercase mb-1">Components</span>
+                <span className="text-xl font-black text-brand-cyan">{(result.billOfMaterials || []).length}</span>
+            </div>
+            <div className="p-4 bg-white dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-800 text-center">
+                <span className="block text-[10px] font-black text-gray-400 uppercase mb-1">Risk Vectors</span>
+                <span className="text-xl font-black text-red-500">{(result.complianceAndSafety?.safety_risks || []).length}</span>
+            </div>
+        </div>
       </div>
-      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 shadow-sm transition-colors duration-300">
-        <div ref={materialChartRef} />
-      </div>
-      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 shadow-sm transition-colors duration-300">
-        <div ref={riskChartRef} />
+
+      {/* Main Charts Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 shadow-sm transition-colors duration-300">
+          <div ref={materialChartRef} />
+        </div>
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 shadow-sm transition-colors duration-300">
+          <div ref={materialBarChartRef} />
+        </div>
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 shadow-sm transition-colors duration-300">
+          <div ref={costChartRef} />
+        </div>
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 shadow-sm transition-colors duration-300">
+          <div ref={riskChartRef} />
+        </div>
       </div>
     </div>
   );

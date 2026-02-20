@@ -1,6 +1,6 @@
+
 import React from 'react';
-// Added FoundryCadResult to the imported types
-import { AnalysisResult, Faction, GeneratedDrawing, Project, User, CadData, ProjectVersion, GeneratedImage, RotorModel, GoogleDocContent, FoundryCadResult } from '../types';
+import { AnalysisResult, Faction, GeneratedDrawing, Project, User, CadData, ProjectVersion, GeneratedImage, RotorModel, GoogleDocContent, FoundryCadResult, SimulationResult, ProjectTask } from '../types';
 import { InitialView } from './analysis/InitialView';
 import { LoadingView } from './analysis/LoadingView';
 import { ErrorView } from './analysis/ErrorView';
@@ -45,15 +45,16 @@ interface AnalysisDisplayProps {
   isSummaryLoading: boolean;
   summaryError: string | null;
   cadData: CadData | null;
-  // Added foundryResult to AnalysisDisplayProps
   foundryResult: FoundryCadResult | null;
   onGenerateCad: (drawings: GeneratedDrawing[], result: AnalysisResult) => Promise<CadData | null>;
   isCadLoading: boolean;
   cadError: string | null;
+  /**
+   * FIX: Added isCadViewerOpen and onOpenCadViewer to props.
+   */
+  isCadViewerOpen: boolean;
   onOpenCadViewer: () => void;
-  // Added onAddLocalSnapshot to AnalysisDisplayProps to resolve TS error in App.tsx
   onAddLocalSnapshot?: (dataUrl: string, prompt: string) => void;
-  // Google Export props
   isGoogleExporterAuthenticated: boolean;
   googleExporterUser: { name: string; email: string } | null;
   isGoogleAuthLoading: boolean;
@@ -65,7 +66,6 @@ interface AnalysisDisplayProps {
   googleDocContent: GoogleDocContent | null;
   onOpenGoogleDocPreview: () => void;
   onExportToGoogle: () => void;
-  // Ross Rotordynamics props
   rotorModel?: RotorModel;
   onRotorModelChange: (model: RotorModel) => void;
   rossAnalysis: {
@@ -76,28 +76,21 @@ interface AnalysisDisplayProps {
     rossError: string | null;
     runAnalysis: (rotorModel: RotorModel, analysisType: 'critical_speed' | 'campbell') => void;
   };
-  // TTS props
   tts: ReturnType<typeof useTts>;
-  // Image History props
   inspirationalImageHistory: GeneratedImage[];
   onReinsertInspirationalImage: (image: GeneratedImage) => void;
   onDeleteInspirationalImageFromHistory: (imageId: string) => void;
-  // Simulation props
   simulation: ReturnType<typeof useSimulation>;
-  // Fabrication Planner props
   fabricationPlanner: ReturnType<typeof useFabricationPlanner>;
-  // G-Code Visualizer props
   gcodeVisualizer: ReturnType<typeof useGCodeVisualizer>;
-  // Suggestion Explorer props
   suggestionExplorer: ReturnType<typeof useSuggestionExplorer>;
-  // BOM Sourcing props
   bomSourcing: ReturnType<typeof useBomSourcing>;
-  // Live Costing props
   liveCosting: ReturnType<typeof useLiveCosting>;
-  // Next Step Assistant props
   nextStepAssistant: ReturnType<typeof useNextStepAssistant>;
-  // Patent Generator props
   patentGenerator: ReturnType<typeof usePatentGenerator>;
+  onSaveSimulation?: (result: SimulationResult) => void;
+  // FIX: Added onUpdateTasks prop to resolve type error in App.tsx.
+  onUpdateTasks: (tasks: ProjectTask[]) => void;
 }
 
 export const AnalysisDisplay = (props: AnalysisDisplayProps) => {
@@ -140,13 +133,15 @@ export const AnalysisDisplay = (props: AnalysisDisplayProps) => {
         isSummaryLoading={props.isSummaryLoading}
         summaryError={props.summaryError}
         cadData={props.cadData}
-        // Passed foundryResult to ResultView
         foundryResult={props.foundryResult}
         onGenerateCad={props.onGenerateCad}
         isCadLoading={props.isCadLoading}
         cadError={props.cadError}
+        /**
+         * FIX: Passing isCadViewerOpen to ResultView.
+         */
+        isCadViewerOpen={props.isCadViewerOpen}
         onOpenCadViewer={props.onOpenCadViewer}
-        // Passed onAddLocalSnapshot down to ResultView
         onAddLocalSnapshot={props.onAddLocalSnapshot}
         isGoogleExporterAuthenticated={props.isGoogleExporterAuthenticated}
         googleExporterUser={props.googleExporterUser}
@@ -174,9 +169,12 @@ export const AnalysisDisplay = (props: AnalysisDisplayProps) => {
         liveCosting={props.liveCosting}
         nextStepAssistant={props.nextStepAssistant}
         patentGenerator={props.patentGenerator}
+        onSaveSimulation={props.onSaveSimulation}
+        // FIX: Passing onUpdateTasks through to ResultView.
+        onUpdateTasks={props.onUpdateTasks}
       />
     );
   }
 
-  return <InitialView />;
+  return <InitialView onStartDialogue={props.onLaunchDeVinci} />;
 };

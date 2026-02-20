@@ -1,60 +1,19 @@
 
 import { GoogleGenAI, Part, Type, FunctionDeclaration, Modality, GenerateContentResponse } from '@google/genai';
-import { Faction, AnalysisResult, CadData, FactionId, SetupSuggestions, CadComparisonResult, FabricationPlan, GCodeSummary, SimulationType, ManufacturingProcessType, BillOfMaterialsItem, ProcurementInfo, PreliminaryCostEstimate, PromptValidationResult, NextStepSuggestion, GeneratedDrawing, ManufacturingProcess, PatentApplication, IngestedDocument, EngineeringBranch, User, ProtectionTypePref, LegalJurisdiction, FoundryCadResult } from '../types';
+import { Faction, Persona, AnalysisResult, CadData, FactionId, SetupSuggestions, CadComparisonResult, FabricationPlan, GCodeSummary, SimulationType, ManufacturingProcessType, BillOfMaterialsItem, ProcurementInfo, PreliminaryCostEstimate, PromptValidationResult, NextStepSuggestion, GeneratedDrawing, ManufacturingProcess, PatentApplication, IngestedDocument, EngineeringBranch, User, ProtectionTypePref, LegalJurisdiction, FoundryCadResult, BillOfMaterials, ProjectTask, FoundryOptimization, ReinforcementProfile, SystemMap } from '../types';
 
 const getAiClient = () => new GoogleGenAI({ apiKey: process.env.API_KEY! });
 
 /**
- * RAG UTILITY: Semantic Search Simulation.
+ * Helper: File to generative part base64
  */
-const getTopKRelevantDocs = async (query: string, knowledgeBase: IngestedDocument[], k: number = 3): Promise<string> => {
-    if (!knowledgeBase || knowledgeBase.length === 0) return "";
-    
-    const queryTokens = new Set(query.toLowerCase().split(/\W+/).filter(t => t.length > 3));
-    
-    const docsWithScores = knowledgeBase.map(doc => {
-        const docText = (doc.name + " " + doc.content + " " + doc.summary).toLowerCase();
-        let overlap = 0;
-        queryTokens.forEach(token => {
-            if (docText.includes(token)) overlap++;
-        });
-        return { doc, score: overlap };
-    });
-
-    const topDocs = docsWithScores
-        .sort((a, b) => b.score - a.score)
-        .slice(0, k)
-        .filter(d => d.score > 0)
-        .map(d => d.doc);
-
-    if (topDocs.length === 0) return "";
-
-    return topDocs
-        .map(doc => `[TECHNICAL REFERENCE: ${doc.name} (Branch: ${doc.branch})]\n${doc.content}`)
-        .join("\n\n---\n\n");
-};
-
-const getBranchSafetyInstructions = (branch?: EngineeringBranch) => {
-    switch (branch) {
-        case EngineeringBranch.NUCLEAR:
-            return `
-### NUCLEAR SAFETY PROTOCOLS (AGENTIC INTERLOCK)
-1. ALARA COMPLIANCE: Audit all material suggestions against radiation shielding effectiveness and activation potential.
-2. CRITICALITY SAFETY: Verify geometry-based neutron moderation constraints for all structural components.
-3. SEISMIC INTEGRITY: Ensure compliance with ASME BPVC Section III for pressure boundary components.
-4. NEUTRON EMBRITTLEMENT: Flag any materials susceptible to long-term radiation damage.
-`;
-        case EngineeringBranch.AEROSPACE:
-            return `
-### AEROSPACE AIRWORTHINESS PROTOCOLS (AGENTIC INTERLOCK)
-1. REDUNDANCY CHECK: Scan for single-point failure modes. Flag critical systems lacking triple-modular redundancy.
-2. MIL-HDBK-5 VALIDATION: Cross-reference material fatigue life under cyclic loading (-55°C to 200°C).
-3. AERO-ALLOY DFM: Apply specific manufacturing rules for Titanium and Inconel 718 to minimize work-hardening.
-4. POWER-TO-WEIGHT: Audit all redesigns for net weight reduction and structural optimization.
-`;
-        default:
-            return "";
-    }
+const fileToBase64 = async (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve((reader.result as string).split(',')[1]);
+    reader.onerror = (error) => reject(error);
+  });
 };
 
 export interface ExtractedProjectDetails {
@@ -63,6 +22,307 @@ export interface ExtractedProjectDetails {
     tags: string[];
     initialPrompt: string;
 }
+
+export const parseApiError = (error: any): string => {
+    console.error("Gemini API Error:", error);
+    if (error?.message) return error.message;
+    return "An unexpected error occurred during the AI orchestration.";
+};
+
+/**
+ * AI Agent to enhance a Persona using real-world internet data.
+ */
+export const enhancePersonaWithSearch = async (personaName: string): Promise<Partial<Persona>> => {
+    const ai = getAiClient();
+    const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: `Research the historical/scientific figure "${personaName}" and provide a deep technical profile for an engineering AI persona.
+        
+        Focus on:
+        1. Their specific engineering or scientific philosophy.
+        2. Known technical biases (materials they favored, methods they pioneered).
+        3. A professional system instruction that captures their specific logic.
+        
+        Output in JSON.`,
+        config: {
+            tools: [{ googleSearch: {} }],
+            responseMimeType: 'application/json',
+            responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                    title: { type: Type.STRING },
+                    bio: { type: Type.STRING },
+                    bias: { type: Type.STRING },
+                    systemInstruction: { type: Type.STRING }
+                },
+                required: ["title", "bio", "bias", "systemInstruction"]
+            }
+        }
+    });
+    
+    const data = JSON.parse(response.text!);
+    return data;
+};
+
+const extractionSchema = {
+    type: Type.OBJECT,
+    properties: {
+        name: { type: Type.STRING, description: 'A short, professional name for the project.' },
+        description: { type: Type.STRING, description: 'A concise 1-sentence summary of the product.' },
+        tags: { type: Type.ARRAY, items: { type: Type.STRING }, description: 'Engineering and domain-specific tags.' },
+        initialPrompt: { type: Type.STRING, description: 'A high-fidelity engineering prompt describing the goals for analysis based on the file content.' }
+    },
+    required: ["name", "description", "tags", "initialPrompt"]
+};
+
+export const extractProjectDetailsFromPdf = async (part: Part): Promise<ExtractedProjectDetails> => {
+    const ai = getAiClient();
+    const response = await ai.models.generateContent({
+        model: 'gemini-3-pro-preview',
+        contents: { parts: [part, { text: "Extract project initialization details from this technical PDF. Focus on product identity and engineering requirements." }] },
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: extractionSchema
+        }
+    });
+    return JSON.parse(response.text!);
+};
+
+export const extractProjectDetailsFromImage = async (part: Part): Promise<ExtractedProjectDetails> => {
+    const ai = getAiClient();
+    const response = await ai.models.generateContent({
+        model: 'gemini-3-pro-preview',
+        contents: { parts: [part, { text: "Extract project initialization details from this image. Identify components and intended functionality." }] },
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: extractionSchema
+        }
+    });
+    return JSON.parse(response.text!);
+};
+
+export const extractProjectDetailsFromVideo = async (part: Part): Promise<ExtractedProjectDetails> => {
+    const ai = getAiClient();
+    const response = await ai.models.generateContent({
+        model: 'gemini-3-pro-preview',
+        contents: { parts: [part, { text: "Extract project initialization details from this video clip. Analyze structural layout and intended motion." }] },
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: extractionSchema
+        }
+    });
+    return JSON.parse(response.text!);
+};
+
+export const extractProjectDetailsFromVideoUrl = async (url: string): Promise<ExtractedProjectDetails> => {
+    const ai = getAiClient();
+    const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: `Research the following video content and extract project initialization parameters: ${url}. 
+        Analyze the motion vectors to infer propulsion logic and kinematic capabilities.`,
+        config: {
+            tools: [{ googleSearch: {} }],
+            responseMimeType: "application/json",
+            responseSchema: extractionSchema
+        }
+    });
+    return JSON.parse(response.text!);
+};
+
+/**
+ * DECONSTRUCT SYSTEM: Maps hierarchy of parts from multi-modal inputs for Reverse Engineering.
+ */
+export const performSystemMapping = async (parts: Part[], identification: string): Promise<SystemMap> => {
+    const ai = getAiClient();
+    const response = await ai.models.generateContent({
+        model: 'gemini-3-pro-preview',
+        contents: {
+            parts: [
+                ...parts,
+                { text: `ACT AS: Lead Systems Engineer.
+                CONTEXT: Solid Balloon / Hydro-Heliogel Whitepapers.
+                TASK: Deconstruct the ${identification} shown in these assets. 
+                
+                MANDATORY PROTOCOL:
+                1. Map visual propulsion to the 'Buoyant Structural Core' physics (Hydro-Heliogel/Methane Hydrate).
+                2. If the craft's motion implies a 'foundation' not in the whitepapers or known physics:
+                   - SET confidence_score < 0.6.
+                   - STOP generation of the CAD model.
+                   - FLAG 'foundation_query' with the specific conflict.
+                3. DO NOT hallucinate 'sci-fi' solutions. Redline and ask Richard.` }
+            ]
+        },
+        config: {
+            tools: [{ googleSearch: {} }],
+            responseMimeType: 'application/json',
+            responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                    product_name: { type: Type.STRING },
+                    confidence_score: { type: Type.NUMBER },
+                    foundation_query: { type: Type.STRING },
+                    component_id: { type: Type.STRING },
+                    hierarchy: {
+                        type: Type.ARRAY,
+                        items: {
+                            type: Type.OBJECT,
+                            properties: {
+                                name: { type: Type.STRING },
+                                material_inference: { type: Type.STRING },
+                                confidence: { type: Type.NUMBER },
+                                dimensions: {
+                                    type: Type.OBJECT,
+                                    properties: { x: { type: Type.NUMBER }, y: { type: Type.NUMBER }, z: { type: Type.NUMBER } },
+                                    required: ["x", "y", "z"]
+                                },
+                                children: { type: Type.ARRAY, items: { type: Type.OBJECT } }
+                            },
+                            required: ["name", "material_inference", "confidence", "dimensions"]
+                        }
+                    }
+                },
+                required: ["product_name", "hierarchy"]
+            }
+        }
+    });
+    const result = JSON.parse(response.text!);
+    
+    // Trigger the UI interrupt if confidence is low
+    if (result.confidence_score !== undefined && result.confidence_score < 0.6) {
+        window.dispatchEvent(new CustomEvent('foundry-redline', { 
+            detail: { 
+                query: result.foundation_query, 
+                conflictingComponent: result.component_id 
+            } 
+        }));
+    }
+    return result;
+};
+
+export const createProjectFunctionDeclaration: FunctionDeclaration = {
+    name: 'create_project',
+    parameters: {
+        type: Type.OBJECT,
+        description: 'Initialize a new engineering project.',
+        properties: {
+            name: { type: Type.STRING },
+            description: { type: Type.STRING },
+            tags: { type: Type.ARRAY, items: { type: Type.STRING } },
+            factionId: { type: Type.STRING, enum: Object.values(FactionId) }
+        },
+        required: ['name', 'description', 'factionId']
+    }
+};
+
+export const runGenesisVerificationFunctionDeclaration: FunctionDeclaration = {
+    name: 'run_genesis_verification',
+    parameters: {
+        type: Type.OBJECT,
+        description: 'Perform a 4D structural audit of the active assembly.'
+    }
+};
+
+export const runFoundrySimulationFunctionDeclaration: FunctionDeclaration = {
+    name: 'run_foundry_simulation',
+    parameters: {
+        type: Type.OBJECT,
+        description: 'Perform a physics simulation (e.g. FEA, CFD).',
+        properties: {
+            type: { type: Type.STRING },
+            components: { type: Type.ARRAY, items: { type: Type.STRING } }
+        },
+        required: ['type', 'components']
+    }
+};
+
+export const applyReinforcementFunctionDeclaration: FunctionDeclaration = {
+    name: 'apply_reinforcement',
+    parameters: {
+        type: Type.OBJECT,
+        description: 'Apply structural reinforcements.',
+        properties: { profileName: { type: Type.STRING } },
+        required: ['profileName']
+    }
+};
+
+export const triggerFullAnalysisFunctionDeclaration: FunctionDeclaration = {
+    name: 'trigger_full_analysis',
+    parameters: {
+        type: Type.OBJECT,
+        description: 'Engage core AI synthesis for a full project report.',
+        properties: {
+            useFactionId: { type: Type.STRING, enum: Object.values(FactionId) },
+            descriptionOverride: { type: Type.STRING }
+        }
+    }
+};
+
+export const showSectionFunctionDeclaration: FunctionDeclaration = {
+    name: 'show_section',
+    parameters: {
+        type: Type.OBJECT,
+        description: 'Focus view on a specific report section.',
+        properties: { sectionId: { type: Type.STRING } },
+        required: ['sectionId']
+    }
+};
+
+export const downloadDrawingsFunctionDeclaration: FunctionDeclaration = {
+    name: 'download_drawings',
+    parameters: {
+        type: Type.OBJECT,
+        description: 'Download all generated visuals as a ZIP bundle.'
+    }
+};
+
+export const generateVideoFunctionDeclaration: FunctionDeclaration = {
+    name: 'generate_video',
+    parameters: {
+        type: Type.OBJECT,
+        description: 'Synthesize a video animation.',
+        properties: { prompt: { type: Type.STRING }, useUploadedImage: { type: Type.BOOLEAN } },
+        required: ['prompt']
+    }
+};
+
+export const switchAppViewFunctionDeclaration: FunctionDeclaration = {
+    name: 'switch_app_view',
+    parameters: {
+        type: Type.OBJECT,
+        description: 'Navigate to a different application view.',
+        properties: { view: { type: Type.STRING, enum: ['app', 'admin', 'suite', 'pricing', 'account'] } },
+        required: ['view']
+    }
+};
+
+export const toggleDocumentationFunctionDeclaration: FunctionDeclaration = {
+    name: 'toggle_documentation',
+    parameters: {
+        type: Type.OBJECT,
+        description: 'Open or close documentation modals.',
+        properties: { doc_type: { type: Type.STRING, enum: ['manual', 'technical'] }, open: { type: Type.BOOLEAN } },
+        required: ['doc_type']
+    }
+};
+
+export const engageAnalysisFunctionDeclaration: FunctionDeclaration = {
+    name: 'engage_analysis',
+    parameters: {
+        type: Type.OBJECT,
+        description: 'Deprecated alias for trigger_full_analysis.',
+        properties: { useFactionId: { type: Type.STRING } }
+    }
+};
+
+export const analyze_fileFunctionDeclaration: FunctionDeclaration = {
+    name: 'analyze_file',
+    parameters: {
+        type: Type.OBJECT,
+        description: 'Initiate a specialized file intake workflow.',
+        properties: { fileName: { type: Type.STRING }, workflow: { type: Type.STRING, enum: ['TECHNICAL_INTAKE', 'IMAGE_SYNTHESIS', 'VIDEO_INFLOW'] } },
+        required: ['fileName', 'workflow']
+    }
+};
 
 const fullAnalysisSchema = {
     type: Type.OBJECT,
@@ -113,12 +373,12 @@ const fullAnalysisSchema = {
                             properties: {
                                 failure_mode: { type: Type.STRING },
                                 potential_effects: { type: Type.STRING },
-                                severity: { type: Type.INTEGER, description: 'Severity score 1-10' },
+                                severity: { type: Type.INTEGER },
                                 potential_causes: { type: Type.STRING },
-                                occurrence: { type: Type.INTEGER, description: 'Occurrence probability 1-10' },
+                                occurrence: { type: Type.INTEGER },
                                 current_controls: { type: Type.STRING },
-                                detection: { type: Type.INTEGER, description: 'Ease of detection 1-10' },
-                                rpn: { type: Type.INTEGER, description: 'Risk Priority Number (Sev * Occ * Det)' },
+                                detection: { type: Type.INTEGER },
+                                rpn: { type: Type.INTEGER },
                                 recommended_action: { type: Type.STRING }
                             },
                             required: ["failure_mode", "potential_effects", "severity", "potential_causes", "occurrence", "current_controls", "detection", "rpn", "recommended_action"]
@@ -287,16 +547,18 @@ const fullAnalysisSchema = {
                 required: ["eco_id", "change_title", "description", "reason_for_change", "impact_analysis"]
             }
         },
-        safety_audit: {
+        suggested_tasks: {
             type: Type.ARRAY,
             items: {
                 type: Type.OBJECT,
                 properties: {
-                    protocol: { type: Type.STRING },
-                    status: { type: Type.STRING, enum: ['Pass', 'Warn', 'Fail'] },
-                    message: { type: Type.STRING }
+                    id: { type: Type.STRING },
+                    title: { type: Type.STRING },
+                    description: { type: Type.STRING },
+                    status: { type: Type.STRING, enum: ['TODO', 'IN_PROGRESS', 'DONE'] },
+                    priority: { type: Type.STRING, enum: ['LOW', 'MEDIUM', 'HIGH'] }
                 },
-                required: ["protocol", "status", "message"]
+                required: ["id", "title", "status", "priority"]
             }
         }
     },
@@ -310,126 +572,19 @@ const fullAnalysisSchema = {
     ]
 };
 
-const extractionSchema = {
-    type: Type.OBJECT,
-    properties: {
-        name: { type: Type.STRING },
-        description: { type: Type.STRING },
-        tags: { type: Type.ARRAY, items: { type: Type.STRING } },
-        initialPrompt: { type: Type.STRING }
-    },
-    required: ["name", "description", "tags", "initialPrompt"]
-};
-
-const patentSchema = {
-    type: Type.OBJECT,
-    properties: {
-        title: { type: Type.STRING },
-        abstract: { type: Type.STRING },
-        background: { type: Type.STRING },
-        summary: { type: Type.STRING },
-        independent_claims: { 
-            type: Type.ARRAY, 
-            items: {
-                type: Type.OBJECT,
-                properties: {
-                    text: { type: Type.STRING, description: 'Formal patent claim: Preamble (category), Transition (comprising), Body (limitations/wherein clauses).' },
-                    rationale: { type: Type.STRING, description: 'Scientific/Technical rationale for non-obviousness/synergy.' }
-                },
-                required: ["text", "rationale"]
-            }
-        },
-        dependent_claims: { type: Type.ARRAY, items: { type: Type.STRING } },
-        novelty_points: { 
-            type: Type.ARRAY, 
-            items: {
-                type: Type.OBJECT,
-                properties: {
-                    text: { type: Type.STRING, description: 'Specific technical differentiator from prior art.' },
-                    rationale: { type: Type.STRING, description: 'Brief technical rationale explaining why this is novel.' }
-                },
-                required: ["text", "rationale"]
-            },
-            description: "3-5 specific technical aspects that differentiate this invention from existing prior art."
-        },
-        inventive_step_rationale: { type: Type.STRING, description: 'High-level synthesis of non-obviousness.' },
-        owner_of_record: { type: Type.STRING, description: 'Determined from user metadata provided in prompt.' },
-        protection_type: { type: Type.STRING, enum: ['PATENT', 'COPYRIGHT', 'TRADEMARK'] },
-        legal_hash: { type: Type.STRING, description: 'Simulated blockchain/encrypted ledger fingerprint.' }
-    },
-    required: ["title", "abstract", "background", "summary", "independent_claims", "dependent_claims", "novelty_points", "inventive_step_rationale", "owner_of_record", "protection_type", "legal_hash"]
-};
-
-const foundryCadSchema = {
-  type: Type.OBJECT,
-  properties: {
-    plugin: { type: Type.STRING },
-    action: { type: Type.STRING },
-    metadata: {
-      type: Type.OBJECT,
-      properties: {
-        project_id: { type: Type.STRING },
-        material: { type: Type.STRING },
-        geometric_hash_required: { type: Type.BOOLEAN }
-      },
-      required: ["project_id", "material", "geometric_hash_required"]
-    },
-    scad_params: {
-      type: Type.OBJECT,
-      properties: {
-        base_dimensions: { type: Type.ARRAY, items: { type: Type.NUMBER }, minItems: 3, maxItems: 3 },
-        parameters: { type: Type.OBJECT, description: "Key-value pairs for parametric CAD controls" },
-        raw_scad: { type: Type.STRING, description: "Deterministic OpenSCAD code" }
-      },
-      required: ["base_dimensions", "parameters", "raw_scad"]
-    },
-    suggested_fix: { type: Type.STRING, nullable: true }
-  },
-  required: ["plugin", "action", "metadata", "scad_params"]
-};
-
-export const parseApiError = (error: any): string => {
-    if (typeof error === 'string') {
-        try {
-            const parsed = JSON.parse(error);
-            if (parsed?.error?.message) return parsed.error.message;
-        } catch (e) {
-            return error;
-        }
-    }
-    return error?.message || "An unexpected error occurred.";
-};
-
-const parseMarkdownJson = (text: string) => {
-    const jsonMatch = text.match(/```json\n?([\s\S]*?)\n?```/) || text.match(/```\n?([\s\S]*?)\n?```/);
-    const cleanText = jsonMatch ? jsonMatch[1].trim() : text.trim();
-    try {
-        return JSON.parse(cleanText);
-    } catch (e) {
-        throw new Error("Failed to parse AI output as JSON.");
-    }
-};
-
 export const generateAnalysis = async (
     projectName: string, 
     prompt: string, 
-    faction: Faction, 
+    faction: Faction | null, 
     files: Part[] | null,
-    knowledgeBase: IngestedDocument[] = []
+    knowledgeBase: IngestedDocument[] = [],
+    persona?: Persona
 ): Promise<AnalysisResult> => {
     const ai = getAiClient();
     
-    const branchContext = knowledgeBase.length > 0 ? knowledgeBase[0].branch : EngineeringBranch.GENERAL;
-
-    const technicalContext = await getTopKRelevantDocs(prompt, knowledgeBase, 4);
-    
-    const retrievalBlock = technicalContext ? `
-### PROJECT KNOWLEDGE BASE (RAG ENABLED)
-The following technical snippets were retrieved from our internal library as highly relevant to this specific design task:
-${technicalContext}
-` : '';
-
-    const safetyInstructions = getBranchSafetyInstructions(branchContext);
+    const contextStr = persona 
+        ? `PERSONA INCEPTION: ${persona.systemInstruction}. Your analysis should reflect the technical bias: ${persona.bias}`
+        : `LOGICAL LENS: Analyze through the prism of ${faction?.name || 'Agnostic Engineering'}. Philosophy: ${faction?.philosophy || 'General R&D'}. Bias: ${JSON.stringify(faction?.bias || {})}`;
 
     const response = await ai.models.generateContent({
         model: 'gemini-3-pro-preview',
@@ -438,17 +593,13 @@ ${technicalContext}
                 role: 'user',
                 parts: [
                     ...(files || []),
-                    { text: `Analyze the engineering design "${projectName}" through the prism of the "${faction.name}" philosophy. 
-                      Philosophical Bias: ${faction.philosophy}.
+                    { text: `Analyze the engineering design "${projectName}". 
                       
-                      Project Branch: ${branchContext}
-                      ${safetyInstructions}
-
-                      ${retrievalBlock}
-
+                      ${contextStr}
+                      
                       Detailed User Requirements: ${prompt}
                       
-                      The analysis must be technically rigorous and strictly conform to the provided JSON schema. Ensure the 'safety_audit' array is populated based on the branch safety protocols provided.` }
+                      The analysis must be technically rigorous and strictly conform to the provided JSON schema. Also, suggest an initial list of project tasks.` }
                 ]
             }
         ],
@@ -460,117 +611,25 @@ ${technicalContext}
         }
     });
 
-    const result = JSON.parse(response.text!);
-    result.branch = branchContext;
-    return result;
-};
-
-export const generatePatentDraft = async (
-    result: AnalysisResult, 
-    user: User, 
-    protectionType: ProtectionTypePref, 
-    jurisdiction: LegalJurisdiction, 
-    designHash: string, 
-    knowledgeBase: IngestedDocument[] = []
-): Promise<PatentApplication> => {
-    const ai = getAiClient();
-    const branchContext = result.branch || EngineeringBranch.GENERAL;
-    const attributionOwner = user.use_company_attribution ? (user.company_name || user.name) : (user.legal_identity || user.name);
-
-    const patentContext = await getTopKRelevantDocs(`Novelty and claims for ${result.product_name}`, knowledgeBase, 6);
-    
-    const retrievalBlock = patentContext ? `
-### PRIOR ART & STANDARDS REFERENCE (PhD LEVEL RAG)
-Use these documents to verify novelty and ensure standard compliance:
-${patentContext}
-` : '';
-
-    const response = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview',
-        contents: `Act as a Specialist Patent Attorney and a PhD Research Lead in ${branchContext} Engineering.
-          
-          Generate a formal IP specification for:
-          Product: ${result.product_name}
-          Executive Summary: ${result.executive_summary}
-          Design Fingerprint: ${designHash}
-          Target Jurisdiction: ${jurisdiction}
-          
-          Owner of Record: ${attributionOwner}
-          Protection Type: ${protectionType}
-          
-          ${retrievalBlock}
-          
-          ### JURISDICTIONAL CONSTRAINTS
-          - If ${jurisdiction} is USPTO: Focus on utility, non-obviousness, and enablement per 35 U.S.C. 101/102/103.
-          - If ${jurisdiction} is EPO: Focus on 'Technical Character' and the problem-solution approach.
-          - If ${jurisdiction} is WIPO: Ensure PCT-compliant formalisms.
-
-          Draft strictly based on the provided JSON schema. Identify 3-5 specific technical aspects that differentiate this invention from existing prior art and provide brief, high-level rationales for each.`,
-        config: {
-            responseMimeType: "application/json",
-            responseSchema: patentSchema,
-            maxOutputTokens: 10000,
-            thinkingConfig: { thinkingBudget: 4000 }
-        }
-    });
-    const parsed = JSON.parse(response.text!);
-    parsed.jurisdiction = jurisdiction;
-    return parsed;
-};
-
-export const generateFoundryCad = async (
-    projectName: string,
-    prompt: string,
-    material: string,
-    projectId: string
-): Promise<FoundryCadResult> => {
-    const ai = getAiClient();
-    const response = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview',
-        contents: `You are the Sovereign Foundry Architect. Translate requirements into a CADAM JSON payload.
-        
-        Project: ${projectName}
-        Material: ${material}
-        User Intent: ${prompt}
-        
-        Rules:
-        - Output strictly JSON for the 'foundry-core' plugin.
-        - Plugin action must be 'AUTO_GENERATE'.
-        - 'raw_scad' must be valid deterministic OpenSCAD code.
-        - Ensure base dimensions are derived from physical requirements.
-        - Calibrate parameters like 'wall_thickness' and 'lattice_density' for ${material}.`,
-        config: {
-            responseMimeType: "application/json",
-            responseSchema: foundryCadSchema,
-            maxOutputTokens: 5000,
-            thinkingConfig: { thinkingBudget: 2000 }
-        }
-    });
     return JSON.parse(response.text!);
 };
 
-export const generateVideo = async (prompt: string, imageFile?: File, aspectRatio: '16:9' | '9:16' = '16:9'): Promise<string> => {
+export const generateVideo = async (prompt: string, imageFile?: File, aspectRatio?: '16:9' | '9:16'): Promise<string> => {
     const ai = getAiClient();
-    
-    let imagePart;
+    let image;
     if (imageFile) {
-        const base64 = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.readAsDataURL(imageFile);
-            reader.onload = () => resolve((reader.result as string).split(',')[1]);
-            reader.onerror = reject;
-        });
-        imagePart = { imageBytes: base64, mimeType: imageFile.type };
+        const base64 = await fileToBase64(imageFile);
+        image = { imageBytes: base64, mimeType: imageFile.type };
     }
 
     let operation = await ai.models.generateVideos({
         model: 'veo-3.1-fast-generate-preview',
         prompt,
-        image: imagePart,
+        image,
         config: {
             numberOfVideos: 1,
             resolution: '720p',
-            aspectRatio
+            aspectRatio: aspectRatio || '16:9'
         }
     });
 
@@ -585,116 +644,146 @@ export const generateVideo = async (prompt: string, imageFile?: File, aspectRati
     return URL.createObjectURL(blob);
 };
 
-export const generateTechnicalDrawingImage = async (analysisResult: AnalysisResult, specificPrompt: string, fileUrls?: string[]): Promise<string> => {
+export const generateTechnicalDrawingImage = async (result: AnalysisResult, prompt: string, fileUrls?: string[]): Promise<string> => {
     const ai = getAiClient();
-    const prompt = `Generate a technical drawing for: ${analysisResult.product_name}. View: ${specificPrompt}.`;
-
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash-image',
-        contents: { parts: [{ text: prompt }] },
+        contents: `Generate a professional 2D technical drawing for: ${prompt}. Context: ${result.executive_summary}. Include dimensions and engineering notations.`,
         config: {
             imageConfig: { aspectRatio: "16:9" }
         }
     });
-
-    for (const part of response.candidates![0].content!.parts!) {
+    for (const part of response.candidates?.[0]?.content?.parts || []) {
         if (part.inlineData) {
-            return `data:image/png;base64,${part.inlineData.data}`;
+            return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
         }
     }
-    throw new Error("No image generated.");
+    throw new Error("Technical drawing synthesis failed.");
 };
 
-export const generateDrawingFromImage = async (imagePart: Part, specificPrompt: string): Promise<string> => {
+export const generateDrawingFromImage = async (imagePart: Part, prompt: string): Promise<string> => {
     const ai = getAiClient();
-    const prompt = `Convert image to technical drawing: ${specificPrompt}.`;
-
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash-image',
-        contents: { parts: [imagePart, { text: prompt }] },
+        contents: { parts: [imagePart, { text: `Convert this input image into a standardized engineering technical drawing. Instruction: ${prompt}` }] },
+        config: {
+            imageConfig: { aspectRatio: "16:9" }
+        }
     });
-
-    for (const part of response.candidates![0].content!.parts!) {
+    for (const part of response.candidates?.[0]?.content?.parts || []) {
         if (part.inlineData) {
-            return `data:image/png;base64,${part.inlineData.data}`;
+            return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
         }
     }
-    throw new Error("No image generated.");
+    throw new Error("Reference-based drawing synthesis failed.");
 };
 
-export const identifyImageFromWeb = async (imagePart: Part): Promise<{ summary: string, sources: any[] }> => {
-    const ai = getAiClient();
-    const response = await ai.models.generateContent({
-        model: 'gemini-3-pro-image-preview', // Image task + search requires pro-image-preview
-        contents: { parts: [imagePart, { text: "Identify this product and search the web." }] },
-        config: {
-            tools: [{ googleSearch: {} }],
-        }
-    });
-    return {
-        summary: response.text || "",
-        sources: response.candidates?.[0]?.groundingMetadata?.groundingChunks || []
-    };
-};
-
-export const extractProjectDetailsFromImage = async (imagePart: Part): Promise<ExtractedProjectDetails> => {
+export const generateSummary = async (result: AnalysisResult): Promise<string> => {
     const ai = getAiClient();
     const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: { parts: [imagePart, { text: "Extract project details from image." }] },
+        contents: `Summarize the following engineering analysis results for a dashboard view: ${JSON.stringify(result)}`,
+    });
+    return response.text || "Summary generation returned no data.";
+};
+
+export const generateCadData = async (drawings: GeneratedDrawing[], result: AnalysisResult): Promise<CadData> => {
+    const ai = getAiClient();
+    const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: `Based on the following analysis, synthesize a 3D assembly structure using primitives (cube, cylinder, sphere). 
+        Report: ${result.executive_summary}. 
+        Output in JSON matching the CadData schema.`,
         config: {
-            responseMimeType: "application/json",
-            responseSchema: extractionSchema
+            responseMimeType: 'application/json',
+            responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                    assemblyName: { type: Type.STRING },
+                    units: { type: Type.STRING, enum: ['mm', 'inches'] },
+                    components: {
+                        type: Type.ARRAY,
+                        items: {
+                            type: Type.OBJECT,
+                            properties: {
+                                name: { type: Type.STRING },
+                                shape: { type: Type.STRING, enum: ['cube', 'cylinder', 'sphere', 'complex'] },
+                                dimensions: { type: Type.OBJECT, properties: { x: { type: Type.NUMBER }, y: { type: Type.NUMBER }, z: { type: Type.NUMBER } }, required: ['x', 'y', 'z'] },
+                                position: { type: Type.OBJECT, properties: { x: { type: Type.NUMBER }, y: { type: Type.NUMBER }, z: { type: Type.NUMBER } }, required: ['x', 'y', 'z'] }
+                            },
+                            required: ['name', 'shape', 'dimensions', 'position']
+                        }
+                    }
+                },
+                required: ['assemblyName', 'units', 'components']
+            }
         }
     });
     return JSON.parse(response.text!);
 };
 
-export const extractProjectDetailsFromPdf = async (pdfPart: Part): Promise<ExtractedProjectDetails> => {
-    const ai = getAiClient();
-    const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: { parts: [pdfPart, { text: "Extract project details from PDF." }] },
-        config: {
-            responseMimeType: "application/json",
-            responseSchema: extractionSchema
-        }
-    });
-    return JSON.parse(response.text!);
-};
-
-export const extractProjectDetailsFromVideo = async (videoPart: Part): Promise<ExtractedProjectDetails> => {
+export const generateFoundryCad = async (productName: string, prompt: string, material: string, version: string, result: AnalysisResult): Promise<FoundryCadResult> => {
     const ai = getAiClient();
     const response = await ai.models.generateContent({
         model: 'gemini-3-pro-preview',
-        contents: { parts: [videoPart, { text: "Extract project details from video." }] },
+        contents: `Synthesize parametric CAD parameters and SCAD definitions for ${productName} using ${material}. Context: ${prompt}.`,
         config: {
-            responseMimeType: "application/json",
-            responseSchema: extractionSchema
+            responseMimeType: 'application/json',
+            responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                    plugin: { type: Type.STRING },
+                    action: { type: Type.STRING },
+                    metadata: {
+                        type: Type.OBJECT,
+                        properties: { project_id: { type: Type.STRING }, material: { type: Type.STRING }, geometric_hash_required: { type: Type.BOOLEAN } },
+                        required: ["project_id", "material", "geometric_hash_required"]
+                    },
+                    scad_params: {
+                        type: Type.OBJECT,
+                        properties: {
+                            base_dimensions: { type: Type.ARRAY, items: { type: Type.NUMBER } },
+                            parameters: { type: Type.OBJECT },
+                            raw_scad: { type: Type.STRING }
+                        },
+                        required: ["base_dimensions", "parameters", "raw_scad"]
+                    },
+                    optimizations: {
+                        type: Type.ARRAY,
+                        items: { type: Type.OBJECT, properties: { parameter: { type: Type.STRING }, recommendedValue: { type: Type.NUMBER }, rationale: { type: Type.STRING } }, required: ["parameter", "recommendedValue", "rationale"] }
+                    }
+                },
+                required: ["plugin", "action", "metadata", "scad_params"]
+            }
         }
     });
     return JSON.parse(response.text!);
 };
 
-export const extractProjectDetailsFromVideoUrl = async (url: string): Promise<ExtractedProjectDetails> => {
+export const generateInspirationalImage = async (prompt: string, aspectRatio: string = "16:9"): Promise<string> => {
     const ai = getAiClient();
     const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: `Analyze video content at ${url} and output JSON with keys: name, description, tags, initialPrompt.`,
+        model: 'gemini-3-pro-image-preview',
+        contents: prompt,
         config: {
-            tools: [{ googleSearch: {} }],
+            imageConfig: { aspectRatio: aspectRatio as any }
         }
     });
-    return parseMarkdownJson(response.text || "{}");
+    for (const part of response.candidates?.[0]?.content?.parts || []) {
+        if (part.inlineData) {
+            return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+        }
+    }
+    throw new Error("High-fidelity concept synthesis failed.");
 };
 
 export const getSetupSuggestions = async (prompt: string): Promise<SetupSuggestions> => {
     const ai = getAiClient();
     const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: `Suggest engineering philosophy and tags for: ${prompt}`,
+        contents: `Analyze this project abstract and suggest the best engineering lens and initial tags: ${prompt}`,
         config: {
-            responseMimeType: "application/json",
+            responseMimeType: 'application/json',
             responseSchema: {
                 type: Type.OBJECT,
                 properties: {
@@ -708,109 +797,30 @@ export const getSetupSuggestions = async (prompt: string): Promise<SetupSuggesti
     return JSON.parse(response.text!);
 };
 
-export const generateSummary = async (result: AnalysisResult): Promise<string> => {
-    const ai = getAiClient();
-    const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: `Summarize: ${JSON.stringify(result)}`,
-    });
-    return response.text || "";
-};
-
-export const generateCadData = async (drawings: GeneratedDrawing[], result: AnalysisResult): Promise<CadData> => {
-    const ai = getAiClient();
-    const response = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview',
-        contents: `Generate 3D CAD data for "${result.product_name}".`,
-        config: {
-            responseMimeType: "application/json",
-            responseSchema: {
-                type: Type.OBJECT,
-                properties: {
-                    assemblyName: { type: Type.STRING },
-                    units: { type: Type.STRING, enum: ['mm', 'inches'] },
-                    components: {
-                        type: Type.ARRAY,
-                        items: {
-                            type: Type.OBJECT,
-                            properties: {
-                                name: { type: Type.STRING },
-                                shape: { type: Type.STRING, enum: ['cube', 'cylinder', 'sphere', 'complex'] },
-                                dimensions: {
-                                    type: Type.OBJECT,
-                                    properties: { x: { type: Type.NUMBER }, y: { type: Type.NUMBER }, z: { type: Type.NUMBER } },
-                                    required: ["x", "y", "z"]
-                                },
-                                position: {
-                                    type: Type.OBJECT,
-                                    properties: { x: { type: Type.NUMBER }, y: { type: Type.NUMBER }, z: { type: Type.NUMBER } },
-                                    required: ["x", "y", "z"]
-                                }
-                            },
-                            required: ["name", "shape", "dimensions", "position"]
-                        }
-                    }
-                },
-                required: ["assemblyName", "units", "components"]
-            }
-        }
-    });
-    return JSON.parse(response.text!);
-};
-
-export const compareCadData = async (base: CadData, updated: CadData): Promise<CadComparisonResult> => {
-    const ai = getAiClient();
-    const response = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview',
-        contents: `Compare CAD data: ${JSON.stringify(base)} vs ${JSON.stringify(updated)}`,
-        config: {
-            responseMimeType: "application/json",
-            responseSchema: {
-                type: Type.OBJECT,
-                properties: {
-                    additions: { type: Type.ARRAY, items: { type: Type.STRING } },
-                    deletions: { type: Type.ARRAY, items: { type: Type.STRING } },
-                    modifications: {
-                        type: Type.ARRAY,
-                        items: {
-                            type: Type.OBJECT,
-                            properties: {
-                                name: { type: Type.STRING },
-                                changes: { type: Type.ARRAY, items: { type: Type.STRING } }
-                            },
-                            required: ["name", "changes"]
-                        }
-                    }
-                },
-                required: ["additions", "deletions", "modifications"]
-            }
-        }
-    });
-    return JSON.parse(response.text!);
-};
-
-export const generateSpeech = async (text: string, voice: string): Promise<string> => {
+export const generateSpeech = async (text: string, voiceName: string = 'Kore'): Promise<string> => {
     const ai = getAiClient();
     const response = await ai.models.generateContent({
         model: "gemini-2.5-flash-preview-tts",
         contents: [{ parts: [{ text }] }],
         config: {
             responseModalities: [Modality.AUDIO],
-            speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } },
+            speechConfig: {
+                voiceConfig: { prebuiltVoiceConfig: { voiceName } },
+            },
         },
     });
     const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    if (!base64Audio) throw new Error("No audio generated.");
+    if (!base64Audio) throw new Error("Audio synthesis failed.");
     return base64Audio;
 };
 
-export const generateSimulationResult = async (type: SimulationType, componentName: string, productContext: string): Promise<{ summary: string, keyFindings: string[], imagePrompt: string }> => {
+export const generateSimulationResult = async (type: SimulationType, componentName: string, productContext: string) => {
     const ai = getAiClient();
     const response = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview',
-        contents: `Run simulated ${type} on "${componentName}".`,
+        model: 'gemini-3-flash-preview',
+        contents: `Perform theoretical ${type} simulation for "${componentName}" in context of: ${productContext}.`,
         config: {
-            responseMimeType: "application/json",
+            responseMimeType: 'application/json',
             responseSchema: {
                 type: Type.OBJECT,
                 properties: {
@@ -822,36 +832,69 @@ export const generateSimulationResult = async (type: SimulationType, componentNa
             }
         }
     });
-    // Fixed: Removed undefined 'height' wrapper; JSON.parse expects the response text string directly.
     return JSON.parse(response.text!);
 };
 
-export const generateFabricationPlan = async (processType: ManufacturingProcessType, material: string, productContext: string): Promise<FabricationPlan> => {
+export const identifyImageFromWeb = async (imagePart: Part): Promise<{ summary: string, sources: any[] }> => {
     const ai = getAiClient();
     const response = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview',
-        contents: `Generate fabrication plan for ${processType} using ${material}.`,
+        model: 'gemini-3-flash-preview',
+        contents: { parts: [imagePart, { text: "Identify this engineering component and find its technical specifications from the web." }] },
         config: {
-            responseMimeType: "application/json",
+            tools: [{ googleSearch: {} }]
+        }
+    });
+    return {
+        summary: response.text || "Identification summary unavailable.",
+        sources: response.candidates?.[0]?.groundingMetadata?.groundingChunks || []
+    };
+};
+
+export const compareCadData = async (base: CadData, current: CadData): Promise<CadComparisonResult> => {
+    const ai = getAiClient();
+    const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: `Compare the base CAD structure with the new version and identify geometric diffs.
+        Base: ${JSON.stringify(base)}
+        New: ${JSON.stringify(current)}`,
+        config: {
+            responseMimeType: 'application/json',
             responseSchema: {
                 type: Type.OBJECT,
                 properties: {
-                    dfmChecks: {
+                    additions: { type: Type.ARRAY, items: { type: Type.STRING } },
+                    deletions: { type: Type.ARRAY, items: { type: Type.STRING } },
+                    modifications: {
                         type: Type.ARRAY,
-                        items: {
-                            type: Type.OBJECT,
-                            properties: { component: { type: Type.STRING }, issue: { type: Type.STRING }, recommendation: { type: Type.STRING } },
-                            required: ["component", "issue", "recommendation"]
-                        }
-                    },
-                    tolerancingNotes: { type: Type.ARRAY, items: { type: Type.STRING } },
-                    processSpecificOutput: {
-                        type: Type.OBJECT,
-                        properties: { title: { type: Type.STRING }, data: { type: Type.STRING } },
-                        required: ["title", "data"]
+                        items: { type: Type.OBJECT, properties: { name: { type: Type.STRING }, changes: { type: Type.ARRAY, items: { type: Type.STRING } } }, required: ["name", "changes"] }
                     }
                 },
-                required: ["dfmChecks", "tolerancingNotes", "processSpecificOutput"]
+                required: ["additions", "deletions", "modifications"]
+            }
+        }
+    });
+    return JSON.parse(response.text!);
+};
+
+export const generateFabricationPlan = async (process: ManufacturingProcessType, material: string, productContext: string, prioritizedChecks: string[] = []): Promise<FabricationPlan> => {
+    const ai = getAiClient();
+    const checksContext = prioritizedChecks.length > 0 ? `Prioritize the following DFM checks: ${prioritizedChecks.join(', ')}.` : '';
+    
+    const response = await ai.models.generateContent({
+        model: 'gemini-3-pro-preview',
+        contents: `Generate a fabrication plan for ${process} using ${material}. Context: ${productContext}. ${checksContext}
+        For the DFM checks, explicitly highlight if the prioritized checks passed or failed.`,
+        config: {
+            responseMimeType: 'application/json',
+            responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                    dfmChecks: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { component: { type: Type.STRING }, issue: { type: Type.STRING }, recommendation: { type: Type.STRING }, severity: { type: Type.STRING, enum: ['Critical', 'Major', 'Minor'] } }, required: ["component", "issue", "recommendation", "severity"] } },
+                    tolerancingNotes: { type: Type.ARRAY, items: { type: Type.STRING } },
+                    processSpecificOutput: { type: Type.OBJECT, properties: { title: { type: Type.STRING }, data: { type: Type.STRING } }, required: ["title", "data"] },
+                    criticalChecksForProcess: { type: Type.ARRAY, items: { type: Type.STRING }, description: "List of DFM checks that are most critical for this specific process/material combination." }
+                },
+                required: ["dfmChecks", "tolerancingNotes", "processSpecificOutput", "criticalChecksForProcess"]
             }
         }
     });
@@ -862,9 +905,9 @@ export const summarizeGCode = async (gcode: string): Promise<GCodeSummary> => {
     const ai = getAiClient();
     const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: `Summarize G-Code: ${gcode}`,
+        contents: `Analyze the toolpaths in this G-Code and provide a technical summary of operations: ${gcode.substring(0, 5000)}`,
         config: {
-            responseMimeType: "application/json",
+            responseMimeType: 'application/json',
             responseSchema: {
                 type: Type.OBJECT,
                 properties: {
@@ -882,103 +925,52 @@ export const exploreSuggestion = async (suggestionText: string, productContext: 
     const ai = getAiClient();
     const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: `Explain: "${suggestionText}".`,
+        contents: `Provide a detailed engineering explanation for this suggestion and a prompt to visualize it. Suggestion: ${suggestionText}. Context: ${productContext}`,
         config: {
-            responseMimeType: "application/json",
+            responseMimeType: 'application/json',
             responseSchema: {
                 type: Type.OBJECT,
-                properties: {
-                    explanation: { type: Type.STRING },
-                    imagePrompt: { type: Type.STRING }
-                },
+                properties: { explanation: { type: Type.STRING }, imagePrompt: { type: Type.STRING } },
                 required: ["explanation", "imagePrompt"]
             }
         }
     });
-    const { explanation, imagePrompt } = JSON.parse(response.text!);
-    const imageUrl = await generateInspirationalImage(imagePrompt, '16:9');
-    return { explanation, imageUrl };
+    const data = JSON.parse(response.text!);
+    const imageUrl = await generateInspirationalImage(data.imagePrompt, "16:9");
+    return { explanation: data.explanation, imageUrl };
 };
 
 export const sourceBomItemWithValidation = async (item: BillOfMaterialsItem): Promise<ProcurementInfo[]> => {
     const ai = getAiClient();
-    
     const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: `Perform a procurement search for the following industrial part: "${item.name}" (Description: ${item.description}). Focus on verified suppliers and check for Q1 2024 pricing or newer.`,
-        config: { tools: [{ googleSearch: {} }] }
-    });
-    
-    const rawText = response.text || "[]";
-    const potentialJson = rawText.includes("[") ? rawText.substring(rawText.indexOf("[")) : "[]";
-    let results: ProcurementInfo[] = [];
-    try {
-        results = JSON.parse(potentialJson);
-    } catch(e) {
-        const formatter = await ai.models.generateContent({
-            model: 'gemini-3-flash-preview',
-            contents: `Format the following raw search data for "${item.name}" into a JSON array matching procurement schema: ${rawText}`,
-            config: {
-                responseMimeType: 'application/json',
-                responseSchema: {
-                    type: Type.ARRAY,
-                    items: {
-                        type: Type.OBJECT,
-                        properties: {
-                            supplier: { type: Type.STRING },
-                            url: { type: Type.STRING },
-                            estimatedCost: { type: Type.STRING },
-                            leadTime: { type: Type.STRING }
-                        }
-                    }
-                }
-            }
-        });
-        results = JSON.parse(formatter.text!);
-    }
-    
-    const validationResponse = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: `Critically review these procurement options for part "${item.name}": ${JSON.stringify(results)}. 
-                  1. Flag suppliers that lack industrial credibility.
-                  2. Assess if pricing is realistic for current market conditions.
-                  3. Assign a verification boolean and a confidence score (0.0 to 1.0).
-                  Output the verified procurement data in JSON.`,
+        contents: `Find reputable suppliers for engineering component: ${item.name} (${item.material}). Include cost and lead time.`,
         config: {
-            responseMimeType: "application/json",
+            tools: [{ googleSearch: {} }],
+            responseMimeType: 'application/json',
             responseSchema: {
                 type: Type.ARRAY,
                 items: {
                     type: Type.OBJECT,
-                    properties: {
-                        supplier: { type: Type.STRING },
-                        url: { type: Type.STRING },
-                        estimatedCost: { type: Type.STRING },
-                        leadTime: { type: Type.STRING },
-                        verified: { type: Type.BOOLEAN },
-                        confidence: { type: Type.NUMBER }
-                    }
+                    properties: { supplier: { type: Type.STRING }, url: { type: Type.STRING }, estimatedCost: { type: Type.STRING }, leadTime: { type: Type.STRING }, verified: { type: Type.BOOLEAN }, confidence: { type: Type.NUMBER } },
+                    required: ["supplier", "url", "estimatedCost", "leadTime"]
                 }
             }
         }
     });
-    
-    return JSON.parse(validationResponse.text!);
+    return JSON.parse(response.text!);
 };
 
 export const validatePrompt = async (prompt: string): Promise<PromptValidationResult> => {
     const ai = getAiClient();
     const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: `Validate: "${prompt}".`,
+        contents: `Evaluate the technical clarity of this engineering prompt: ${prompt}`,
         config: {
-            responseMimeType: "application/json",
+            responseMimeType: 'application/json',
             responseSchema: {
                 type: Type.OBJECT,
-                properties: {
-                    isClear: { type: Type.BOOLEAN },
-                    suggestion: { type: Type.STRING, nullable: true }
-                },
+                properties: { isClear: { type: Type.BOOLEAN }, suggestion: { type: Type.STRING } },
                 required: ["isClear"]
             }
         }
@@ -986,27 +978,20 @@ export const validatePrompt = async (prompt: string): Promise<PromptValidationRe
     return JSON.parse(response.text!);
 };
 
-export const recalculateCost = async (bom: BillOfMaterialsItem[], mfgContext: ManufacturingProcess[], matContext: string): Promise<PreliminaryCostEstimate> => {
+export const recalculateCost = async (bom: BillOfMaterialsItem[], manufacturing: ManufacturingProcess[], materials: string): Promise<PreliminaryCostEstimate> => {
     const ai = getAiClient();
     const response = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview',
-        contents: `Recalculate cost for BOM: ${JSON.stringify(bom)}.`,
+        model: 'gemini-3-flash-preview',
+        contents: `Recalculate preliminary cost estimate based on updated BOM and manufacturing context: ${JSON.stringify(bom)}.`,
         config: {
-            responseMimeType: "application/json",
+            responseMimeType: 'application/json',
             responseSchema: {
                 type: Type.OBJECT,
                 properties: {
                     total_estimate_range: { type: Type.STRING },
                     confidence: { type: Type.STRING, enum: ['Low', 'Medium', 'High'] },
                     assumptions: { type: Type.ARRAY, items: { type: Type.STRING } },
-                    breakdown: {
-                        type: Type.ARRAY,
-                        items: {
-                            type: Type.OBJECT,
-                            properties: { item: { type: Type.STRING }, cost_estimate: { type: Type.STRING }, rationale: { type: Type.STRING } },
-                            required: ["item", "cost_estimate", "rationale"]
-                        }
-                    }
+                    breakdown: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { item: { type: Type.STRING }, cost_estimate: { type: Type.STRING }, rationale: { type: Type.STRING } }, required: ["item", "cost_estimate", "rationale"] } }
                 },
                 required: ["total_estimate_range", "confidence", "assumptions", "breakdown"]
             }
@@ -1019,19 +1004,14 @@ export const getNextStepSuggestions = async (context: string): Promise<NextStepS
     const ai = getAiClient();
     const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: `Suggest 3 next steps for: ${context}.`,
+        contents: `Analyze current project state and suggest 3 high-impact next steps: ${context}`,
         config: {
-            responseMimeType: "application/json",
+            responseMimeType: 'application/json',
             responseSchema: {
                 type: Type.ARRAY,
                 items: {
                     type: Type.OBJECT,
-                    properties: {
-                        title: { type: Type.STRING },
-                        rationale: { type: Type.STRING },
-                        actionId: { type: Type.STRING },
-                        icon: { type: Type.STRING, enum: ['beaker', 'cube', 'bolt', 'ruler', 'chart', 'dollar', 'conversation', 'play'] }
-                    },
+                    properties: { title: { type: Type.STRING }, rationale: { type: Type.STRING }, actionId: { type: Type.STRING }, icon: { type: Type.STRING, enum: ['beaker', 'cube', 'bolt', 'ruler', 'chart', 'dollar', 'conversation', 'play'] } },
                     required: ["title", "rationale", "actionId", "icon"]
                 }
             }
@@ -1040,239 +1020,30 @@ export const getNextStepSuggestions = async (context: string): Promise<NextStepS
     return JSON.parse(response.text!);
 };
 
-export const performWebSearch = async (query: string): Promise<any> => {
+export const generatePatentDraft = async (result: AnalysisResult, user: User, protectionType: ProtectionTypePref, jurisdiction: LegalJurisdiction, designHash: string, knowledgeBase: IngestedDocument[]): Promise<PatentApplication> => {
     const ai = getAiClient();
     const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: query,
-        config: { tools: [{ googleSearch: {} }] }
-    });
-    return {
-        summary: response.text,
-        sources: response.candidates?.[0]?.groundingMetadata?.groundingChunks
-    };
-};
-
-export const generateInspirationalImage = async (prompt: string, aspectRatio: string = '16:9'): Promise<string> => {
-    const ai = getAiClient();
-    const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-image',
-        contents: { parts: [{ text: prompt }] },
-        config: { imageConfig: { aspectRatio: aspectRatio as any } }
-    });
-    for (const part of response.candidates![0].content!.parts!) {
-        if (part.inlineData) {
-            return `data:image/png;base64,${part.inlineData.data}`;
-        }
-    }
-    throw new Error("Failed to generate image.");
-};
-
-export const generateFactionInspirationalPrompts = async (result: AnalysisResult): Promise<string[]> => {
-    const ai = getAiClient();
-    const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: `Based on the engineering analysis for "${result.product_name}", generate 3 distinct, creative prompts for generating photorealistic product concept art. 
-        Focus on the unique features described in the executive summary: ${result.executive_summary}.
-        
-        Output strictly as a JSON array of strings.`,
+        model: 'gemini-3-pro-preview',
+        contents: `Draft a formal ${protectionType} application for ${result.product_name} in ${jurisdiction}. Design Hash: ${designHash}`,
         config: {
-            responseMimeType: "application/json",
+            responseMimeType: 'application/json',
             responseSchema: {
-                type: Type.ARRAY,
-                items: { type: Type.STRING }
+                type: Type.OBJECT,
+                properties: {
+                    title: { type: Type.STRING },
+                    abstract: { type: Type.STRING },
+                    background: { type: Type.STRING },
+                    summary: { type: Type.STRING },
+                    independent_claims: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { text: { type: Type.STRING }, rationale: { type: Type.STRING } }, required: ["text", "rationale"] } },
+                    dependent_claims: { type: Type.ARRAY, items: { type: Type.STRING } },
+                    novelty_points: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { text: { type: Type.STRING }, rationale: { type: Type.STRING } }, required: ["text", "rationale"] } },
+                    inventive_step_rationale: { type: Type.STRING },
+                    legal_hash: { type: Type.STRING },
+                    jurisdiction: { type: Type.STRING }
+                },
+                required: ["title", "abstract", "independent_claims", "novelty_points", "legal_hash", "jurisdiction"]
             }
         }
     });
-    
-    try {
-        return JSON.parse(response.text || "[]");
-    } catch (e) {
-        console.error("Failed to parse faction concepts JSON:", e);
-        return [];
-    }
-};
-
-export const createProjectFunctionDeclaration: FunctionDeclaration = {
-    name: 'create_project',
-    parameters: {
-        type: Type.OBJECT,
-        properties: {
-            name: { type: Type.STRING },
-            description: { type: Type.STRING },
-            tags: { type: Type.ARRAY, items: { type: Type.STRING } },
-            factionId: { type: Type.STRING, enum: Object.values(FactionId) }
-        },
-        required: ["name", "description", "factionId"]
-    }
-};
-
-export const triggerFullAnalysisFunctionDeclaration: FunctionDeclaration = {
-    name: 'trigger_full_analysis',
-    description: 'Executes the core SynapseForge engineering analysis on current session context. Call this only when project name, description, and lens are clarified.',
-    parameters: {
-        type: Type.OBJECT,
-        properties: {
-            useFactionId: { type: Type.STRING, enum: Object.values(FactionId), description: 'The engineering lens to apply.' },
-            descriptionOverride: { type: Type.STRING, description: 'Optional updated product concept description.' }
-        }
-    }
-};
-
-export const analyze_fileFunctionDeclaration: FunctionDeclaration = {
-    name: 'analyze_file',
-    description: 'Triggers a specific intake workflow for an uploaded file (Image, PDF, or Video).',
-    parameters: {
-        type: Type.OBJECT,
-        properties: {
-            fileName: { type: Type.STRING, description: 'The name of the file to analyze from the uploaded set.' },
-            workflow: { 
-                type: Type.STRING, 
-                enum: ['IMAGE_SYNTHESIS', 'TECHNICAL_INTAKE', 'VISUAL_INTAKE', 'SYSTEM_MAPPING', 'RECURSIVE_LOGIC'],
-                description: 'The specific synthesis protocol to trigger.'
-            }
-        },
-        required: ["fileName", "workflow"]
-    }
-};
-
-export const generateTechnicalDrawingFunctionDeclaration: FunctionDeclaration = {
-    name: 'generate_technical_drawing',
-    parameters: {
-        type: Type.OBJECT,
-        properties: { specificPrompt: { type: Type.STRING } },
-        required: ["specificPrompt"]
-    }
-};
-
-export const researchWebFunctionDeclaration: FunctionDeclaration = {
-    name: 'research_web',
-    parameters: {
-        type: Type.OBJECT,
-        properties: { query: { type: Type.STRING } },
-        required: ["query"]
-    }
-};
-
-export const runAnalysisWithFactionFunctionDeclaration: FunctionDeclaration = {
-    name: 'run_analysis_with_faction',
-    parameters: {
-        type: Type.OBJECT,
-        properties: { factionId: { type: Type.STRING, enum: Object.values(FactionId) } },
-        required: ["factionId"]
-    }
-};
-
-export const generateInspirationalImageFunctionDeclaration: FunctionDeclaration = {
-    name: 'generate_inspirational_image',
-    parameters: {
-        type: Type.OBJECT,
-        properties: { prompt: { type: Type.STRING } },
-        required: ["prompt"]
-    }
-};
-
-export const downloadDrawingsFunctionDeclaration: FunctionDeclaration = {
-    name: 'download_drawings',
-    parameters: { type: Type.OBJECT, properties: {} }
-};
-
-export const generateVideoFunctionDeclaration: FunctionDeclaration = {
-    name: 'generate_video',
-    parameters: {
-        type: Type.OBJECT,
-        properties: { prompt: { type: Type.STRING }, useUploadedImage: { type: Type.BOOLEAN } },
-        required: ["prompt"]
-    }
-};
-
-export const showSectionFunctionDeclaration: FunctionDeclaration = {
-    name: 'show_section',
-    parameters: {
-        type: Type.OBJECT,
-        properties: { sectionId: { type: Type.STRING, enum: ['executive_summary', 'faction_rationale', 'ai_suggestions', 'visual_documentation', 'cad_export', 'bom', 'live_costing', 'advanced_simulation', 'rotordynamics_studio', 'fabrication_planner', 'test_plan', 'compliance_safety', 'change_orders', 'patent_application'] } },
-        required: ["sectionId"]
-    }
-};
-
-export const switchAppViewFunctionDeclaration: FunctionDeclaration = {
-    name: 'switch_app_view',
-    parameters: {
-        type: Type.OBJECT,
-        properties: { view: { type: Type.STRING, enum: ['app', 'admin', 'suite', 'account', 'pricing'] } },
-        required: ["view"]
-    }
-};
-
-export const toggleDocumentationFunctionDeclaration: FunctionDeclaration = {
-    name: 'toggle_documentation',
-    parameters: {
-        type: Type.OBJECT,
-        properties: { doc_type: { type: Type.STRING, enum: ['manual', 'technical'] }, open: { type: Type.BOOLEAN } },
-        required: ["doc_type", "open"]
-    }
-};
-
-export const engageAnalysisFunctionDeclaration: FunctionDeclaration = {
-    name: 'engage_analysis',
-    parameters: { type: Type.OBJECT, properties: {} }
-};
-
-/**
- * REALITY FILTER: run_genesis_verification
- * High-fidelity 4D physical stress test tool.
- */
-export const runGenesisVerificationFunctionDeclaration: FunctionDeclaration = {
-  name: 'run_genesis_verification',
-  description: 'Executes a high-fidelity 4D physical stress test on a component geometry. Use this when the user asks if a design "works in the real world."',
-  parameters: {
-    type: Type.OBJECT,
-    properties: {
-      target_mesh: { 
-        type: Type.OBJECT, 
-        description: 'The current 3D geometry and NAL constants of the part to be verified.' 
-      },
-      physics_domain: { 
-        type: Type.STRING, 
-        description: 'The environmental context (e.g., Relativistic_Vacuum, High_Pressure, Deep_Sea).' 
-      },
-      safety_threshold: { 
-        type: Type.NUMBER, 
-        description: 'The minimum factor of safety required (e.g. 1.5).' 
-      }
-    },
-    required: ["target_mesh", "physics_domain", "safety_threshold"]
-  }
-};
-
-/**
- * REALITY FILTER: run_foundry_simulation
- * Specialized 4D physics simulation for engineering viability.
- */
-export const runFoundrySimulationFunctionDeclaration: FunctionDeclaration = {
-  name: 'run_foundry_simulation',
-  description: 'Executes a 4D physics simulation using the Genesis engine to verify real-world viability of a design.',
-  parameters: {
-    type: Type.OBJECT,
-    properties: {
-      project_domain: {
-        type: Type.STRING,
-        description: "The engineering domain, e.g., 'AEROSPACE_LEO', 'PROPULSION', or 'SOLID_STRUCTURES'."
-      },
-      engineering_specs: {
-        type: Type.STRING,
-        description: "Key numerical constants extracted from the NAL, such as magnetic field strength (Tesla) or yield strength (GPa)."
-      },
-      simulation_type: {
-        type: Type.STRING,
-        enum: ["STRESS_TO_FAILURE", "THERMAL_STABILITY", "PARTICLE_CAPTURE"],
-        description: "The specific physics test to perform on the mesh."
-      },
-      environment_id: {
-        type: Type.STRING,
-        description: "The environmental preset, e.g., 'SAA_ORBIT' or 'STP_GROUND'."
-      }
-    },
-    required: ["project_domain", "engineering_specs", "simulation_type"]
-  }
+    return JSON.parse(response.text!);
 };

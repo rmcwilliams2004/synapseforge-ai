@@ -1,5 +1,5 @@
 {
-  "name": "new-forge-ai:-reverse-engineering-v-12",
+  "name": "new-forge-ai:-reverse-engineering-v-16.9",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -15,7 +15,8 @@
     "three": "^0.180.0",
     "idb": "8",
     "@pdfme/generator": "5.1.0",
-    "@pdfme/common": "5.1.0"
+    "@pdfme/common": "5.1.0",
+    "lucide-react": "0.344.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

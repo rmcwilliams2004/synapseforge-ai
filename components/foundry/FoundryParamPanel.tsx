@@ -1,5 +1,6 @@
+
 import React, { useEffect, useRef } from 'react';
-import { MaterialPreset, FoundryState, LegalJurisdiction } from '../../types';
+import { MaterialPreset, FoundryState, LegalJurisdiction, FoundryOptimization, ReinforcementProfile } from '../../types';
 import { MATERIAL_LIBRARY } from '../../constants/materialLibrary';
 
 interface FoundryParamPanelProps {
@@ -43,12 +44,65 @@ export const FoundryParamPanel: React.FC<FoundryParamPanelProps> = ({ state, onU
     }
   };
 
+  const applyReinforcement = (profile: ReinforcementProfile) => {
+      window.dispatchEvent(new CustomEvent('forge-log', { 
+          detail: `[FORGE]: Applying '${profile.name}' reinforcement profile. Recalculating mesh...` 
+      }));
+      
+      onUpdate({
+          activeReinforcementId: profile.id,
+          parameters: {
+              ...state.parameters,
+              ...profile.parameterOverrides
+          }
+      });
+
+      window.dispatchEvent(new CustomEvent('forge-milestone', {
+          detail: {
+              id: 'reinforcement_applied',
+              title: `${profile.name} Applied`,
+              description: `Physical configuration updated with ${Object.keys(profile.parameterOverrides).length} geometric overrides.`,
+              type: 'STRUCTURAL'
+          }
+      }));
+  };
+
+  useEffect(() => {
+      const handleVoiceParam = (e: any) => {
+          const { param, delta, value, isAbsolute, isPercent } = e.detail;
+          // Find closest matching key
+          const key = Object.keys(state.parameters).find(k => k.toLowerCase().includes(param.toLowerCase()));
+          if (key) {
+              const currentVal = state.parameters[key];
+              let newVal;
+              
+              if (isAbsolute) {
+                  newVal = value;
+              } else if (isPercent) {
+                  newVal = currentVal * (1 + (delta / 100));
+              } else {
+                  newVal = currentVal + delta;
+              }
+              
+              handleParamChange(key, newVal);
+          }
+      };
+
+      window.addEventListener('forge-voice-param', handleVoiceParam);
+      return () => window.removeEventListener('forge-voice-param', handleVoiceParam);
+  }, [state.parameters, onUpdate]);
+
   const handleMaterialChange = (id: string) => {
     const material = MATERIAL_LIBRARY.find(m => m.id === id);
     if (material) {
       onUpdate({ selectedMaterial: material });
       window.dispatchEvent(new CustomEvent('forge-status', { detail: 'CALIBRATING' }));
     }
+  };
+
+  const applyOptimization = (opt: FoundryOptimization) => {
+    handleParamChange(opt.parameter, opt.recommendedValue);
+    window.dispatchEvent(new CustomEvent('forge-log', { detail: `[FOUNDRY]: Applied optimization for ${opt.parameter}.` }));
   };
 
   const toggleLock = async () => {
@@ -111,6 +165,61 @@ export const FoundryParamPanel: React.FC<FoundryParamPanelProps> = ({ state, onU
       </div>
 
       <div className={`flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar transition-opacity duration-300 ${state.isLocked ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
+        
+        {/* Reinforcement Engine Section */}
+        {state.cadResult?.availableReinforcements && state.cadResult.availableReinforcements.length > 0 && (
+            <section className="space-y-4">
+                <label className="block text-[10px] font-black text-amber-500 uppercase tracking-widest">Reinforcement Profiles</label>
+                <div className="grid grid-cols-1 gap-2">
+                    {state.cadResult.availableReinforcements.map(profile => (
+                        <button
+                            key={profile.id}
+                            onClick={() => applyReinforcement(profile)}
+                            className={`p-4 text-left rounded-xl border-2 transition-all group ${state.activeReinforcementId === profile.id ? 'bg-amber-500/10 border-amber-500 shadow-lg shadow-amber-900/20' : 'bg-gray-800 border-gray-700 hover:border-amber-500/50'}`}
+                        >
+                            <div className="flex justify-between items-center mb-1">
+                                <span className={`text-xs font-black uppercase tracking-tighter ${state.activeReinforcementId === profile.id ? 'text-amber-400' : 'text-gray-300'}`}>{profile.name}</span>
+                                {state.activeReinforcementId === profile.id && <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></div>}
+                            </div>
+                            <p className="text-[9px] text-gray-500 leading-tight italic">{profile.description}</p>
+                        </button>
+                    ))}
+                </div>
+            </section>
+        )}
+
+        {/* Suggested Optimizations Section */}
+        {state.cadResult?.optimizations && state.cadResult.optimizations.length > 0 && (
+          <section className="bg-indigo-600/10 border border-indigo-500/30 rounded-2xl p-4 space-y-4 animate-scale-in">
+            <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3.5 h-3.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 00 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 00 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 00 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 00 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z" /></svg>
+              AI Optimization Advice
+            </h4>
+            <div className="space-y-3">
+              {state.cadResult.optimizations.map((opt, i) => (
+                <div key={i} className="bg-black/30 p-3 rounded-xl border border-gray-800 space-y-2 group">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase leading-none">{opt.parameter}</p>
+                      <p className="text-xs font-black text-brand-light mt-1">Target: {opt.recommendedValue}</p>
+                    </div>
+                    {!isViewer && (
+                      <button 
+                        onClick={() => applyOptimization(opt)}
+                        className="p-1 text-indigo-400 hover:text-white hover:bg-indigo-600 rounded transition-all opacity-0 group-hover:opacity-100"
+                        title="Apply recommended value"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-[9px] text-gray-500 italic leading-tight">{opt.rationale}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
         {/* Material Selection */}
         <section className="space-y-4">
           <div className="flex justify-between items-center">

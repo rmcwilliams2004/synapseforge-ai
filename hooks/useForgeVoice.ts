@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { VoiceInterfaceMode, VoiceTranscriptEntry, FactionId, User } from '../types';
 import { useTts } from './useTts';
-import { generateSystemVerificationPDF } from '../services/pdfService';
+import { ENGINEERING_PHILOSOPHIES } from '../constants';
 
 declare global {
   interface Window {
@@ -14,7 +14,8 @@ declare global {
 interface ForgeVoiceCallbacks {
     onSwitchLens: (factionId: FactionId) => void;
     onSetMaterial: (materialName: string) => void;
-    onUpdateParam: (param: string, delta: number) => void;
+    onUpdateParam: (param: string, delta: number, isPercent?: boolean) => void;
+    onSetParam: (param: string, value: number) => void; 
     onGenerateCertificate: () => void;
     onSetCover: (id: string, type: 'drawing' | 'image') => void;
     onSealBundle: () => void;
@@ -25,6 +26,9 @@ interface ForgeVoiceCallbacks {
     onSwitchView: (view: 'app' | 'admin' | 'suite' | 'pricing' | 'account') => void;
     onNavigateSection: (sectionId: string) => void;
     onLaunchNewProjectWizard: () => void;
+    onCreateProject: (args: { name: string, description: string, factionId: FactionId }) => string;
+    onGenerateSection: () => void; 
+    onApplyReinforcement: (name: string) => void;
     authenticatedUser: User | null;
 }
 
@@ -58,126 +62,130 @@ export const useForgeVoice = (
         isProcessingRef.current = true;
         window.dispatchEvent(new CustomEvent('forge-log', { detail: `[VOICE_HUD]: Captured intent: "${text}"` }));
 
-        // 1. Lens Change
+        // 1. REINFORCEMENT TRIGGER
+        const reinforceMatch = command.match(/apply (?:the )?(.+) reinforcement/i) || command.match(/reinforce (?:this )?(?:design )?with (?:the )?(.+)/i);
+        if (reinforceMatch) {
+            const profileName = reinforceMatch[1].trim();
+            callbacks.onApplyReinforcement(profileName);
+            addTranscript(text, "REINFORCE_TRIGGER", "EXECUTED");
+            return;
+        }
+
+        // 2. ANALYSIS TRIGGER - Natural Language Faction Selection
+        const analysisMatch = command.match(/analyze (?:this )?(?:design|concept)? with (?:the )?(.+) (?:lens|perspective|philosophy)/i);
+        if (analysisMatch) {
+            const factionName = analysisMatch[1].trim();
+            const targetFaction = ENGINEERING_PHILOSOPHIES.find(f => 
+                f.name.toLowerCase().includes(factionName) || 
+                f.id.toLowerCase().includes(factionName.replace(/\s+/g, '_'))
+            );
+
+            if (targetFaction) {
+                callbacks.onSwitchLens(targetFaction.id);
+                callbacks.onStartAnalysis();
+                tts.speak(`Applying ${targetFaction.name} parameters. Core synthesis protocol engaged.`, "Zephyr");
+                addTranscript(text, "ANALYSIS_TRIGGER", "EXECUTED");
+            } else {
+                tts.speak(`I couldn't identify the "${factionName}" lens. Please specify Advanced Materials, Pragmatic Production, or Systems lens.`, "Zephyr");
+                addTranscript(text, "ANALYSIS_TRIGGER", "REJECTED");
+            }
+            return;
+        }
+
+        // 3. PROJECT CREATION
+        const forgeMatch = command.match(/forge a new project for (.+)/i) || command.match(/create a new project for (.+)/i);
+        if (forgeMatch) {
+            const projectTopic = forgeMatch[1].trim();
+            const resultMessage = callbacks.onCreateProject({
+                name: `AI Forged: ${projectTopic.split(' ').slice(0, 3).join(' ')}`,
+                description: `Autonomous project initialized via voice for: ${projectTopic}`,
+                factionId: FactionId.PRAGMATIC_PRODUCTION // Default
+            });
+            tts.speak(resultMessage, "Zephyr");
+            addTranscript(text, "PROJECT_FORGE", "EXECUTED");
+            return;
+        }
+
+        // 4. PARAMETRIC CONTROL - FOUNDRY (Absolute: "set thickness to 15mm")
+        const setParamMatch = command.match(/set (\w+) to ([\d.]+)(?:\s*\w+)?/i);
+        if (setParamMatch) {
+            const param = setParamMatch[1];
+            const value = parseFloat(setParamMatch[2]);
+            callbacks.onSetParam(param, value);
+            tts.speak(`Setting ${param} to ${value}. Recalculating lattice stress.`, "Zephyr");
+            addTranscript(text, "PARAM_SET", "EXECUTED");
+            return;
+        }
+
+        // 5. PARAMETRIC CONTROL - FOUNDRY (Relative: "increase density by 10%")
+        const relativeMatch = command.match(/(increase|decrease|add to|reduce) (\w+) by ([\d.]+)(%)?/i);
+        if (relativeMatch) {
+            const action = relativeMatch[1].toLowerCase();
+            const param = relativeMatch[2];
+            const value = parseFloat(relativeMatch[3]);
+            const isPercent = !!relativeMatch[4];
+            
+            const isIncrease = action === 'increase' || action === 'add to';
+            const delta = isIncrease ? value : -value;
+            
+            callbacks.onUpdateParam(param, delta, isPercent);
+            
+            const effectMsg = isPercent ? `${value} percent` : `${value} units`;
+            tts.speak(`${isIncrease ? 'Increasing' : 'Decreasing'} ${param} by ${effectMsg}. Adjusting solver mesh.`, "Zephyr");
+            addTranscript(text, "PARAM_ADJUST", "EXECUTED");
+            return;
+        }
+
+        // 6. Lens Change (Direct)
         if (command.includes("switch to") && (command.includes("lens") || command.includes("philosophy") || command.includes("perspective"))) {
             if (command.includes("advanced") || command.includes("materials")) {
                 callbacks.onSwitchLens(FactionId.ADVANCED_MATERIALS);
-                tts.speak("Switching to Advanced Materials and Processes lens. Calibrating physics mesh.", "Zephyr");
+                tts.speak("Lens switched to Advanced Materials.", "Zephyr");
                 addTranscript(text, "LENS_CHANGE", "EXECUTED");
             } else if (command.includes("pragmatic") || command.includes("production")) {
                 callbacks.onSwitchLens(FactionId.PRAGMATIC_PRODUCTION);
-                tts.speak("Switching to Pragmatic and Production-Oriented lens. Optimizing for supply chain.", "Zephyr");
+                tts.speak("Lens switched to Pragmatic Production.", "Zephyr");
                 addTranscript(text, "LENS_CHANGE", "EXECUTED");
             } else if (command.includes("systems") || command.includes("automation")) {
                 callbacks.onSwitchLens(FactionId.SYSTEMS_AUTOMATION);
-                tts.speak("Switching to Systems and Automation lens. Mapping recursive logic gates.", "Zephyr");
+                tts.speak("Lens switched to Systems Automation.", "Zephyr");
                 addTranscript(text, "LENS_CHANGE", "EXECUTED");
             }
         }
-        // 2. Navigation - Views
+        
+        // 7. Navigation & Documents
         else if (command.includes("go to") || command.includes("open") || command.includes("switch to")) {
-            if (command.includes("admin") || command.includes("dashboard") || command.includes("console")) {
+            if (command.includes("admin") || command.includes("dashboard")) {
                 callbacks.onSwitchView('admin');
-                tts.speak("Opening Administration Dashboard.", "Zephyr");
+                tts.speak("Opening Admin Console.", "Zephyr");
                 addTranscript(text, "VIEW_NAV", "EXECUTED");
-            } else if (command.includes("suite") || command.includes("tool") || command.includes("engineering tools")) {
-                callbacks.onSwitchView('suite');
-                tts.speak("Initializing Engineering Tool Suite.", "Zephyr");
-                addTranscript(text, "VIEW_NAV", "EXECUTED");
-            } else if (command.includes("workspace") || command.includes("main") || command.includes("forge")) {
-                callbacks.onSwitchView('app');
-                tts.speak("Returning to the main Workspace.", "Zephyr");
-                addTranscript(text, "VIEW_NAV", "EXECUTED");
-            } else if (command.includes("account") || command.includes("profile") || command.includes("identity")) {
-                callbacks.onSwitchView('account');
-                tts.speak("Opening Identity and Account settings.", "Zephyr");
-                addTranscript(text, "VIEW_NAV", "EXECUTED");
-            } else if (command.includes("pricing") || command.includes("billing") || command.includes("license")) {
-                callbacks.onSwitchView('pricing');
-                tts.speak("Opening Licensing and Pricing options.", "Zephyr");
-                addTranscript(text, "VIEW_NAV", "EXECUTED");
-            }
-            // Documentation sub-cases
-            else if (command.includes("manual") || command.includes("guide")) {
+            } else if (command.includes("manual")) {
                 callbacks.onOpenManual();
                 tts.speak("Opening User Manual.", "Zephyr");
                 addTranscript(text, "DOC_OPEN", "EXECUTED");
-            } else if (command.includes("technical documentation") || command.includes("tech doc")) {
-                callbacks.onOpenTechDoc();
-                tts.speak("Opening Technical Documentation.", "Zephyr");
-                addTranscript(text, "DOC_OPEN", "EXECUTED");
-            }
-            // Section Navigation sub-cases
-            else if (command.includes("summary") || command.includes("executive")) {
-                callbacks.onNavigateSection('executive_summary');
-                addTranscript(text, "SECTION_NAV", "EXECUTED");
-            } else if (command.includes("bom") || command.includes("materials list")) {
-                callbacks.onNavigateSection('bom');
-                addTranscript(text, "SECTION_NAV", "EXECUTED");
-            } else if (command.includes("cost") || command.includes("pricing")) {
-                callbacks.onNavigateSection('live_costing');
-                addTranscript(text, "SECTION_NAV", "EXECUTED");
-            } else if (command.includes("patent") || command.includes("intellectual property")) {
-                callbacks.onNavigateSection('patent_application');
-                addTranscript(text, "SECTION_NAV", "EXECUTED");
+            } else if (command.includes("workspace")) {
+                callbacks.onSwitchView('app');
+                tts.speak("Returning to Workspace.", "Zephyr");
+                addTranscript(text, "VIEW_NAV", "EXECUTED");
             }
         }
-        // 3. Analysis Control
+
+        // 8. Analysis Start (Generic)
         else if (command.includes("start analysis") || command.includes("begin analysis") || command.includes("engage")) {
             callbacks.onStartAnalysis();
-            tts.speak("Analysis sequence initiated. Engaging SynapseForge AI.", "Zephyr");
+            tts.speak("Initiating core synthesis. Calibrating physics mesh.", "Zephyr");
             addTranscript(text, "ANALYSIS_START", "EXECUTED");
         }
-        // 4. Material Control
-        else if (command.includes("set material to") || command.includes("change material to")) {
-            const matName = text.split(/to /i)[1];
-            if (matName) {
-                callbacks.onSetMaterial(matName.trim());
-                tts.speak(`Awaiting NAL confirmation for ${matName} properties. Adjusting stress HUD.`, "Zephyr");
-                addTranscript(text, "MATERIAL_CHANGE", "EXECUTED");
-            }
-        }
-        // 5. Param Tuning
-        else if (command.includes("increase thickness") || command.includes("make it thicker")) {
-             callbacks.onUpdateParam("Thickness", 10);
-             tts.speak("Increasing wall thickness. Recalculating safety factor.", "Zephyr");
-             addTranscript(text, "PARAM_UPDATE", "EXECUTED");
-        }
-        // 6. IP & Bundle
-        else if (command.includes("generate") && (command.includes("certificate") || command.includes("patent"))) {
-            callbacks.onGenerateCertificate();
-            tts.speak("Synthesizing Innovation Certificate.", "Zephyr");
-            addTranscript(text, "TRIGGER_IP", "EXECUTED");
-        }
-        else if (command.includes("set") && command.includes("cover")) {
-            callbacks.onSetCover("auto-selected", "drawing");
-            tts.speak("Setting the primary technical drawing as the report cover.", "Zephyr");
-            addTranscript(text, "SET_COVER", "EXECUTED");
-        }
-        else if (command.includes("seal") && (command.includes("bundle") || command.includes("vault"))) {
-            callbacks.onSealBundle();
-            addTranscript(text, "SEAL_BUNDLE", "EXECUTED");
-        }
-        // 7. System Reports
-        else if (command.includes("verification report") || command.includes("health report")) {
-            if (callbacks.authenticatedUser) {
-                generateSystemVerificationPDF(callbacks.authenticatedUser);
-                tts.speak("Generating formal System Verification Report. All architectural fixes have been logged and signed.", "Zephyr");
-                addTranscript(text, "SYSTEM_REPORT", "EXECUTED");
-            } else {
-                tts.speak("Unauthorized. Administrator identity required for system audit.", "Zephyr");
-                addTranscript(text, "SYSTEM_REPORT", "REJECTED");
-            }
-        }
-        // 8. New Project Control
-        else if (command.includes("new project") || command.includes("create a project") || command.includes("forge a project")) {
-            callbacks.onLaunchNewProjectWizard();
-            tts.speak("Initializing DeVinci for project synthesis. Please describe your core concept.", "Zephyr");
-            addTranscript(text, "NEW_PROJECT_WIZARD", "EXECUTED");
+
+        // 9. Visual / CAD Actions
+        else if (command.includes("section") || command.includes("slice") || command.includes("cut")) {
+            callbacks.onGenerateSection();
+            tts.speak("Generating cross-section at assembly centroid.", "Zephyr");
+            addTranscript(text, "VISUAL_SECTION", "EXECUTED");
         }
         else {
             addTranscript(text, "UNKNOWN", "REJECTED");
-            tts.speak("Command not recognized. Please consult the User Manual for supported voice protocols.", "Zephyr");
+            tts.speak("Voice command not recognized. Check manual for supported intent protocols.", "Zephyr");
         }
 
         setTimeout(() => { isProcessingRef.current = false; }, 2000);
@@ -185,10 +193,7 @@ export const useForgeVoice = (
 
     useEffect(() => {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SpeechRecognition) {
-            console.warn("Speech recognition not supported in this browser.");
-            return;
-        }
+        if (!SpeechRecognition) return;
 
         const recognition = new SpeechRecognition();
         recognition.continuous = true;
@@ -198,13 +203,10 @@ export const useForgeVoice = (
         recognition.onstart = () => setIsListening(true);
         recognition.onend = () => {
             setIsListening(false);
-            // Auto-restart if in ALWAYS_ON mode
             if (mode === 'ALWAYS_ON') {
                 try {
                     recognition.start();
-                } catch(e) {
-                    console.error("Failed to restart speech recognition", e);
-                }
+                } catch(e) {}
             }
         };
 

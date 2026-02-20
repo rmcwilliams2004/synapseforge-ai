@@ -14,15 +14,24 @@ const LOG_LINES = [
     "[SUCCESS] Sovereign environment primed for forging."
 ];
 
-export const SystemStatusIndicator: React.FC<{ isVoiceActive?: boolean }> = ({ isVoiceActive }) => {
+export const SystemStatusIndicator: React.FC<{ isVoiceActive?: boolean; isProcessing?: boolean }> = ({ isVoiceActive, isProcessing }) => {
     return (
         <div className="fixed bottom-8 left-8 z-[60] flex items-center gap-3 animate-fade-in pointer-events-none select-none group">
-            <div className="relative flex h-2 w-2">
-                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-40 ${isVoiceActive ? 'bg-red-500' : 'bg-brand-cyan'}`}></span>
-                <span className={`relative inline-flex rounded-full h-2 w-2 shadow-[0_0_8px] ${isVoiceActive ? 'bg-red-500 shadow-red-500' : 'bg-brand-cyan shadow-brand-cyan'}`}></span>
+            <div className="relative flex h-3 w-3">
+                {/* Forge Logic Pulse: pronounced blur/scale when processing, subtle breath when idle */}
+                <span className={`absolute inline-flex h-full w-full rounded-full transition-all duration-1000 ${
+                    isProcessing ? 'bg-amber-500 animate-pulse-active' : 
+                    isVoiceActive ? 'bg-red-500 animate-pulse' : 
+                    'bg-brand-cyan animate-pulse-idle'
+                }`}></span>
+                <span className={`relative inline-flex rounded-full h-3 w-3 shadow-[0_0_12px] transition-colors duration-500 ${
+                    isProcessing ? 'bg-amber-500 shadow-amber-500' : 
+                    isVoiceActive ? 'bg-red-500 shadow-red-500' : 
+                    'bg-brand-cyan shadow-brand-cyan'
+                }`}></span>
             </div>
             <span className="text-[9px] font-black text-brand-cyan uppercase tracking-[0.3em] opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-                {isVoiceActive ? 'Voice Monitoring Active' : 'Forge Ready'}
+                {isProcessing ? 'Forge Processing' : isVoiceActive ? 'Voice Monitoring Active' : 'Forge Ready'}
             </span>
         </div>
     );

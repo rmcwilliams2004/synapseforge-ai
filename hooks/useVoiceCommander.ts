@@ -197,7 +197,8 @@ Be professional, concise, and proactive. If information is ambiguous, ask the us
         const livePromise = ai.live.connect({
             model: 'gemini-2.5-flash-native-audio-preview-12-2025', 
             config: {
-                responseModalities: ['AUDIO'],
+                // FIX: Using Modality.AUDIO enum instead of raw string
+                responseModalities: [Modality.AUDIO],
                 speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } },
                 systemInstruction,
                 tools: [{ 
@@ -216,19 +217,35 @@ Be professional, concise, and proactive. If information is ambiguous, ask the us
             },
             callbacks: {
                 onopen: () => {
-                    const inputCtx = audioRefs.current.inputAudioContext!;
-                    const stream = audioRefs.current.mediaStream!;
-                    audioRefs.current.source = inputCtx.createMediaStreamSource(stream);
-                    const scriptProcessor = inputCtx.createScriptProcessor(4096, 1, 1);
-                    audioRefs.current.scriptProcessor = scriptProcessor;
+                    // FIX: Ensure AudioContext exists and is in a 'running' state before creating source
+                    if (typeof window.AudioContext === 'undefined' && typeof (window as any).webkitAudioContext === 'undefined') {
+                        console.warn("Audio Engine: Browser environment not supported.");
+                        return;
+                    }
 
-                    scriptProcessor.onaudioprocess = (audioProcessingEvent) => {
-                        const inputData = audioProcessingEvent.inputBuffer.getChannelData(0);
-                        const pcmBlob = createBlob(inputData);
-                        livePromise.then(session => session.sendRealtimeInput({ media: pcmBlob }));
-                    };
-                    audioRefs.current.source.connect(scriptProcessor);
-                    scriptProcessor.connect(inputCtx.destination);
+                    const inputCtx = audioRefs.current.inputAudioContext;
+                    const stream = audioRefs.current.mediaStream;
+                    
+                    if (!inputCtx || !stream) {
+                        console.warn("Voice Commander: Audio context or stream missing on open. Connection likely closed.");
+                        return;
+                    }
+                    
+                    try {
+                        audioRefs.current.source = inputCtx.createMediaStreamSource(stream);
+                        const scriptProcessor = inputCtx.createScriptProcessor(4096, 1, 1);
+                        audioRefs.current.scriptProcessor = scriptProcessor;
+
+                        scriptProcessor.onaudioprocess = (audioProcessingEvent) => {
+                            const inputData = audioProcessingEvent.inputBuffer.getChannelData(0);
+                            const pcmBlob = createBlob(inputData);
+                            livePromise.then(session => session.sendRealtimeInput({ media: pcmBlob }));
+                        };
+                        audioRefs.current.source.connect(scriptProcessor);
+                        scriptProcessor.connect(inputCtx.destination);
+                    } catch (err) {
+                        console.error("Voice Engine Handshake Failed: ", err);
+                    }
                 },
                 onmessage: async (message: LiveServerMessage) => {
                     if (message.toolCall) {

@@ -1,7 +1,7 @@
 
-import { useState } from 'react';
-import { generateAnalysis as performAnalysis, parseApiError } from '../services/geminiService';
-import { AnalysisResult, Faction, LogEntry, IngestedDocument } from '../types';
+import { useState, useCallback } from 'react';
+import { generateAnalysis as performAnalysis, parseApiError, identifyImageFromWeb, performSystemMapping, generateCadData } from '../services/geminiService';
+import { AnalysisResult, Faction, Persona, LogEntry, IngestedDocument, Innovator, SystemMap, CadData } from '../types';
 
 const fileToGenerativePart = async (file: File) => {
   const base64 = await new Promise<string>((resolve, reject) => {
@@ -18,94 +18,89 @@ const fileToGenerativePart = async (file: File) => {
   };
 };
 
-const dataUrlToGenerativePart = (dataUrl: string) => {
-    const [header, data] = dataUrl.split(',');
-    if (!header || !data) {
-        throw new Error("Invalid data URL format");
-    }
-    const mimeTypeMatch = header.match(/data:(.*);base64/);
-    if (!mimeTypeMatch || !mimeTypeMatch[1]) {
-        throw new Error("Could not extract MIME type from data URL");
-    }
-    const mimeType = mimeTypeMatch[1];
-
-    return {
-        inlineData: {
-            data,
-            mimeType
-        }
-    };
-};
-
 interface FileSource {
     files: File[];
-    fileUrls?: string[];
-    // Fixed: Changed technicalContext (string) to knowledgeBase (array) to match geminiService requirements
+    persona?: Persona;
     knowledgeBase?: IngestedDocument[];
 }
-
-export const runFullAnalysis = async (projectName: string, prompt: string, faction: Faction, source: FileSource): Promise<AnalysisResult> => {
-    const fileParts = [];
-    // Prioritize newly uploaded files over saved project files
-    if (source.files.length > 0) {
-      for(const file of source.files) {
-          // Allow images, PDFs (application/pdf), and videos
-          if (!file.type.startsWith('image/') && file.type !== 'application/pdf' && !file.type.startsWith('video/')) {
-              throw new Error('Only image, PDF, and video files are supported for analysis.');
-          }
-          fileParts.push(await fileToGenerativePart(file));
-      }
-    } else if (source.fileUrls && source.fileUrls.length > 0) {
-      for(const url of source.fileUrls) {
-          fileParts.push(dataUrlToGenerativePart(url));
-      }
-    }
-    
-    // Fixed: Passing knowledgeBase array to geminiService instead of technicalContext string
-    const analysisResult = await performAnalysis(projectName, prompt, faction, fileParts.length > 0 ? fileParts : null, source.knowledgeBase || []);
-    return analysisResult;
-};
-
 
 export const useAnalysis = (addLog: (level: LogEntry['level'], message: string) => void) => {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  const generateAnalysis = async (projectName: string, prompt: string, faction: Faction, source: FileSource): Promise<AnalysisResult | null> => {
+  const generateAnalysis = async (projectName: string, prompt: string, faction: Faction | null, source: FileSource): Promise<AnalysisResult | null> => {
     setIsLoading(true);
     setError(null);
     setResult(null);
 
     try {
-      // Check for API key presence if expected by environment
-      if (typeof (window as any).aistudio !== 'undefined' && !(await (window as any).aistudio.hasSelectedApiKey())) {
-          await (window as any).aistudio.openSelectKey();
+      const fileParts = [];
+      for(const file of source.files) {
+          fileParts.push(await fileToGenerativePart(file));
       }
 
-      const analysisResult = await runFullAnalysis(projectName, prompt, faction, source);
+      const analysisResult = await performAnalysis(
+          projectName, 
+          prompt, 
+          faction as any, 
+          fileParts.length > 0 ? fileParts : null, 
+          source.knowledgeBase || [],
+          source.persona
+      );
+      
       setResult(analysisResult);
+      addLog('INFO', `Analysis sequence complete for "${projectName}".`);
       return analysisResult;
     } catch (e) {
       const errorMessage = parseApiError(e);
-      
-      // Handle unauthenticated state by prompting for key
-      if (errorMessage.includes("Auth Error") || errorMessage.includes("Unauthenticated") || errorMessage.includes("API keys are not supported")) {
-          if (typeof (window as any).aistudio !== 'undefined') {
-              addLog('WARN', 'Unauthenticated request detected. Prompting user to select API key.');
-              await (window as any).aistudio.openSelectKey();
-              // Guide the user to try again
-              setError("Session re-authenticated. Please click 'Engage' again to run your analysis.");
-          } else {
-              setError(errorMessage);
-          }
-      } else {
-          setError(errorMessage);
-          addLog('ERROR', `Core Analysis Failed: ${errorMessage}`);
-      }
+      setError(errorMessage);
+      addLog('ERROR', `Core Analysis Failed: ${errorMessage}`);
       return null;
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  /**
+   * REVERSE ENGINEERING PIPELINE: Multi-modal extraction to synthesis.
+   */
+  const runReverseEngineering = async (files: File[], faction: Faction, council: Innovator[]): Promise<{ identification: any, systemMap: SystemMap, analysis: AnalysisResult } | null> => {
+    setIsLoading(true);
+    setError(null);
+    addLog('INFO', `Initializing end-to-end Reverse Engineering Pipeline for ${files.length} assets.`);
+
+    try {
+        const fileParts = await Promise.all(files.map(f => fileToGenerativePart(f)));
+        
+        // 1. Identification
+        const identification = await identifyImageFromWeb(fileParts[0]);
+        addLog('INFO', `Object identified: ${identification.summary}. Initiating disciplinary deconstruction.`);
+
+        // 2. System Mapping
+        const systemMap = await performSystemMapping(fileParts, identification.summary);
+        addLog('INFO', `System deconstructed. ${(systemMap?.hierarchy || []).length} sub-assemblies identified.`);
+
+        // 3. Detailed Analysis (Synthesis)
+        const analysis = await performAnalysis(
+            systemMap.product_name,
+            `Perform a deep reverse-engineering analysis on this ${identification.summary}. Focusing on mechanical deconstruction and material replication.`,
+            faction,
+            fileParts
+        );
+        
+        const finalResult = { ...analysis, system_map: systemMap };
+        setResult(finalResult);
+        addLog('INFO', `Reverse Engineering finalized. Technical blueprints and BOM synthesized.`);
+        
+        return { identification, systemMap, analysis: finalResult };
+    } catch (e) {
+        const errorMessage = parseApiError(e);
+        setError(errorMessage);
+        addLog('ERROR', `Reverse Engineering Pipeline Failed: ${errorMessage}`);
+        return null;
+    } finally {
+        setIsLoading(false);
     }
   };
   
@@ -114,5 +109,5 @@ export const useAnalysis = (addLog: (level: LogEntry['level'], message: string) 
     setError(null);
   }
 
-  return { result, isLoading, error, generateAnalysis, clearAnalysis, setResult };
+  return { result, isLoading, error, generateAnalysis, runReverseEngineering, clearAnalysis, setResult };
 };

@@ -4,3 +4,7 @@ numpy
 trimesh
 pydantic
 python-multipart
+opencv-python
+genesis
+sqlalchemy
+psycopg2-binary

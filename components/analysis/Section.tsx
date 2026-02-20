@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState } from 'react';
 
 interface SectionProps {
   id?: string;
@@ -10,49 +11,23 @@ interface SectionProps {
 
 export const Section: React.FC<SectionProps> = ({ id, title, children, actions, defaultOpen = true }) => {
     const [isOpen, setIsOpen] = useState(defaultOpen);
-    const [isPulsing, setIsPulsing] = useState(false);
-
-    useEffect(() => {
-        const handleHighlight = (e: any) => {
-            if (id && e.detail === id) {
-                setIsPulsing(true);
-                setTimeout(() => setIsPulsing(false), 3000);
-            }
-            // Agnostic Capability Mappings for Orientation Highlights
-            if (id === 'ai_suggestions' && e.detail === 'structural') {
-                setIsPulsing(true);
-                setTimeout(() => setIsPulsing(false), 3000);
-            }
-             if (id === 'manufacturing_analysis' && e.detail === 'logic') {
-                setIsPulsing(true);
-                setTimeout(() => setIsPulsing(false), 3000);
-            }
-             if (id === 'patent_application' && e.detail === 'sovereignty') {
-                setIsPulsing(true);
-                setTimeout(() => setIsPulsing(false), 3000);
-            }
-        };
-        window.addEventListener('forge-highlight', handleHighlight);
-        return () => window.removeEventListener('forge-highlight', handleHighlight);
-    }, [id]);
 
     return (
-        <div id={id} className={`mb-6 animate-fade-in transition-all duration-500 ${isPulsing ? 'ring-4 ring-brand-cyan/50 rounded-xl bg-brand-cyan/5 scale-[1.01]' : ''}`} style={{ animationDelay: '150ms' }}>
-            <div className="flex justify-between items-center mb-3 pb-2 border-b-2 border-cyan-500/30 dark:border-cyan-800/50">
+        <div id={id} className="mb-8 border border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-900 rounded-xl overflow-hidden shadow-sm">
+            <div className="flex justify-between items-center px-6 py-4 bg-gray-50 dark:bg-slate-800 border-b border-gray-200 dark:border-gray-700">
                 <div className="flex items-center gap-3">
-                    <button onClick={() => setIsOpen(!isOpen)} className="text-brand-cyan">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className={`w-5 h-5 transition-transform ${isOpen ? 'rotate-90' : ''}`}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                    <button onClick={() => setIsOpen(!isOpen)} className="text-gray-500 hover:text-brand-cyan transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : '-rotate-90'}`}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
                         </svg>
                     </button>
-                    <h3 className="text-xl font-bold text-brand-cyan flex items-center gap-2">
+                    <h3 className="text-base font-bold text-gray-800 dark:text-white uppercase tracking-tight">
                         {title}
-                        {isPulsing && <span className="flex h-2 w-2 relative"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span></span>}
                     </h3>
                 </div>
                 {actions && <div className="flex gap-2 items-center">{actions}</div>}
             </div>
-            {isOpen && <div className="pl-8">{children}</div>}
+            {isOpen && <div className="p-6 text-gray-700 dark:text-gray-300 leading-relaxed">{children}</div>}
         </div>
     );
 }

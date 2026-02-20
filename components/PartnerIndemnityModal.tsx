@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React from 'react';
 
 interface PartnerIndemnityModalProps {
   onSign: (signature: string) => void;
@@ -6,8 +7,6 @@ interface PartnerIndemnityModalProps {
 }
 
 export const PartnerIndemnityModal: React.FC<PartnerIndemnityModalProps> = ({ onSign, onCancel }) => {
-  const [signature, setSignature] = useState('');
-
   return (
     <div className="fixed inset-0 z-[110] bg-gray-950/98 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
       <div className="max-w-3xl w-full bg-black border border-brand-cyan/40 rounded-3xl p-10 shadow-cyan-900/40 shadow-2xl animate-scale-in">
@@ -39,16 +38,9 @@ export const PartnerIndemnityModal: React.FC<PartnerIndemnityModalProps> = ({ on
         </div>
 
         <div className="space-y-6">
-          <div>
-            <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 ml-1">Type "I ACCEPT" followed by your Legal Identity to proceed</label>
-            <input 
-              type="text" 
-              className="w-full p-4 bg-gray-900 border-2 border-gray-700 rounded-xl text-brand-cyan font-mono outline-none focus:border-brand-cyan transition-all shadow-inner uppercase"
-              placeholder="I ACCEPT - [FULL NAME]"
-              value={signature}
-              onChange={(e) => setSignature(e.target.value.toUpperCase())}
-            />
-          </div>
+          <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest text-center">
+            By clicking accept, you establish a sovereign legal handshake with the CAIDI Institute.
+          </p>
 
           <div className="flex gap-4">
              <button 
@@ -58,11 +50,10 @@ export const PartnerIndemnityModal: React.FC<PartnerIndemnityModalProps> = ({ on
                 Cancel
             </button>
             <button 
-                disabled={!signature.includes('I ACCEPT') || signature.length < 15}
-                onClick={() => onSign(signature)}
-                className="flex-1 py-4 bg-brand-cyan text-gray-900 font-black rounded-xl hover:bg-cyan-400 transition-all disabled:opacity-10 uppercase tracking-widest shadow-xl shadow-cyan-900/30 active:scale-95"
+                onClick={() => onSign('Sovereign Signature - One Click')}
+                className="flex-1 py-4 bg-brand-cyan text-gray-900 font-black rounded-xl hover:bg-cyan-400 transition-all uppercase tracking-widest shadow-xl shadow-cyan-900/30 active:scale-95"
             >
-                Activate Partner Layer Access
+                Accept Terms & Activate Partner Layer
             </button>
           </div>
         </div>

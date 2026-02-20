@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, SubscriptionStatus, ProtectionTypePref, Role } from '../types';
 
 interface AccountPageProps {
@@ -28,6 +28,19 @@ export const AccountPage: React.FC<AccountPageProps> = ({ user, onUpdate, onNavi
     use_company_attribution: user.use_company_attribution || false,
     default_protection_pref: user.default_protection_pref || 'AI_RECOMMENDED',
   });
+
+  const [savedMaterialsCount, setSavedMaterialsCount] = useState(0);
+
+  useEffect(() => {
+    const STORAGE_KEY = `synapseforge_materials_${user.id}`;
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+        try {
+            const mats = JSON.parse(stored);
+            setSavedMaterialsCount(mats.length || 0);
+        } catch(e) {}
+    }
+  }, [user.id]);
 
   const handleSave = () => {
     if (!formData.name?.trim()) {
@@ -107,6 +120,7 @@ export const AccountPage: React.FC<AccountPageProps> = ({ user, onUpdate, onNavi
 
                 <div className="grid grid-cols-1 gap-4">
                     <StatBox label="Analyses Performed" value={user.analysesRun} icon={<svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a2 2 0 00-1.96 1.414l-.727 2.903a2 2 0 01-3.515 1.058l-1.574-1.574a2 2 0 00-2.828 0l-1.574 1.574a2 2 0 01-3.515-1.058l.727-2.903a2 2 0 00-1.96-1.414l-2.387.477a2 2 0 00-1.022.547l-1.574-1.574a2 2 0 010-2.828l1.574-1.574a2 2 0 00.547-1.022l.477-2.387a2 2 0 00-1.414-1.96L.727 7.071a2 2 0 01-1.058-3.515l1.574-1.574a2 2 0 000-2.828l-1.574-1.574a2 2 0 011.058-3.515l2.903.727a2 2 0 001.96-1.414l.477-2.387a2 2 0 001.022-.547l1.574 1.574a2 2 0 012.828 0l1.574-1.574a2 2 0 001.022.547l2.387.477a2 2 0 001.96-1.414l.727-2.903a2 2 0 013.515-1.058l1.574 1.574a2 2 0 002.828 0l1.574-1.574a2 2 0 013.515 1.058l-.727 2.903a2 2 0 001.96 1.414l2.387-.477a2 2 0 001.022-.547l1.574 1.574a2 2 0 010 2.828l-1.574 1.574a2 2 0 00-.547 1.022l-.477 2.387a2 2 0 001.414 1.96l2.903.727a2 2 0 011.058 3.515l-1.574 1.574a2 2 0 000 2.828l1.574 1.574a2 2 0 01-1.058 3.515l-2.903-.727a2 2 0 00-1.96 1.414l-.477 2.387z" /></svg>} />
+                    <StatBox label="Custom Tensors" value={savedMaterialsCount} icon={<svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0v3.75" /></svg>} />
                     <StatBox label="Certificates Secured" value={user.certificatesGenerated || 0} icon={<svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04m14.506 0A11.954 11.954 0 0012 20.12a11.954 11.954 0 00-8.618-11.724" /></svg>} />
                 </div>
             </div>
@@ -147,7 +161,7 @@ export const AccountPage: React.FC<AccountPageProps> = ({ user, onUpdate, onNavi
                         <label className="flex items-center justify-between cursor-pointer group">
                             <div>
                                 <p className="text-sm font-black text-white uppercase tracking-wider group-hover:text-brand-cyan transition-colors">Default to Entity Attribution</p>
-                                <p className="text-xs text-gray-500 mt-1 max-w-md">Automatically assign IP ownership to the registered company for all new innovation synapses.</p>
+                                <p className="text-xs text-gray-400 mt-1 max-w-md">Automatically assign IP ownership to the registered company for all new innovation synapses.</p>
                             </div>
                             <div className="relative">
                                 <input 

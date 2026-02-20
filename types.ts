@@ -1,10 +1,62 @@
-
 import React from 'react';
 
 export enum FactionId {
   ADVANCED_MATERIALS = 'advanced_materials',
   PRAGMATIC_PRODUCTION = 'pragmatic_production',
   SYSTEMS_AUTOMATION = 'systems_automation',
+}
+
+export enum PersonaId {
+  DA_VINCI = 'da_vinci',
+  TESLA = 'tesla',
+  HAMILTON = 'hamilton',
+  LAMARR = 'lamarr',
+  BRUNEL = 'brunel',
+  MUSK = 'musk',
+  EDISON = 'edison',
+  SHEN_KUO = 'shen_kuo',
+  CARVER = 'carver',
+  HOPPER = 'hopper',
+  ALTSHULLER = 'altshuller',
+  AL_JAZARI = 'al_jazari',
+  LOVELACE = 'lovelace',
+  FULLER = 'fuller',
+  RUTAN = 'rutan',
+  DYSON = 'dyson',
+  EINSTEIN = 'einstein',
+  HAWKING = 'hawking',
+  NASH = 'once',
+  ARISTOTLE = 'aristotle',
+  OPPENHEIMER = 'oppenheimer',
+  JOHNSON = 'johnson',
+  RAMANUJAN = 'ramanujan',
+  HADID = 'hadid',
+  MORGAN = 'morgan',
+  ROSS = 'ross',
+  IBN_AL_HAYTHAM = 'haytham',
+  WU = 'wu',
+  SAGAN = 'sagan',
+  HUBBLE = 'hubble',
+  BOHR = 'bohr',
+  RUTHERFORD = 'rutherford',
+  CURIE = 'curie',
+  FERMI = 'fermi',
+  RUBIN = 'rubin',
+  FEYNMAN = 'feynman',
+  FARADAY = 'faraday',
+  HUYGENS = 'huygens',
+  MEITNER = 'meitner',
+  DIRAC = 'dirac',
+  PAULI = 'pauli',
+  MAXWELL = 'maxwell',
+  DARWIN = 'darwin',
+  FRANKLIN = 'franklin',
+  PASTEUR = 'pasteur',
+  TURING = 'turing',
+  SHANNON = 'shannon',
+  SPOCK = 'spock',
+  LA_FORGE = 'la_forge',
+  DATA = 'data'
 }
 
 export enum DomainCategory {
@@ -24,7 +76,15 @@ export enum EngineeringBranch {
   GENERAL = 'General Engineering'
 }
 
+/**
+ * Fix: Added Admin, Manager, Editor, and Viewer roles to resolve property access 
+ * and comparison errors across multiple files.
+ */
 export enum Role {
+  Operator = 'Operator',
+  Institution = 'Institution',
+  Inventor = 'Inventor',
+  Apprentice = 'Apprentice',
   Admin = 'Admin',
   Manager = 'Manager',
   Editor = 'Editor',
@@ -60,65 +120,44 @@ export enum SubscriptionStatus {
 export type ProtectionTypePref = 'PATENT' | 'COPYRIGHT' | 'TRADEMARK' | 'AI_RECOMMENDED';
 export type LegalJurisdiction = 'USPTO' | 'EPO' | 'WIPO' | 'JPO' | 'CNIPA';
 
-export interface NoveltyPoint {
-  text: string;
-  rationale: string;
+export interface Persona {
+  id: PersonaId;
+  name: string;
+  title: string;
+  bio: string;
+  bias: string;
+  avatar: string;
+  systemInstruction: string;
 }
 
-export type VoiceInterfaceMode = 'ALWAYS_ON' | 'MANUAL';
-
-export interface VoiceTranscriptEntry {
-    id: string;
-    text: string;
-    intent?: string;
-    timestamp: string;
-    status: 'PENDING' | 'EXECUTED' | 'FAILED' | 'REJECTED';
-}
-
-export interface Milestone {
-    id: string;
-    title: string;
-    description: string;
-    timestamp: string;
-    type: 'STRUCTURAL' | 'LEGAL' | 'LOGIC' | 'SYSTEM';
-}
-
-export interface MaterialPreset {
+export interface Innovator {
   id: string;
   name: string;
-  category: 'Metals' | 'Polymers' | 'Ceramics' | 'Composites' | 'Exotic';
-  density: number; // kg/m3
-  youngsModulus: number; // GPa
-  tensileStrength: number; // MPa
-  thermalConductivity: number; // W/mK
-  costPerKg: number; // USD
+  expertise: string;
+  specialties: string[];
+  personaType: 'Visionary' | 'Architect' | 'Strategist' | 'Specialist';
+  avatar: string;
 }
 
-export interface FoundryCadResult {
-  plugin: string;
-  action: string;
-  metadata: {
-    project_id: string;
-    material: string;
-    geometric_hash_required: boolean;
+export interface Faction {
+  id: FactionId;
+  name: string;
+  focus: string;
+  philosophy: string;
+  bias: {
+    materials: string;
+    manufacturing: string;
+    innovativeProposal: string;
   };
-  scad_params: {
-    base_dimensions: [number, number, number];
-    parameters: Record<string, number>;
-    raw_scad: string;
-  };
-  suggested_fix?: string;
+  icon: React.FC<{ className?: string }>;
 }
 
-export interface FoundryState {
-  selectedMaterial: MaterialPreset;
-  parameters: Record<string, number>;
-  scadString: string;
-  safetyFactor: number;
-  isLocked: boolean;
-  jurisdiction: LegalJurisdiction;
-  designHash?: string;
-  cadResult?: FoundryCadResult;
+export interface EditorState {
+  prompt: string;
+  selectedFaction: Faction | null;
+  selectedPersona: Persona | null;
+  selectionMode: 'philosophy' | 'persona';
+  tags: string[];
 }
 
 export interface User {
@@ -142,6 +181,50 @@ export interface User {
   hasSignedPartnerProtocol?: boolean;
   is_first_login?: boolean;
   isSilenced?: boolean;
+  customMaterials?: MaterialPreset[];
+  forgeCredits?: number;
+}
+
+export interface ComputeEvent {
+  id: string;
+  timestamp: string;
+  type: 'FOUNDRY_SYNTHESIS' | 'GENESIS_AUDIT' | 'MASTERMIND_SESSION';
+  user: string;
+  cost: number;
+  status: 'SUCCESS' | 'FAILURE' | 'PENDING';
+}
+
+export interface IpAuditEntry {
+  id: string;
+  timestamp: string;
+  user: string;
+  action: 'TDP_EXPORT' | 'PATENT_DRAFT_GEN' | 'CERTIFICATE_GEN';
+  projectName: string;
+  fileHash: string;
+  jurisdiction: string;
+}
+
+export interface ProjectTask {
+  id: string;
+  title: string;
+  description?: string;
+  status: 'TODO' | 'IN_PROGRESS' | 'DONE';
+  priority: 'LOW' | 'MEDIUM' | 'HIGH';
+  subtasks: ProjectTask[];
+  createdAt: string;
+}
+
+export interface SystemComponentMap {
+  name: string;
+  material_inference: string;
+  confidence: number;
+  dimensions: { x: number; y: number; z: number };
+  children: SystemComponentMap[];
+}
+
+export interface SystemMap {
+  product_name: string;
+  hierarchy: SystemComponentMap[];
 }
 
 export interface InnovationCertificate {
@@ -319,6 +402,11 @@ export interface IndependentClaim {
   rationale: string;
 }
 
+export interface NoveltyPoint {
+  text: string;
+  rationale: string;
+}
+
 export interface PatentApplication {
   title: string;
   abstract: string;
@@ -362,9 +450,21 @@ export interface AnalysisResult {
   engineeringChangeOrders: EngineeringChangeOrder[];
   patentApplication?: PatentApplication;
   safety_audit?: SafetyAuditFinding[];
+  suggested_tasks?: ProjectTask[];
+  system_map?: SystemMap;
 }
 
-export type SimulationType = 'FEA' | 'CFD' | 'THERMAL' | 'PHYSICS_VALIDATION';
+export type SimulationType = 
+  | 'FEA' 
+  | 'CFD' 
+  | 'THERMAL' 
+  | 'PHYSICS_VALIDATION' 
+  | 'MODAL'
+  | 'FATIGUE'
+  | 'IMPACT'
+  | 'EM_FIELD'
+  | 'OPTIMIZATION'
+  ;
 
 export interface FailureTelemetry {
   type: string;
@@ -374,6 +474,25 @@ export interface FailureTelemetry {
   description: string;
 }
 
+export interface PhysicsTelemetry {
+  max_stress: number;
+  stability_index: number;
+  max_stress_gpa: number;
+  thermal_state?: { hotspot_max: number };
+}
+
+export interface PeakStressNode {
+  x: number;
+  y: number;
+  z: number;
+  magnitude: number;
+}
+
+export interface VisualLayers {
+  peak_stress_nodes: PeakStressNode[];
+  displacement_4d: any[];
+}
+
 export interface PhysicsValidationResult {
   simulation_id: string;
   status: 'STABLE' | 'MESH_RUPTURE' | 'THERMAL_OVERLOAD' | 'CRITICAL_SYSTEM_FAILURE';
@@ -381,9 +500,14 @@ export interface PhysicsValidationResult {
   failure_telemetry: FailureTelemetry[] | null;
   engine_handshake: string;
   solver_path: string;
+  video_url?: string;
+  telemetry?: PhysicsTelemetry;
+  visual_layers?: VisualLayers;
 }
 
 export interface SimulationResult {
+    id?: string;
+    timestamp?: string;
     type: SimulationType;
     componentName: string;
     summary: string;
@@ -434,16 +558,14 @@ export interface RotorMaterial {
 }
 
 export interface RotorShaftElement {
-    id: string;
-    n: number;
     L: number;
     idl: number;
     odl: number;
     material: RotorMaterial;
+    n: number;
 }
 
 export interface RotorDiskElement {
-    id: string;
     n: number;
     m: number;
     Id: number;
@@ -451,12 +573,15 @@ export interface RotorDiskElement {
 }
 
 export interface RotorBearingElement {
-    id: string;
     n: number;
-    kxx: number; kxy: number;
-    kyx: number; kyy: number;
-    cxx: number; cxy: number;
-    cyx: number; cyy: number;
+    kxx?: number;
+    kxy?: number;
+    kyx?: number;
+    kyy?: number;
+    cxx?: number;
+    cxy?: number;
+    cyx?: number;
+    cyy?: number;
 }
 
 export interface RotorModel {
@@ -497,6 +622,7 @@ export interface ProjectVersion {
   inspirationalImages?: GeneratedImage[];
   incorporatedSuggestions?: string[];
   rotorModel?: RotorModel;
+  simulations?: SimulationResult[];
 }
 
 export interface ProjectIndexEntry {
@@ -514,12 +640,7 @@ export interface Project extends ProjectIndexEntry {
   history: ProjectVersion[];
   inspirationalImageHistory?: GeneratedImage[];
   knowledgeBase?: IngestedDocument[];
-}
-
-export interface EditorState {
-  prompt: string;
-  selectedFaction: Faction | null;
-  tags: string[];
+  tasks: ProjectTask[];
 }
 
 export type DeVinciState = 'idle' | 'connecting' | 'listening' | 'speaking' | 'thinking' | 'error' | 'paused' | 'reconnecting' | 'reconnect_failed';
@@ -537,6 +658,16 @@ export type AiChatState = 'idle' | 'thinking' | 'error';
 export interface ChatMessage {
   role: 'user' | 'model';
   parts: { text: string }[];
+}
+
+export type VoiceInterfaceMode = 'MANUAL' | 'ALWAYS_ON';
+
+export interface VoiceTranscriptEntry {
+  id: string;
+  text: string;
+  intent?: string;
+  timestamp: string;
+  status: 'PENDING' | 'EXECUTED' | 'REJECTED';
 }
 
 export interface LogEntry {
@@ -604,7 +735,20 @@ export interface SetupSuggestions {
   suggested_tags: string[];
 }
 
-export type ManufacturingProcessType = 'CNC Machining' | '3D Printing' | 'Sheet Metal';
+export type ManufacturingProcessType = 
+  | 'CNC Machining' 
+  | '3D Printing' 
+  | 'Sheet Metal' 
+  | 'Injection Molding' 
+  | 'Die Casting' 
+  | 'Forging' 
+  | 'Laser Cutting' 
+  | 'Waterjet Cutting' 
+  | 'Extrusion' 
+  | 'Robotic Assembly' 
+  | 'Manual Assembly' 
+  | 'Composite Layup'
+  ;
 
 export interface GCodeSummary {
     summary: string;
@@ -615,6 +759,7 @@ export interface DfmCheck {
     component: string;
     issue: string;
     recommendation: string;
+    severity?: 'Critical' | 'Major' | 'Minor';
 }
 
 export interface FabricationPlan {
@@ -624,6 +769,7 @@ export interface FabricationPlan {
         title: string;
         data: string;
     };
+    criticalChecksForProcess?: string[];
 }
 
 export interface ImageIdentificationResult {
@@ -661,24 +807,13 @@ export interface InProgressState {
   domainCategory?: DomainCategory;
 }
 
-export interface Faction {
-  id: FactionId;
-  name: string;
-  focus: string;
-  philosophy: string;
-  bias: {
-    materials: string;
-    manufacturing: string;
-    innovativeProposal: string;
-  };
-  icon: React.FC<{ className?: string }>;
-}
-
 export interface Material {
     id: string;
     name: string;
     category: string;
     properties: Record<string, string>;
+    materialData?: MaterialPreset;
+    isUserGenerated?: boolean;
 }
 
 export interface StandardComponent {
@@ -773,4 +908,68 @@ export interface ChartData {
     name: string;
     type: 'bode' | 'gantt' | 'stress-strain';
     data: any;
+}
+
+export interface Milestone {
+    id: string;
+    title: string;
+    description: string;
+    timestamp: string;
+    type: 'STRUCTURAL' | 'LEGAL' | 'LOGIC' | 'SYSTEM';
+}
+
+export interface MaterialPreset {
+  id: string;
+  name: string;
+  category: 'Metals' | 'Polymers' | 'Ceramics' | 'Composites' | 'Exotic';
+  density: number;
+  youngsModulus: number;
+  tensileStrength: number;
+  thermalConductivity: number;
+  thermalExpansion: number;
+  yieldStrength: number;
+  costPerKg: number;
+}
+
+export interface FoundryOptimization {
+  parameter: string;
+  recommendedValue: number;
+  rationale: string;
+}
+
+export interface ReinforcementProfile {
+  id: string;
+  name: string;
+  description: string;
+  parameterOverrides: Record<string, number>;
+}
+
+export interface FoundryCadResult {
+  plugin: string;
+  action: string;
+  metadata: {
+    project_id: string;
+    material: string;
+    geometric_hash_required: boolean;
+  };
+  scad_params: {
+    base_dimensions: [number, number, number];
+    parameters: Record<string, number>;
+    raw_scad: string;
+  };
+  suggested_fix?: string;
+  optimizations?: FoundryOptimization[];
+  availableReinforcements?: ReinforcementProfile[];
+}
+
+export interface FoundryState {
+  selectedMaterial: MaterialPreset;
+  parameters: Record<string, number>;
+  scadString: string;
+  safetyFactor: number;
+  isLocked: boolean;
+  jurisdiction: LegalJurisdiction;
+  designHash?: string;
+  cadResult?: FoundryCadResult;
+  activeReinforcementId?: string;
 }

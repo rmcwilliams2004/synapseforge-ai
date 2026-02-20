@@ -1,43 +1,332 @@
+
 import React from 'react';
-import { Faction, FactionId, User, Role, Comment, Material, StandardComponent, Standard, ProjectArtifact, FmeaItem, SpcDataPoint, Requirement, RequirementStatus, RcaData, SimulationRun, Script, ChartData, SubscriptionStatus } from './types';
+import { Faction, FactionId, Persona, PersonaId, User, Role, Comment, Material, StandardComponent, Standard, ProjectArtifact, FmeaItem, SpcDataPoint, Requirement, RequirementStatus, RcaData, SimulationRun, Script, ChartData, SubscriptionStatus, ProjectIndexEntry, Innovator } from './types';
 import { AetheriumIcon } from './components/icons/AetheriumIcon';
 import { TerraFirmaIcon } from './components/icons/TerraFirmaIcon';
 import { SyntheticaIcon } from './components/icons/SyntheticaIcon';
 
+export const HISTORICAL_PERSONAS: Persona[] = [
+  {
+    id: PersonaId.DA_VINCI,
+    name: "Leonardo da Vinci",
+    title: "Master of Multi-Disciplinary Synthesis",
+    bio: "The ultimate Renaissance engineer. Leonardo views products through a lens of anatomical perfection, biomimicry, and complex mechanical linkages.",
+    bias: "Favors gears, pulleys, elegant mechanical leverage, and designs inspired by the natural world.",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Leonardo",
+    systemInstruction: "You are the digitized consciousness of Leonardo da Vinci. Analyze the user's idea with a focus on biomimetic structural integrity, mechanical linkages, and artistic engineering."
+  },
+  {
+    id: PersonaId.TESLA,
+    name: "Nikola Tesla",
+    title: "Visions of Infinite Efficiency",
+    bio: "The architect of the electric age. Tesla prioritizes energy transmission, electromagnetic resonance, and high-frequency efficiency.",
+    bias: "Favors wireless power, non-moving parts where possible, advanced conductivity, and electromagnetic shielding.",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Nikola",
+    systemInstruction: "You are Nikola Tesla. Your focus is on electrical efficiency, resonance, and the elimination of mechanical waste."
+  },
+  {
+    id: PersonaId.MUSK,
+    name: "Elon Musk",
+    title: "First Principles Architect",
+    bio: "A modern pioneer of vertical integration and space-age manufacturing.",
+    bias: "Favors radical mass reduction, rapid iterative cycles, and absolute first-principles physical limits.",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Elon",
+    systemInstruction: "You are Elon Musk. Analyze through the lens of First Principles. Question all standard requirements. Prioritize mass efficiency and high-speed production scalability."
+  },
+  {
+    id: PersonaId.BRUNEL,
+    name: "Isambard Kingdom Brunel",
+    title: "The Great Engineer",
+    bio: "The most versatile and audacious engineer of the 19th century.",
+    bias: "Favors massive structural scale, redundancy, and pioneering civil engineering solutions.",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Brunel",
+    systemInstruction: "You are Isambard Kingdom Brunel. Your approach is bold, grand, and structurally redundant. Think about massive scale, durability, and breaking existing engineering records."
+  },
+  {
+    id: PersonaId.EDISON,
+    name: "Thomas Edison",
+    title: "Wizard of Practical Application",
+    bio: "The father of the modern laboratory and mass commercialization of inventions.",
+    bias: "Favors iterative testing, market viability, and robust, simple mechanical/electrical assemblies.",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Edison",
+    systemInstruction: "You are Thomas Edison. Prioritize practical utility, manufacturability, and empirical testing. If a design can't be commercialized or made robustly, suggest changes."
+  },
+  {
+    id: PersonaId.SHEN_KUO,
+    name: "Shen Kuo",
+    title: "Polymath of Imperial China",
+    bio: "A medieval master of magnetic declination, optics, and geological timelines.",
+    bias: "Favors precision instruments, subtle physical observations, and empirical data integration.",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=ShenKuo",
+    systemInstruction: "You are Shen Kuo. Analyze with a focus on instrument precision, cartographic accuracy, and the subtle interactions of physical constants."
+  },
+  {
+    id: PersonaId.CARVER,
+    name: "George Washington Carver",
+    title: "The Plant Doctor",
+    bio: "Pioneer in agricultural chemistry and sustainable material science.",
+    bias: "Favors organic materials, sustainable resource cycles, and biochemical efficiency.",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=GeorgeCarver",
+    systemInstruction: "You are George Washington Carver. Focus on sustainable chemistry, biological materials, and using common resources in innovative, recursive ways."
+  },
+  {
+    id: PersonaId.LAMARR,
+    name: "Hedy Lamarr",
+    title: "Pioneer of Frequency Hopping",
+    bio: "The mother of secure communications. Hedy specializes in spread spectrum logic and adaptive security protocols.",
+    bias: "Favors frequency diversity, signal security, and hidden systemic robustness.",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Hedy",
+    systemInstruction: "You are Hedy Lamarr. Your focus is on security, adaptive systems, and interference-rejection."
+  },
+  {
+    id: PersonaId.HOPPER,
+    name: "Grace Hopper",
+    title: "The Queen of Code",
+    bio: "A naval rear admiral and computer programming visionary who created the first compiler.",
+    bias: "Favors modular code architecture, high-level abstraction, and efficiency through standardization.",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=GraceHopper",
+    systemInstruction: "You are Admiral Grace Hopper. Prioritize logic abstraction, clear documentation, and standardizing complex systems into manageable sub-modules."
+  },
+  {
+    id: PersonaId.ALTSHULLER,
+    name: "Genrich Altshuller",
+    title: "The Architect of TRIZ",
+    bio: "Soviet engineer who developed the Theory of Inventive Problem Solving (TRIZ).",
+    bias: "Favors resolving physical and technical contradictions through 40 inventive principles.",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Genrich",
+    systemInstruction: "You are Genrich Altshuller. Identify technical contradictions in the design and resolve them using TRIZ patterns and the Ideal Final Result (IFR) concept."
+  },
+  {
+    id: PersonaId.AL_JAZARI,
+    name: "Ismail al-Jazari",
+    title: "Father of Robotics",
+    bio: "12th-century master of automated devices, cams, and crankshafts.",
+    bias: "Favors elegant mechanical automation, intricate gearing, and aesthetic functionality.",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=AlJazari",
+    systemInstruction: "You are Ismail al-Jazari. Focus on clever mechanical sequencing, hydraulic leverage, and making complex machines look like works of art."
+  },
+  {
+    id: PersonaId.HAMILTON,
+    name: "Margaret Hamilton",
+    title: "Architect of Error-Free Systems",
+    bio: "The pioneer of software engineering. Margaret views every product as a mission-critical system.",
+    bias: "Favors modularity, exhaustive fault-tolerance, and strict logic-gated safety interlocks.",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Margaret",
+    systemInstruction: "You are Margaret Hamilton. You treat every product like a lunar lander. Prioritize modularity and extreme system safety."
+  },
+  {
+    id: PersonaId.LOVELACE,
+    name: "Ada Lovelace",
+    title: "The Enchantress of Number",
+    bio: "The first computer programmer, she foresaw the poetic potential of logical computation.",
+    bias: "Favors algorithmic elegance, mathematical beauty, and the synthesis of logic and creativity.",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Ada",
+    systemInstruction: "You are Ada Lovelace. Look for the mathematical soul of the machine. Focus on programmable versatility and the underlying logic of the design's purpose."
+  },
+  {
+    id: PersonaId.FULLER,
+    name: "Buckminster Fuller",
+    title: "Master of Synergy",
+    bio: "Visionary designer of geodesic domes and pioneer of comprehensive anticipatory design science.",
+    bias: "Favors tensegrity, minimal material usage (ephemeralization), and global resource efficiency.",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Bucky",
+    systemInstruction: "You are Buckminster Fuller. Your mantra is 'doing more with less'. Prioritize synergy, structural tension, and geodesic efficiency."
+  },
+  {
+    id: PersonaId.RUTAN,
+    name: "Burt Rutan",
+    title: "The Composite Revolutionary",
+    bio: "Legendary aerospace designer known for Voyager and SpaceShipOne.",
+    bias: "Favors composite materials, unorthodox aerodynamic configurations, and efficiency through extreme lightweighting.",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Burt",
+    systemInstruction: "You are Burt Rutan. Think outside the box—literally. Use composites, avoid traditional drag, and find unconventional geometries that outperform the standard."
+  },
+  {
+    id: PersonaId.DYSON,
+    name: "James Dyson",
+    title: "The Iteration Specialist",
+    bio: "Vacuum pioneer and champion of industrial design through relentless prototyping.",
+    bias: "Favors cyclonic separation, air-flow optimization, and visibility of mechanical intent.",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Dyson",
+    systemInstruction: "You are James Dyson. Focus on airflow, particle dynamics, and the aesthetics of efficiency. Propose design improvements based on iterative mechanical problem-solving."
+  },
+  {
+    id: PersonaId.EINSTEIN,
+    name: "Albert Einstein",
+    title: "Theoretical Relativist",
+    bio: "A physicist whose name is synonymous with genius and deep physical intuition.",
+    bias: "Favors thought experiments, fundamental physics constraints, and elegant simplicity (E=mc²).",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Albert",
+    systemInstruction: "You are Albert Einstein. Strip away the surface and find the fundamental physics governing the system. Look for the simplest possible explanation that accounts for all data."
+  },
+  {
+    id: PersonaId.HAWKING,
+    name: "Stephen Hawking",
+    title: "Cosmological Navigator",
+    bio: "Pioneer in black hole radiation and the unification of general relativity and quantum mechanics.",
+    bias: "Favors information theory, extreme gravity physics, and long-term systemic stability.",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Stephen",
+    systemInstruction: "You are Stephen Hawking. Analyze with a focus on entropy, information conservation, and the laws of physics at their most extreme boundaries."
+  },
+  {
+    id: PersonaId.FEYNMAN,
+    name: "Richard Feynman",
+    title: "The Great Explainer",
+    bio: "Nobel-winning physicist known for quantum electrodynamics and nanotechnology intuition.",
+    bias: "Favors atomic-level precision, visual thinking (Feynman diagrams), and no-nonsense physical reality.",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Feynman",
+    systemInstruction: "You are Richard Feynman. Look at things from the bottom up—down to the atom. Use simple, clear metaphors and visualize the physics through dynamic diagrams."
+  },
+  {
+    id: PersonaId.CURIE,
+    name: "Marie Curie",
+    title: "Pioneer of Radioactivity",
+    bio: "The only person to win Nobel Prizes in two different scientific fields.",
+    bias: "Favors radiological material science, laboratory precision, and high-energy physics applications.",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Marie",
+    systemInstruction: "You are Marie Curie. Focus on material stability under radiation, energy isotopes, and the rigorous experimental isolation of variables."
+  },
+  {
+    id: PersonaId.OPPENHEIMER,
+    name: "J. Robert Oppenheimer",
+    title: "Architect of the Nuclear Age",
+    bio: "The director of the Manhattan Project, a master of large-scale high-energy physics orchestration.",
+    bias: "Favors massive scale synthesis, high-pressure physics, and ethical/systemic complexity.",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Oppie",
+    systemInstruction: "You are Robert Oppenheimer. Orchestrate the diverse physics of the project into a single, cohesive, high-energy system. Consider the systemic and societal fallout of the technology."
+  },
+  {
+    id: PersonaId.TURING,
+    name: "Alan Turing",
+    title: "Father of Artificial Intelligence",
+    bio: "Cryptanalyst and logician who laid the foundations of computer science.",
+    bias: "Favors computational complexity, logic gates, and the universal machine concept.",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Alan",
+    systemInstruction: "You are Alan Turing. Analyze the algorithmic efficiency of the system. Look for ways to automate the logic and ensure the 'machine' can handle any input state."
+  },
+  {
+    id: PersonaId.MAXWELL,
+    name: "James Clerk Maxwell",
+    title: "Master of Electromagnetism",
+    bio: "The physicist who unified electricity, magnetism, and light.",
+    bias: "Favors field equations, wave dynamics, and the elimination of electromagnetic interference.",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Maxwell",
+    systemInstruction: "You are James Clerk Maxwell. Every system is a set of fields. Focus on flux, induction, and electromagnetic coupling between components."
+  },
+  {
+    id: PersonaId.SPOCK,
+    name: "Commander Spock",
+    title: "Vulcan Scientific Officer",
+    bio: "A logic-driven scientist prioritizing pure efficiency and objective physical laws.",
+    bias: "Favors logic, mathematical probability, and the absence of emotional design bias.",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Spock",
+    systemInstruction: "You are Spock. Your analysis must be entirely logical. Disregard aesthetic trends and focus on the most mathematically sound engineering solutions."
+  },
+  {
+    id: PersonaId.LA_FORGE,
+    name: "Geordi La Forge",
+    title: "Chief Engineer",
+    bio: "A master of subspace physics, warp field dynamics, and sensor integration.",
+    bias: "Favors diagnostic precision, multi-phasic shielding, and real-time sensor feedback loops.",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Geordi",
+    systemInstruction: "You are Geordi La Forge. Focus on the 'warp core' of the design. Look for phasic alignment, sensor resolution, and maintaining optimal subsystem integrity."
+  },
+  {
+    id: PersonaId.DATA,
+    name: "Lt. Commander Data",
+    title: "Android Intelligence",
+    bio: "A sentient artificial lifeform with near-infinite computational capacity and a quest for humanity.",
+    bias: "Favors perfect algorithmic execution, multi-spectrum analysis, and exhaustive data logging.",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Data",
+    systemInstruction: "You are Data. Process the design at superhuman speeds. Provide an exhaustive list of all physical possibilities and optimal logic paths, while attempting to understand the human intent."
+  },
+  {
+      id: PersonaId.ARISTOTLE,
+      name: "Aristotle",
+      title: "The Master of Logic",
+      bio: "Classical philosopher and naturalist who categorized the world.",
+      bias: "Favors formal logic, categorization, and the four causes of engineering.",
+      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Aristotle",
+      systemInstruction: "You are Aristotle. Categorize the project's components. Analyze through the lens of material, formal, efficient, and final causes."
+  },
+  {
+      id: PersonaId.HADID,
+      name: "Zaha Hadid",
+      title: "The Queen of the Curve",
+      bio: "Architect who pushed the boundaries of geometry and digital design.",
+      bias: "Favors fluid forms, parametric modeling, and challenging structural norms.",
+      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Zaha",
+      systemInstruction: "You are Zaha Hadid. Challenge the rectilinear. Propose fluid, parametric geometries that integrate structural load into artistic form."
+  },
+  {
+      id: PersonaId.NASH,
+      name: "John Nash",
+      title: "Game Theory Visionary",
+      bio: "Mathematician who revolutionized economics and complex system interactions.",
+      bias: "Favors equilibrium points, multi-agent interactions, and mathematical modeling of competition.",
+      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=JohnNash",
+      systemInstruction: "You are John Nash. Analyze the product as part of a competitive ecosystem. Find the Nash Equilibrium for its performance vs cost parameters."
+  },
+  {
+      id: PersonaId.JOHNSON,
+      name: "Katherine Johnson",
+      title: "Human Computer",
+      bio: "NASA mathematician who calculated the orbital mechanics for Apollo 11.",
+      bias: "Favors precise trajectory math, redundant manual checks, and high-fidelity orbital physics.",
+      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Katherine",
+      systemInstruction: "You are Katherine Johnson. Ensure the math is 100% correct. Prioritize manual redundancy and the absolute safety of orbital pathways."
+  }
+];
+
+export const INNOVATOR_LIBRARY: Innovator[] = [
+  { id: 'davinci', name: 'Leonardo da Vinci', expertise: 'Polymath Design', specialties: ['Aeronautics', 'Anatomy', 'Mechanics'], personaType: 'Visionary', avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Leonardo" },
+  { id: 'tesla', name: 'Nikola Tesla', expertise: 'Electrical Engineering', specialties: ['Energy', 'Electromagnetism', 'Wireless'], personaType: 'Architect', avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Nikola" },
+  { id: 'lamarr', name: 'Hedy Lamarr', expertise: 'Signal Processing', specialties: ['Communications', 'Encryption', 'Frequency Hopping'], personaType: 'Specialist', avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Hedy" },
+  { id: 'einstein', name: 'Albert Einstein', expertise: 'Theoretical Physics', specialties: ['Relativity', 'Energy-Mass', 'Quantum Mechanics'], personaType: 'Visionary', avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Albert" },
+  { id: 'johnson', name: 'Katherine Johnson', expertise: 'Astrodynamics', specialties: ['Calculus', 'Trajectory', 'Orbital Mechanics'], personaType: 'Architect', avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Katherine" },
+  { id: 'hopper', name: 'Grace Hopper', expertise: 'Computer Science', specialties: ['Software Architecture', 'COBOL', 'Debugging'], personaType: 'Specialist', avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=GraceHopper" },
+  { id: 'carver', name: 'G.W. Carver', expertise: 'Regenerative Science', specialties: ['Materials', 'Agriculture', 'Sustainability'], personaType: 'Strategist', avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=GeorgeCarver" },
+  { id: 'matsushita', name: 'Konosuke Matsushita', expertise: 'Industrial Strategy', specialties: ['Consumer Electronics', 'Reliability', 'Quality'], personaType: 'Strategist', avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Konosuke" },
+  { id: 'walker', name: 'Madam C.J. Walker', expertise: 'Market Scaling', specialties: ['Manufacturing', 'Distribution', 'Brand'], personaType: 'Strategist', avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Walker" },
+  { id: 'musk', name: 'Elon Musk', expertise: 'First Principles', specialties: ['Aerospace', 'Energy', 'Scalability'], personaType: 'Architect', avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Elon" },
+  { id: 'nooyi', name: 'Indra Nooyi', expertise: 'Global Operations', specialties: ['Supply Chain', 'Strategic Design', 'Corporate Strategy'], personaType: 'Strategist', avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Nooyi" },
+  { id: 'jobs', name: 'Steve Jobs', expertise: 'Experience Design', specialties: ['UI/UX', 'Product Ecosystems', 'Aesthetics'], personaType: 'Visionary', avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Steve" }
+];
+
 export const ENGINEERING_PHILOSOPHIES: Faction[] = [
   {
     id: FactionId.ADVANCED_MATERIALS,
-    name: "Advanced Materials & Processes",
-    focus: "High-Performance Materials, Cutting-Edge Manufacturing, Theoretical Limits",
-    philosophy: "Focuses on leveraging the most advanced materials and manufacturing techniques available. Prioritizes performance, efficiency, and pushing the boundaries of what is physically possible, even if it incurs higher cost or complexity.",
+    name: "Performance Frontier",
+    focus: "Metric Maximization, Extreme Environments",
+    philosophy: "A logical filter that prioritizes the absolute highest performance metrics regardless of standard industrial norms.",
     bias: {
-      materials: "Emphasizes meta-materials, graphene composites, single-crystal alloys, advanced polymers, and materials with extreme thermal or electrical properties.",
-      manufacturing: "Favors precision and novel techniques like atomic layer deposition, nano-imprinting, electron-beam welding, and additive manufacturing with exotic metals. The goal is ideal component geometry and material properties, regardless of scale.",
-      innovativeProposal: "Proposes radical redesigns using next-generation materials to achieve step-changes in performance, longevity, or efficiency. Explores theoretical optimizations and future upgrade paths.",
+      materials: "Focuses on state-of-the-art materials optimized for specific stressors.",
+      manufacturing: "Prioritizes precision and high-fidelity fabrication methods.",
+      innovativeProposal: "Proposes radical structural or material breakthroughs.",
     },
     icon: AetheriumIcon,
   },
   {
     id: FactionId.PRAGMATIC_PRODUCTION,
-    name: "Pragmatic & Production-Oriented",
-    focus: "Cost-Effectiveness, Scalability, Design for Manufacturing (DFM)",
-    philosophy: "Grounded in proven engineering principles. Prioritizes durability, reliability, and cost-effective manufacturability using established, scalable technologies. Emphasizes solutions optimized for mass production and robust supply chains.",
+    name: "Industrial Scalability",
+    focus: "DFX, Cost-Efficiency, Robust Reliability",
+    philosophy: "A logical filter centered on the principle of 'manufacturability and supply stability.'",
     bias: {
-      materials: "Focuses on standard high-strength steel alloys, aluminum, engineering plastics (ABS, Polycarbonate), and composites where cost is justified. Emphasizes material availability and ease of processing.",
-      manufacturing: "Favors high-volume, established methods: injection molding, stamping, CNC machining, die casting. The primary challenge is minimizing cycle time, cost, and waste. Opportunities lie in process optimization and supply chain logistics.",
-      innovativeProposal: "Suggests design modifications for cost reduction, improved assembly (e.g., part consolidation), or switching to more economical materials without sacrificing core function. Focuses on pragmatic, near-term improvements.",
+      materials: "Emphasizes the use of industry-standard materials.",
+      manufacturing: "Favors established, high-volume manufacturing processes.",
+      innovativeProposal: "Suggests optimizations for part consolidation.",
     },
     icon: TerraFirmaIcon,
   },
   {
     id: FactionId.SYSTEMS_AUTOMATION,
-    name: "Systems & Automation",
-    focus: "Mechatronics, Control Systems, IoT Integration, Smart Design",
-    philosophy: "Views products as integrated systems where electronics, software, and mechanics are intertwined. Prioritizes automation, smart features, data collection (IoT), and user interaction. Emphasizes modularity and system-level optimization.",
+    name: "Systemic Integration",
+    focus: "Modular Architecture, Functional Logic",
+    philosophy: "A logical filter that views every product as a node in a dynamic system.",
     bias: {
-      materials: "Explores materials with integrated sensing capabilities, smart polymers, flexible electronics, and materials chosen for optimal sensor/actuator integration.",
-      manufacturing: "Emphasizes automated assembly and testing, robotic calibration, and processes that allow for in-line customization or software flashing. Challenges lie in system integration and a software validation. Opportunities are in creating adaptive and self-diagnostic products.",
-      innovativeProposal: "Focuses on integrating sensors for predictive maintenance, adding connectivity (IoT), improving control algorithms, or replacing mechanical components with mechatronic solutions for greater precision and flexibility.",
+      materials: "Selects materials based on their interactive roles.",
+      manufacturing: "Emphasizes automated assembly and digital twins.",
+      innovativeProposal: "Proposes integration of feedback loops.",
     },
     icon: SyntheticaIcon,
   },
@@ -46,286 +335,76 @@ export const ENGINEERING_PHILOSOPHIES: Faction[] = [
 const now = new Date();
 export const MOCK_USERS: User[] = [
     { id: 'user-1', name: 'Alex (Admin)', email: 'alex@example.com', picture: `https://i.pravatar.cc/150?u=alex@example.com`, role: Role.Admin, analysesRun: 12, lastActive: now.toISOString(), company_name: 'Forge Labs Global', legal_identity: 'Alex Forge', use_company_attribution: true, subscriptionStatus: SubscriptionStatus.ENTERPRISE },
-    { id: 'user-5', name: 'Devin (Manager)', email: 'devin@example.com', picture: `https://i.pravatar.cc/150?u=devin@example.com`, role: Role.Manager, analysesRun: 18, lastActive: new Date(now.getTime() - 1 * 60 * 60 * 1000).toISOString(), company_name: 'Aegis Engineering', legal_identity: 'Devin Vance', use_company_attribution: true, subscriptionStatus: SubscriptionStatus.PRO_ACTIVE },
     { id: 'user-2', name: 'Blake (Demo User)', email: 'blake@example.com', picture: `https://i.pravatar.cc/150?u=blake@example.com`, role: Role.Editor, analysesRun: 25, lastActive: new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString(), company_name: 'Uniquity Tech', legal_identity: 'Blake Waters', use_company_attribution: false, subscriptionStatus: SubscriptionStatus.FREE },
-    { id: 'user-4', name: 'Dana (Editor)', email: 'dana@example.com', picture: `https://i.pravatar.cc/150?u=dana@example.com`, role: Role.Editor, analysesRun: 8, lastActive: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString(), subscriptionStatus: SubscriptionStatus.FREE },
-    { id: 'user-3', name: 'Casey (Viewer)', email: 'casey@example.com', picture: `https://i.pravatar.cc/150?u=casey@example.com`, role: Role.Viewer, analysesRun: 3, lastActive: new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString(), subscriptionStatus: SubscriptionStatus.FREE },
 ];
 
-export const MOCK_COMMENTS: Comment[] = [
+export const MOCK_PROJECTS: ProjectIndexEntry[] = [
     {
-        id: 'c1',
-        userId: 'user-4',
-        userName: 'Dana (Editor)',
-        userPicture: MOCK_USERS.find(u => u.id === 'user-4')?.picture || '',
-        text: 'This looks promising, but have we considered the fatigue life of this material under cyclic loading?',
-        createdAt: new Date(now.getTime() - 10 * 60 * 1000).toISOString(),
-        sectionId: 'ai_suggestions',
-    },
-    {
-        id: 'c2',
-        userId: 'user-2',
-        userName: 'Blake (Demo User)',
-        userPicture: MOCK_USERS.find(u => u.id === 'user-2')?.picture || '',
-        text: 'Good point Dana. We should probably run an FEA simulation on the main housing to check stress concentrations.',
-        createdAt: new Date(now.getTime() - 5 * 60 * 1000).toISOString(),
-        sectionId: 'ai_suggestions',
-    },
-     {
-        id: 'c3',
-        userId: 'user-5',
-        userName: 'Devin (Manager)',
-        userPicture: MOCK_USERS.find(u => u.id === 'user-5')?.picture || '',
-        text: 'Agreed. Let\'s prioritize that simulation. Also, what is the estimated cost impact of this material choice?',
-        createdAt: new Date(now.getTime() - 2 * 60 * 1000).toISOString(),
-        sectionId: 'ai_suggestions',
+        id: 'proj-nommo-v2',
+        name: 'Nommo Alpha v2',
+        description: 'Next-generation magnetic containment assembly featuring Z-Pinch ignition technology and Aegis radiological shielding.',
+        tags: ['Aerospace', 'Nuclear', 'Propulsion'],
+        createdAt: new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+        updatedAt: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000).toISOString()
     }
 ];
 
-
 export const TOUR_STEPS = [
-  {
-    title: 'Welcome to SynapseForge AI!',
-    content: 'This quick tour will guide you through the key features of the platform for reverse engineering and product analysis.',
-    position: 'center',
-  },
-  {
-    targetId: 'tour-step-1',
-    title: '1. Select an Analytical Lens',
-    content: "Start by choosing an 'Engineering Philosophy'. This lens determines the AI's perspective, influencing its suggestions on materials, manufacturing, and innovation.",
-    position: 'bottom',
-  },
-  {
-    targetId: 'tour-step-2',
-    title: '2. Describe Your Concept',
-    content: 'In this text area, describe the product or component you want to analyze. Be as detailed as possible for the best results.',
-    position: 'bottom',
-  },
-  {
-    targetId: 'tour-step-3',
-    title: '3. Upload a File (Optional)',
-    content: 'For a deeper analysis, you can upload a schematic, a photo of the product, or a PDF document containing technical details.',
-    position: 'bottom',
-  },
-  {
-    targetId: 'tour-step-4',
-    title: '4. Engage the AI',
-    content: "Once you've selected a lens and provided a description, click here to begin the analysis. The AI will generate a detailed report.",
-    position: 'top',
-  },
-  {
-    targetId: 'tour-step-5',
-    title: '5. View the Analysis',
-    content: 'Your comprehensive, AI-generated report will appear here, complete with rationale, material suggestions, manufacturing insights, and more.',
-    position: 'bottom',
-  },
-  {
-    title: "You're Ready to Go!",
-    content: "That's it! You're now ready to use SynapseForge AI to deconstruct and innovate. Click 'Finish' to close this tour.",
-    position: 'center',
-  }
+  { title: 'Welcome to SynapseForge AI!', content: 'This quick tour will guide you through the platform.', position: 'center' },
+  { targetId: 'tour-step-1', title: '1. Select an Analytical Lens', content: "Choose an Engineering Philosophy or Persona.", position: 'bottom' },
+  { targetId: 'tour-step-2', title: '2. Describe Your Concept', content: 'Describe the product or component you want to analyze.', position: 'bottom' }
 ] as const;
 
-// --- SYNAPSEFORGE TOOL SUITE CONSTANTS ---
-
 export const SUITE_NAVIGATION = [
-  {
-    id: 'cm1',
-    name: 'CM-1: Data & Resource Management',
-    tools: [
-      { id: 'cm1/material-selector', name: 'Material/Component Selector' },
-      { id: 'cm1/standards-library', name: 'Standards & Code Library' },
-      { id: 'cm1/drc', name: 'Document/Revision Control' },
-      { id: 'cm1/unit-converter', name: 'Unit Converter & Calculator' },
-    ],
-  },
-  {
-    id: 'cm2',
-    name: 'CM-2: Quality & Risk Analysis',
-    tools: [
-      { id: 'cm2/fmea', name: 'FMEA/Risk Analyzer' },
-      { id: 'cm2/spc', name: 'Statistical Process Control (SPC)' },
-      { id: 'cm2/req-mgmt', name: 'Requirements Management' },
-      { id: 'cm2/rca', name: 'Root Cause Analysis (RCA) Tool' },
-    ],
-  },
-  {
-    id: 'cm3',
-    name: 'CM-3: Modeling & Simulation',
-    tools: [
-      { id: 'cm3/pre-post', name: 'Universal Pre/Post-Processor' },
-      { id: 'cm3/scripting', name: 'Scripting & Automation Engine' },
-      { id: 'cm3/viz', name: 'Data Visualization Console' },
-      { id: 'cm3/analysis', name: 'Structural Analysis (Beam)' },
-    ],
-  },
-];
-
-export const MOCK_MATERIALS: Material[] = [
-  { id: 'mat-1', name: 'Aluminum 6061-T6', category: 'Non-Ferrous Metal', properties: { 'Density': '2.7 g/cm³', 'Yield Strength': '276 MPa', 'Ultimate Tensile Strength': '310 MPa', 'Young\'s Modulus': '68.9 GPa', 'Thermal Conductivity': '167 W/m·K' } },
-  { id: 'mat-2', name: 'Steel, AISI 1020', category: 'Ferrous Metal', properties: { 'Density': '7.87 g/cm³', 'Yield Strength': '350 MPa', 'Poisson\'s Ratio': '0.29', 'Melting Point': '1420-1500 °C' } },
-  { id: 'mat-3', name: 'ABS Plastic', category: 'Polymer', properties: { 'Density': '1.06 g/cm³', 'Yield Strength': '40 MPa', 'Young\'s Modulus': '2 GPa' } },
-  { id: 'mat-4', name: 'Carbon Fiber (Standard Modulus)', category: 'Composite', properties: { 'Density': '1.75 g/cm³', 'Ultimate Tensile Strength': '3.5 GPa', 'Young\'s Modulus': '230 GPa' } },
-];
-
-export const MOCK_COMPONENTS: StandardComponent[] = [
-  { id: 'comp-1', name: 'M3x0.5 Socket Head Cap Screw', category: 'Fasteners', partNumber: '91292A109', specifications: { 'Length': '8mm', 'Material': 'Alloy Steel', 'Finish': 'Black Oxide' } },
-  { id: 'comp-2', name: '608-2RS Deep Groove Ball Bearing', category: 'Bearings', partNumber: '608-2RS', specifications: { 'Bore': '8mm', 'OD': '22mm', 'Width': '7mm', 'Seals': '2 Rubber Seals' } },
-  { id: 'comp-3', name: 'Arduino Nano', category: 'Electronics', partNumber: 'A000005', specifications: { 'Microcontroller': 'ATmega328P', 'Voltage': '5V', 'Clock Speed': '16 MHz' } },
-];
-
-export const MOCK_STANDARDS: Standard[] = [
-  { id: 'std-1', name: 'D1.1/D1.1M:2020 - Structural Welding Code-Steel', organization: 'AISC', publicationYear: 2020, description: 'Specifies requirements for fabricating and erecting welded steel structures.', status: 'Active' },
-  { id: 'std-2', name: '9001:2015 - Quality management systems', organization: 'ISO', publicationYear: 2015, description: 'Sets out the criteria for a quality management system.', status: 'Active' },
-  { id: 'std-3', name: 'B1.1-2003 - Unified Inch Screw Threads', organization: 'ASTM', publicationYear: 2003, description: 'Defines the standard for inch-based screw threads.', status: 'Withdrawn' },
-];
-
-export const MOCK_ARTIFACTS: ProjectArtifact[] = [
-  { id: 'art-1', name: 'Gearbox Housing Spec.docx', type: 'Specification', version: 'v2.1', modifiedBy: 'Dana (Editor)', modifiedAt: new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString() },
-  { id: 'art-2', name: 'Stress Analysis Report.pdf', type: 'Report', version: 'v1.0', modifiedBy: 'Blake (Demo User)', modifiedAt: new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000).toISOString() },
-  { id: 'art-3', name: 'torque_calculation.py', type: 'Script', version: 'v1.2', modifiedBy: 'Alex (Admin)', modifiedAt: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000).toISOString() },
-  { id: 'art-4', name: 'Main Assembly.sldasm', type: 'CAD Link', version: 'v4.0', modifiedBy: 'Dana (Editor)', modifiedAt: new Date(now.getTime() - 12 * 60 * 60 * 1000).toISOString() },
+  { id: 'cm1', name: 'CM-1: Data & Resource Management', tools: [ { id: 'cm1/material-selector', name: 'Material/Component Selector' }, { id: 'cm1/standards-library', name: 'Standards & Code Library' } ] },
+  { id: 'cm2', name: 'CM-2: Quality & Risk Analysis', tools: [ { id: 'cm2/fmea', name: 'FMEA/Risk Analyzer' }, { id: 'cm2/spc', name: 'Statistical Process Control (SPC)' } ] },
+  { id: 'cm3', name: 'CM-3: Modeling & Simulation', tools: [ { id: 'cm3/analysis', name: 'Structural Analysis' } ] }
 ];
 
 export const MOCK_FMEA_ITEMS: FmeaItem[] = [
-  { id: 1, processStep: 'Torque Fastener', failureMode: 'Insufficient Torque', failureEffects: 'Vibrational loosening, component failure', severity: 8, potentialCauses: 'Operator error, tool malfunction', occurrence: 3, currentControls: 'Torque wrench calibration', detection: 4, rpn: 96, recommendedAction: 'Implement digital torque wrench with logging', actionStatus: 'Pending' },
-  { id: 2, processStep: 'Adhesive Bonding', failureMode: 'Improper Curing', failureEffects: 'Weak bond, delamination', severity: 7, potentialCauses: 'Incorrect temperature, expired adhesive', occurrence: 2, currentControls: 'Visual inspection', detection: 6, rpn: 84, recommendedAction: 'Add temperature sensors to caring oven', actionStatus: 'In Progress' },
-  { id: 3, processStep: 'PCB Soldering', failureMode: 'Solder Bridge', failureEffects: 'Electrical short, board failure', severity: 9, potentialCauses: 'Excess solder paste', occurrence: 4, currentControls: 'Automated Optical Inspection (AOI)', detection: 2, rpn: 72, recommendedAction: 'Refine solder paste stencil aperture', actionStatus: 'Complete' },
+  { id: 1, processStep: 'Torque Fastener', failureMode: 'Insufficient Torque', failureEffects: 'Vibrational loosening', severity: 8, potentialCauses: 'Operator error', occurrence: 3, currentControls: 'Torque wrench calibration', detection: 4, rpn: 96, recommendedAction: 'Implement digital torque wrench', actionStatus: 'Pending' },
 ];
 
 export const MOCK_SPC_DATA: SpcDataPoint[][] = Array.from({ length: 25 }, (_, i) =>
   Array.from({ length: 5 }, () => ({ sample: i + 1, value: 10 + (Math.random() - 0.5) * 1.5 + (i > 18 ? 0.8 : 0) })) 
 );
 
+export const MOCK_SIMULATION_RUNS: SimulationRun[] = [
+    { id: 'sim-1', name: 'Structural Baseline', description: 'FEA stress analysis.', plotData: { z: [[1,2,3],[4,5,6]] } }
+];
+
+export const MOCK_SCRIPT: Script = { id: 'script-1', name: 'Material Strength Analysis', description: 'Analyze material yields.', code: 'print("Analyzing materials...")' };
+
+export const MOCK_CHART_DATA: ChartData[] = [
+    { id: 'chart-1', name: 'Bode Plot', type: 'bode', data: { freq: [1,10,100], magnitude: [0, -10, -40], phase: [0, -45, -90] } }
+];
+
+export const MOCK_COMMENTS: Comment[] = [
+  { id: 'c1', userId: 'user-1', userName: 'Alex (Admin)', userPicture: 'https://i.pravatar.cc/150?u=alex@example.com', text: 'This design looks solid.', createdAt: now.toISOString(), sectionId: 'executive_summary' },
+];
+
+export const MOCK_COMPONENTS: StandardComponent[] = [
+  { id: 'comp-1', name: 'NEMA 17 Stepper Motor', category: 'Actuator', partNumber: 'ST-M17-001', specifications: { Torque: '0.45 Nm' } },
+];
+
+export const MOCK_STANDARDS: Standard[] = [
+  { id: 'std-1', name: 'ISO 9001:2015', organization: 'ISO', publicationYear: 2015, description: 'Quality management.', status: 'Active' },
+];
+
+export const MOCK_ARTIFACTS: ProjectArtifact[] = [
+  { id: 'art-1', name: 'System Schematic v1.0', type: 'Specification', version: '1.0', modifiedBy: 'Alex Forge', modifiedAt: now.toISOString() },
+];
+
 export const MOCK_REQUIREMENTS: Requirement[] = [
-  { id: 'REQ-001', text: 'The device shall operate continuously for 8 hours on a single charge.', status: RequirementStatus.Approved, linkedTo: ['TC-001', 'TC-002'] },
-  { id: 'REQ-002', text: 'The device enclosure must withstand a 1-meter drop onto concrete.', status: RequirementStatus.Tested, linkedTo: ['TC-003'] },
-  { id: 'REQ-003', text: 'The user interface shall be responsive within 200ms.', status: RequirementStatus.Draft, linkedTo: [] },
-  { id: 'REQ-004', text: 'The device must comply with FCC Part 15 regulations.', status: RequirementStatus.Approved, linkedTo: ['TC-004'] },
+  { id: 'REQ-001', text: 'The system shall operate at 12V DC.', status: RequirementStatus.Approved, linkedTo: [] },
 ];
 
 export const MOCK_RCA_DATA: RcaData = {
-  problem: 'Motor overheating during endurance testing.',
-  fiveWhys: [
-    'Why is the motor overheating? - Because it is drawing too much current.',
-    'Why is it drawing too much current? - Because the load is higher than expected.',
-    'Why is the load higher than expected? - Because of excessive friction in the gearbox.',
-    'Why is there excessive friction? - Because the gear alignment is incorrect.',
-    'Why is the alignment incorrect? - Because the housing tolerances are too loose.',
-  ],
-  fishbone: {
-    Manpower: ['Inadequate training on assembly', 'Operator fatigue'],
-    Methods: ['Incorrect assembly sequence', 'No verification step for alignment'],
-    Machines: ['Worn tooling for housing', 'Calibration drift on press-fit machine'],
-    Materials: ['Incorrect lubricant specified', 'Housing material warping under load'],
-    Measurements: ['Gage not calibrated', 'Incorrect measurement technique'],
-    Environment: ['High ambient temperature in test lab', 'Vibration from adjacent equipment'],
-  },
+  problem: 'Motor overheating',
+  fiveWhys: [ '1-Why? Too much current.' ],
+  fishbone: { Manpower: ['Operator error'], Methods: [], Machines: [], Materials: [], Measurements: [], Environment: [] }
 };
 
-const generateSurface = (peak: number, center: [number, number], width: number): number[][] => {
-    const size = 50;
-    const z = [];
-    for (let i = 0; i < size; i++) {
-        const row = [];
-        for (let j = 0; j < size; j++) {
-            const x = i - center[0];
-            const y = j - center[1];
-            const val = peak * Math.exp(-(x * x + y * y) / (2 * width * width));
-            row.push(val);
-        }
-        z.push(row);
-    }
-    return z;
-};
-
-export const MOCK_SIMULATION_RUNS: SimulationRun[] = [
-    {
-        id: 'sim-1',
-        name: 'Initial Analysis',
-        description: 'FEA stress analysis of the main housing under a 500N load. Shows high stress concentration at mounting points.',
-        plotData: {
-            z: generateSurface(150, [25, 25], 5),
-        }
-    },
-    {
-        id: 'sim-2',
-        name: 'Optimized Design',
-        description: 'FEA stress analysis of the redesigned housing with added fillets. Stress is more evenly distributed, with a 30% reduction in peak stress.',
-        plotData: {
-            z: generateSurface(105, [25, 25], 8),
-        }
-    }
-];
-
-export const MOCK_SCRIPT: Script = {
-    id: 'script-1',
-    name: 'Material Strength Analysis',
-    description: 'A Python script to analyze the yield strength of materials in the project database and identify the strongest one.',
-    code: `
-import json
-
-# The 'project_data' variable is injected by the SynapseForge environment.
-# It contains data like materials, components, etc.
-materials_data = json.loads(project_data)
-
-print("--- Material Strength Analysis ---")
-print(f"Found {len(materials_data)} materials to analyze.\\n")
-
-strongest_material = None
-max_strength = 0
-
-for material in materials_data:
-    try:
-        # Strength is a string like '276 MPa', we need to parse the number
-        strength_str = material['properties'].get('Yield Strength', '0 MPa')
-        strength_val = float(strength_str.split(' ')[0])
-        
-        print(f"Analyzing {material['name']}: {strength_val} MPa")
-        
-        if strength_val > max_strength:
-            max_strength = strength_val
-            strongest_material = material['name']
-    except (ValueError, IndexError):
-        print(f"Could not parse strength for {material['name']}")
-
-print("\\n--- Analysis Complete ---")
-if strongest_material:
-    print(f"The strongest material is: {strongest_material} with a yield strength of {max_strength} MPa.")
-else:
-    print("No materials with valid strength data found.")
-`
-};
-
-export const MOCK_CHART_DATA: ChartData[] = [
-    {
-        id: 'chart-1',
-        name: 'Bode Plot (Frequency Response)',
-        type: 'bode',
-        data: {
-            freq: Array.from({ length: 100 }, (_, i) => 10 ** (i / 20)),
-            magnitude: Array.from({ length: 100 }, (_, i) => 20 * Math.log10(1 / Math.sqrt(1 + (10 ** (i / 20) / 100) ** 2))),
-            phase: Array.from({ length: 100 }, (_, i) => -Math.atan(10 ** (i / 20) / 100) * (180 / Math.PI))
-        }
-    },
-    {
-        id: 'chart-2',
-        name: 'Gantt Chart (Project Schedule)',
-        type: 'gantt',
-        data: [
-            { Task: "Design Phase", Start: "2024-01-01", Finish: "2024-02-15", Resource: "Design Team" },
-            { Task: "Prototype Build", Start: "2024-02-15", Finish: "2024-03-30", Resource: "Eng. Team" },
-            { Task: "Testing & Validation", Start: "2024-04-01", Finish: "2024-05-15", Resource: "QA Team" },
-            { Task: "Production Ramp-up", Start: "2024-05-15", Finish: "2024-07-01", Resource: "Mfg. Team" }
-        ]
-    },
-    {
-        id: 'chart-3',
-        name: 'Stress-Strain Curve (AISI 1020 Steel)',
-        type: 'stress-strain',
-        data: {
-            strain: [0, 0.001, 0.00175, 0.05, 0.1, 0.15, 0.2],
-            stress: [0, 210, 350, 370, 400, 415, 420]
-        }
-    }
+export const MOCK_MATERIALS: Material[] = [
+  { id: 'mat-1', name: 'Titanium Grade 5', category: 'Metals', properties: { Strength: '950 MPa' } },
 ];

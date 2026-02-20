@@ -1,6 +1,5 @@
-
 import React, { useRef, useState, useCallback, useEffect, useMemo } from 'react';
-import { Faction, FactionId, User } from '../types';
+import { Faction, FactionId, User, Role } from '../types';
 import { UseSetupAssistant } from '../hooks/useSetupAssistant';
 import { ENGINEERING_PHILOSOPHIES } from '../constants';
 import { RoiEditorModal } from './RoiEditorModal';
@@ -37,7 +36,9 @@ interface PromptInputProps {
   selectedFaction: Faction | null;
   activeVersionFactionId: FactionId | undefined;
   promptValidator: ReturnType<typeof usePromptValidator>;
-  hasKnowledgeContext?: boolean; // New prop
+  hasKnowledgeContext?: boolean;
+  onTechnicalIntake?: (file: File) => void;
+  onPhdResearch?: (file: File) => void;
 }
 
 const FileIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>;
@@ -110,24 +111,24 @@ export const PromptInput = ({
   activeVersionFactionId,
   promptValidator,
   hasKnowledgeContext = false,
+  onTechnicalIntake,
+  onPhdResearch,
 }: PromptInputProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [roiEditorState, setRoiEditorState] = useState<{ isOpen: boolean; file: File | null; fileIndex: number | null }>({ isOpen: false, file: null, fileIndex: null });
-  const isViewer = authenticatedUser.role === 'Viewer';
+  // Fix: Use Role.Viewer from enum instead of string literal to resolve "unintentional comparison" type error.
+  const isViewer = authenticatedUser.role === Role.Viewer;
   const { validationResult, isChecking, checkPrompt, clearValidation, error: validationError } = promptValidator;
   
-  // --- UNDO/REDO DEBOUNCING ---
   const [localPrompt, setLocalPrompt] = useState(prompt);
   const debounceTimeoutRef = useRef<number | null>(null);
 
-  // Sync local state when the external prompt prop changes (e.g., from undo/redo, version loading)
   useEffect(() => {
-    // Only update if they differ, to prevent resetting cursor position during typing
     if (localPrompt !== prompt) {
         setLocalPrompt(prompt);
     }
-  }, [prompt]);
+  }, [prompt, localPrompt]);
 
   const handleLocalPromptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newValue = e.target.value;
@@ -139,9 +140,8 @@ export const PromptInput = ({
 
     debounceTimeoutRef.current = window.setTimeout(() => {
         onPromptChange(newValue);
-    }, 500); // 500ms delay before saving to undo history
+    }, 500);
   };
-  // --- END UNDO/REDO DEBOUNCING ---
 
   const canReanalyze = selectedFaction && activeVersionFactionId && selectedFaction.id !== activeVersionFactionId;
 
@@ -152,7 +152,6 @@ export const PromptInput = ({
   const handleCropComplete = (croppedFiles: File[]) => {
       if (roiEditorState.fileIndex !== null) {
           const newFiles = [...files];
-          // Replace the single original file with the array of cropped files
           newFiles.splice(roiEditorState.fileIndex, 1, ...croppedFiles);
           onFilesChange(newFiles);
       }
@@ -170,7 +169,7 @@ export const PromptInput = ({
       const isRedo = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'y';
       const isMacRedo = event.metaKey && event.shiftKey && event.key.toLowerCase() === 'z';
 
-      if (isUndo && !event.shiftKey) { // Exclude Shift+Ctrl+Z
+      if (isUndo && !event.shiftKey) {
         event.preventDefault();
         if (canUndo) onUndo();
       } else if (isRedo || isMacRedo) {
@@ -185,12 +184,10 @@ export const PromptInput = ({
     };
   }, [canUndo, canRedo, onUndo, onRedo]);
   
-  // New useEffect to trigger validation on the local prompt for immediate feedback
   useEffect(() => {
     checkPrompt(localPrompt);
   }, [localPrompt, checkPrompt]);
   
-  // Clean up on unmount or when prompt is cleared
   useEffect(() => {
     return () => clearValidation();
   }, [clearValidation]);
@@ -274,7 +271,6 @@ export const PromptInput = ({
           disabled={isLoading || isViewer}
         />
 
-        {/* Prompt Validation Assistant */}
         {(isChecking || validationResult || validationError) && (
           <div className={`mt-4 p-3 rounded-lg animate-fade-in flex items-start gap-3 ${validationError ? 'bg-red-100 dark:bg-red-900/30 border-red-200 dark:border-red-700' : 'bg-gray-100 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700'}`}>
             {isChecking ? (
@@ -323,7 +319,6 @@ export const PromptInput = ({
               <div>
                 <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Suggested Tags:</h4>
                 <div className="flex flex-wrap gap-2 mt-1">
-                  {/* FIX: Corrected suggestedTags to suggested_tags to match SetupSuggestions interface */}
                   {setupAssistant.suggestions.suggested_tags.map(tag => (
                     <button key={tag} onClick={() => onTagsChange(Array.from(new Set([...tags, tag])))} className="px-2 py-1 text-xs rounded-full bg-purple-100 dark:bg-purple-600/50 text-purple-700 dark:text-purple-200 hover:bg-purple-200 dark:hover:bg-purple-600/80 transition">
                       + {tag}
@@ -365,7 +360,7 @@ export const PromptInput = ({
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 16.5V9.75m0 0l-3.75 3.75M12 9.75l3.75 3.75M3 17.25V8.25c0-1.121.904-2.025 2.025-2.025h13.95A2.025 2.025 0 0 1 21 8.25v9a2.025 2.025 0 0 1-2.025 2.025H5.025A2.025 2.025 0 0 1 3 17.25Z" />
               </svg>
               <p className="text-sm text-gray-500 dark:text-gray-400">Drag & drop files (Images, PDFs) or click to browse</p>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">For images, you can select a Region of Interest (ROI) after uploading.</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">For images, select ROI; for PDFs, trigger Technical Intake.</p>
             </div>
           ) : (
             <div className="w-full text-left">
@@ -380,24 +375,43 @@ export const PromptInput = ({
                   Clear
                 </button>
               </div>
-              <ul className="text-xs space-y-1 max-h-36 overflow-y-auto pr-2">
+              <ul className="text-xs space-y-1 max-h-48 overflow-y-auto pr-2">
                 {files.map((file, index) => (
-                   <li key={index} className="flex items-center justify-between gap-2 p-1 bg-gray-100 dark:bg-gray-700/50 rounded">
+                   <li key={index} className="flex flex-col gap-1 p-2 bg-gray-100 dark:bg-gray-700/50 rounded group">
                         <div className="flex items-center gap-2 min-w-0 text-gray-700 dark:text-gray-200">
                             <FileIcon />
-                            <span className="truncate flex-1" title={file.name}>{file.name}</span>
-                            {file.name.startsWith('roi_') && <span className="text-xs text-cyan-600 dark:text-cyan-400 font-semibold flex-shrink-0">[ROI]</span>}
+                            <span className="truncate flex-1 font-medium" title={file.name}>{file.name}</span>
+                            {file.name.startsWith('roi_') && <span className="text-[10px] text-cyan-600 dark:text-cyan-400 font-bold uppercase tracking-tighter">[ROI]</span>}
                         </div>
-                        {file.type.startsWith('image/') && !file.name.startsWith('roi_') && !isViewer && (
-                            <button
-                                onClick={(e) => { e.stopPropagation(); handleOpenRoiEditor(file, index); }}
-                                className="text-xs py-1 px-2 bg-gray-200 dark:bg-gray-700 rounded hover:bg-gray-300 dark:hover:bg-gray-500 transition-transform active:scale-95 flex-shrink-0 text-gray-700 dark:text-gray-200"
-                                disabled={isLoading}
-                                title="Select a specific region of the image for analysis"
-                            >
-                                Edit ROI
-                            </button>
-                        )}
+                        <div className="flex gap-2 mt-1">
+                            {file.type.startsWith('image/') && !file.name.startsWith('roi_') && !isViewer && (
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); handleOpenRoiEditor(file, index); }}
+                                    className="text-[9px] py-1 px-2 bg-gray-200 dark:bg-gray-700 rounded hover:bg-brand-cyan hover:text-white transition-all active:scale-95 text-gray-700 dark:text-gray-200 font-black uppercase tracking-widest"
+                                    disabled={isLoading}
+                                >
+                                    Select ROI
+                                </button>
+                            )}
+                            {file.type === 'application/pdf' && !isViewer && onTechnicalIntake && (
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); onTechnicalIntake(file); }}
+                                    className="text-[9px] py-1 px-2 bg-brand-cyan/20 text-brand-cyan border border-brand-cyan/30 rounded hover:bg-brand-cyan hover:text-white transition-all active:scale-95 font-black uppercase tracking-widest"
+                                    disabled={isLoading}
+                                >
+                                    Technical Intake
+                                </button>
+                            )}
+                            {file.type === 'application/pdf' && !isViewer && onPhdResearch && (
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); onPhdResearch(file); }}
+                                    className="text-[9px] py-1 px-2 bg-purple-600/20 text-purple-400 border border-purple-500/30 rounded hover:bg-purple-600 hover:text-white transition-all active:scale-95 font-black uppercase tracking-widest"
+                                    disabled={isLoading}
+                                >
+                                    PhD Research
+                                </button>
+                            )}
+                        </div>
                     </li>
                 ))}
               </ul>

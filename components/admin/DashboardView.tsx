@@ -1,163 +1,109 @@
 
 import React, { useMemo } from 'react';
-// FIX: Changed Project to ProjectIndexEntry to avoid needing the full 'history' object.
 import { User, ProjectIndexEntry, LogEntry, Role } from '../../types';
-import { generateSystemVerificationPDF } from '../../services/pdfService';
-
-interface StatCardProps {
-    title: string;
-    value: string | number;
-    icon: React.ReactNode;
-}
-const StatCard = ({ title, value, icon }: StatCardProps) => (
-    <div className="bg-gray-800 border border-gray-700 p-6 rounded-lg flex items-center gap-6">
-        <div className="bg-gray-700 p-4 rounded-full">{icon}</div>
-        <div>
-            <p className="text-gray-400 text-sm font-medium">{title}</p>
-            <p className="text-3xl font-bold text-white">{value}</p>
-        </div>
-    </div>
-);
-
-const BarChart = ({ data, title }: { data: { label: string; value: number, color?: string }[], title: string }) => {
-    const maxValue = Math.max(...data.map(d => d.value), 1);
-    return (
-        <div className="bg-gray-800 border border-gray-700 p-6 rounded-lg">
-            <h3 className="text-lg font-semibold text-brand-light mb-4">{title}</h3>
-            <div className="space-y-4">
-                {data.map(item => (
-                    <div key={item.label} className="grid grid-cols-4 items-center gap-4">
-                        <span className="text-sm text-gray-400 col-span-1 truncate">{item.label}</span>
-                        <div className="col-span-3 bg-gray-700 rounded-full h-6">
-                            <div
-                                className={`${item.color || 'bg-purple-600'} h-6 rounded-full flex items-center justify-end px-2`}
-                                style={{ width: `${(item.value / maxValue) * 100}%` }}
-                            >
-                                <span className="text-xs font-bold text-white">{item.value}</span>
-                            </div>
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-};
-
-const Icons = {
-    Users: () => <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M15 21a6 6 0 00-9-5.197M15 21a6 6 0 00-9-5.197" /></svg>,
-    Projects: () => <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>,
-    Analyses: () => <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M12 6V3m0 18v-3M5.636 5.636l-1.414-1.414m15.152 0l-1.414 1.414M5.636 18.364l-1.414 1.414m15.152 0l-1.414-1.414M12 12a5 5 0 11-10 0 5 5 0 0110 0z" /></svg>,
-    LogInfo: () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-blue-400"><path strokeLinecap="round" strokeLinejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" /></svg>,
-    LogWarn: () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-yellow-400"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" /></svg>,
-    Health: () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6 text-green-400"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>,
-};
-
+import { Activity, Layers, Zap, Globe, ShieldCheck, ChevronRight } from 'lucide-react';
 
 interface DashboardViewProps {
     users: User[];
-    // FIX: Changed projects prop to use ProjectIndexEntry.
     projects: ProjectIndexEntry[];
     logs: LogEntry[];
 }
 
+const SummaryCard = ({ label, value, icon: Icon, trend, color }: any) => (
+    <div className="bg-white border border-slate-200 p-8 rounded-[2rem] shadow-sm flex flex-col justify-between h-48 group hover:border-brand-cyan transition-all duration-300">
+        <div className="flex justify-between items-start">
+            <div className={`p-3 rounded-2xl bg-slate-50 ${color} group-hover:bg-brand-cyan group-hover:text-white transition-all shadow-sm`}>
+                <Icon className="w-6 h-6" />
+            </div>
+            {trend && <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">+{trend}%</span>}
+        </div>
+        <div>
+            <p className="text-4xl font-black text-slate-900 italic tracking-tighter leading-none mb-2">{value}</p>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</p>
+        </div>
+    </div>
+);
+
 export const DashboardView = ({ users, projects, logs }: DashboardViewProps) => {
-
-    const adminUser = users.find(u => u.role === Role.Admin) || users[0];
-
-    // FIX: Changed totalAnalyses calculation to be based on user.analysesRun.
-    // This is more accurate to the metric "Analyses Run" and removes the dependency on the full project.history object.
-    const totalAnalyses = useMemo(() => {
-        return users.reduce((sum, user) => sum + user.analysesRun, 0);
-    }, [users]);
-
-    const modelUsageData = useMemo(() => {
-        const coreAnalysisCount = logs.filter(log => log.message.includes('Core Analysis Failed') || log.message.includes('completed successfully')).length;
-        const drawingCount = logs.filter(log => log.message.includes('2D drawing generation')).length / 2;
-        const videoCount = logs.filter(log => log.message.includes('video generation')).length / 2;
-        const devinciCount = logs.filter(log => log.message.includes('DeVinci session')).length / 2;
-
-        return [
-            { label: 'Core Analysis', value: Math.round(coreAnalysisCount) },
-            { label: '2D Drawings', value: Math.round(drawingCount) },
-            { label: 'Video Animations', value: Math.round(videoCount) },
-            { label: 'DeVinci Sessions', value: Math.round(devinciCount) },
-        ].sort((a,b) => b.value - a.value);
-    }, [logs]);
-
-    const recentActivity = useMemo(() => {
-        return logs
-            .filter(log => log.level !== 'ERROR')
-            .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-            .slice(0, 5);
-    }, [logs]);
-
-    const topUsersData = useMemo(() => {
-        return [...users]
-            .sort((a, b) => b.analysesRun - a.analysesRun)
-            .slice(0, 5)
-            .map(user => ({ label: user.name, value: user.analysesRun, color: 'bg-cyan-600' }));
-    }, [users]);
-    
-    const factionUsageData = useMemo(() => {
-        const counts: Record<string, number> = {};
-        const factionRegex = /with faction "([^"]+)"/;
-        logs.forEach(log => {
-            const match = log.message.match(factionRegex);
-            if (match && match[1]) {
-                counts[match[1]] = (counts[match[1]] || 0) + 1;
-            }
-        });
-        return Object.entries(counts)
-            .map(([label, value]) => ({ label, value, color: 'bg-teal-600' }))
-            .sort((a, b) => b.value - a.value);
-    }, [logs]);
+    const activeSyncs = useMemo(() => projects.length, [projects]);
+    const analysesRun = useMemo(() => users.reduce((sum, u) => sum + u.analysesRun, 0), [users]);
 
     return (
-        <div className="space-y-6 animate-fade-in">
-            <h2 className="text-2xl font-bold text-brand-light">Admin Dashboard</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <StatCard title="Total Users" value={users.length} icon={<Icons.Users />} />
-                <StatCard title="Total Projects" value={projects.length} icon={<Icons.Projects />} />
-                <StatCard title="Total Analyses Run" value={totalAnalyses} icon={<Icons.Analyses />} />
+        <div className="space-y-12 animate-fade-in">
+            <div className="flex justify-between items-end">
+                <div>
+                    <h2 className="text-3xl font-black text-slate-900 uppercase italic tracking-tighter leading-none">Strategic Overview</h2>
+                    <p className="text-slate-500 text-[10px] mt-4 font-black uppercase tracking-[0.2em]">Cross-Tenant Innovation Metrics</p>
+                </div>
+                <div className="bg-brand-cyan/5 border border-brand-cyan/20 px-6 py-3 rounded-2xl flex items-center gap-3">
+                    <Globe className="w-4 h-4 text-brand-cyan animate-pulse" />
+                    <span className="text-[10px] font-black text-brand-cyan uppercase tracking-widest">PLaaS Global Shard 01 Active</span>
+                </div>
             </div>
 
-            <div className="bg-gray-800 border-2 border-brand-cyan/20 p-6 rounded-2xl flex items-center justify-between shadow-xl">
-                <div className="flex items-center gap-6">
-                    <div className="p-4 bg-green-900/20 rounded-full border border-green-500/30">
-                        <Icons.Health />
-                    </div>
-                    <div>
-                        <h3 className="text-lg font-black text-white uppercase italic tracking-tighter">System Health: OPTIMAL</h3>
-                        <p className="text-xs text-gray-400 mt-1">Platform v12.1.2 // Ultra-Tier Protocols Verified</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <SummaryCard label="Active Synapses" value={activeSyncs} icon={Layers} trend="12" color="text-brand-cyan" />
+                <SummaryCard label="Total Physical Solves" value={analysesRun} icon={Zap} trend="5" color="text-purple-500" />
+                <SummaryCard label="Identity Nodes" value={users.length} icon={ShieldCheck} color="text-emerald-500" />
+                <SummaryCard label="Compute Shards" value="12" icon={Activity} color="text-slate-400" />
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Recent High-Fidelity Events */}
+                <div className="lg:col-span-2 space-y-6">
+                    <h3 className="text-xs font-black text-slate-500 uppercase tracking-[0.25em] ml-1">Live Bus Activity Monitor</h3>
+                    <div className="bg-white border border-slate-200 rounded-[2.5rem] overflow-hidden shadow-sm">
+                        <div className="divide-y divide-slate-100">
+                            {logs.slice(0, 6).map(log => (
+                                <div key={log.id} className="p-6 flex items-center justify-between hover:bg-slate-50 transition-colors group">
+                                    <div className="flex items-center gap-6">
+                                        <div className={`w-2 h-2 rounded-full ${log.level === 'INFO' ? 'bg-brand-cyan' : log.level === 'WARN' ? 'bg-amber-500' : 'bg-red-500'}`} />
+                                        <div className="min-w-0">
+                                            <p className="text-xs font-black text-slate-900 uppercase tracking-tight truncate">{log.message}</p>
+                                            <p className="text-[9px] text-slate-400 font-bold uppercase mt-1">Tenant: {log.user} // ID: {log.id}</p>
+                                        </div>
+                                    </div>
+                                    <span className="text-[10px] font-mono text-slate-400 font-bold group-hover:text-slate-900 transition-colors">{new Date(log.timestamp).toLocaleTimeString()}</span>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </div>
-                <button 
-                    onClick={() => generateSystemVerificationPDF(adminUser)}
-                    className="px-6 py-3 bg-brand-cyan text-gray-900 font-black uppercase tracking-widest text-xs rounded-xl hover:bg-cyan-400 transition-all shadow-lg shadow-cyan-900/30 active:scale-95"
-                >
-                    Generate Verification Report
-                </button>
-            </div>
 
-            <BarChart data={modelUsageData} title="AI Model Usage" />
-            <BarChart data={topUsersData} title="Top Active Users (by Analyses)" />
-            <BarChart data={factionUsageData} title="Faction Usage Distribution" />
-
-            <div className="bg-gray-800 border border-gray-700 p-6 rounded-lg">
-                <h3 className="text-lg font-semibold text-brand-light mb-4">Recent Activity</h3>
-                <ul className="space-y-3">
-                    {recentActivity.map(log => (
-                        <li key={log.id} className="flex items-start gap-3 text-sm">
-                            <div className="flex-shrink-0 mt-1">
-                                {log.level === 'INFO' ? <Icons.LogInfo /> : <Icons.LogWarn />}
+                {/* Grid Status Quick Actions */}
+                <div className="space-y-6">
+                    <h3 className="text-xs font-black text-slate-500 uppercase tracking-[0.25em] ml-1">Control Interlocks</h3>
+                    <div className="bg-slate-900 p-8 rounded-[2.5rem] space-y-6 shadow-2xl relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-4 opacity-10">
+                            <Zap className="w-20 h-20 text-white" />
+                        </div>
+                        <div className="relative z-10 space-y-6">
+                            <button className="w-full flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 transition-all text-left">
+                                <div>
+                                    <p className="text-[10px] font-black text-brand-cyan uppercase tracking-widest mb-1">Agnostic Wipe</p>
+                                    <p className="text-[9px] text-slate-500 uppercase font-bold">Hard Reset session buffers</p>
+                                </div>
+                                <ChevronRight className="w-4 h-4 text-slate-500" />
+                            </button>
+                            <button className="w-full flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 transition-all text-left">
+                                <div>
+                                    <p className="text-[10px] font-black text-purple-400 uppercase tracking-widest mb-1">Compute Overdrive</p>
+                                    <p className="text-[9px] text-slate-500 uppercase font-bold">Priority token allocation</p>
+                                </div>
+                                <ChevronRight className="w-4 h-4 text-slate-500" />
+                            </button>
+                            <div className="pt-4 border-t border-white/5">
+                                <div className="flex justify-between items-center mb-2">
+                                    <span className="text-[9px] font-black text-slate-500 uppercase">Mesh Solver Capacity</span>
+                                    <span className="text-[10px] font-black text-emerald-400">92%</span>
+                                </div>
+                                <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+                                    <div className="w-[92%] h-full bg-brand-cyan shadow-[0_0_10px_#06b6d4]"></div>
+                                </div>
                             </div>
-                            <div>
-                                <p className="text-gray-300">{log.message}</p>
-                                <p className="text-xs text-gray-500">{new Date(log.timestamp).toLocaleString()}</p>
-                            </div>
-                        </li>
-                    ))}
-                </ul>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     );

@@ -1,83 +1,53 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Faction, ProjectVersion, Project, AnalysisResult, User, LogEntry, Role, GeneratedDrawing, FactionId, GeneratedImage, EditorState, RotorModel, CadData, InProgressState, IngestedDocument, ProjectIndexEntry, SubscriptionStatus, EngineeringBranch, DomainCategory, SystemState, FoundryCadResult, NalPrecision } from './types';
-import { ENGINEERING_PHILOSOPHIES, TOUR_STEPS, MOCK_USERS } from './constants';
+import { Faction, ProjectVersion, Project, AnalysisResult, User, LogEntry, Role, GeneratedDrawing, FactionId, Persona, PersonaId, GeneratedImage, EditorState, RotorModel, CadData, InProgressState, IngestedDocument, ProjectIndexEntry, SubscriptionStatus, EngineeringBranch, DomainCategory, SystemState, FoundryCadResult, NalPrecision, SimulationResult, ReinforcementProfile, Innovator, ProjectTask, ComputeEvent, IpAuditEntry } from './types';
+import { ENGINEERING_PHILOSOPHIES, MOCK_USERS, HISTORICAL_PERSONAS } from './constants';
 import { useAnalysis } from './hooks/useAnalysis';
 import { useVideoGenerator } from './hooks/useVideoGenerator';
 import { Header } from './components/Header';
 import { FactionSelector } from './components/FactionSelector';
+import { PersonaSelector } from './components/PersonaSelector';
 import { PromptInput } from './components/PromptInput';
 import { AnalysisDisplay } from './components/AnalysisDisplay';
-import { Tour } from './components/Tour';
-import { ProjectManager } from './components/ProjectManager';
+import { InitialView } from './components/analysis/InitialView';
+import { Sidebar } from './components/Sidebar';
 import { useProjects } from './hooks/useProjects';
 import { DeVinciModal } from './components/DeVinciModal';
 import { useDrawingGenerator } from './hooks/useDrawingGenerator';
-import { useAnalysisPersistence } from './hooks/useAnalysisPersistence';
-import { UserManualModal } from './components/UserManualModal';
-import { TechnicalDocumentModal } from './components/TechnicalDocumentModal';
-import { AdminDashboard } from './components/admin/AdminDashboard';
-import { ProjectModal } from './components/ProjectModal';
-// Added missing import for CommitModal
-import { CommitModal } from './components/CommitModal';
-import { AuthPage } from './components/AuthPage';
-import { ProfileModal } from './components/ProfileModal';
-import { ImageIdentifierModal } from './components/ImageIdentifierModal';
-import { VoiceCommanderWidget } from './components/VoiceCommanderWidget';
-import { useUndoRedo } from './hooks/useUndoRedo';
-import { useSummaryGenerator } from './hooks/useSummaryGenerator';
 import { useCadGenerator } from './hooks/useCadGenerator';
 import { useDeVinci } from './hooks/useDeVinci';
 import { 
-    extractProjectDetailsFromPdf,
-    extractProjectDetailsFromImage,
-    extractProjectDetailsFromVideo,
     extractProjectDetailsFromVideoUrl,
     parseApiError,
-    ExtractedProjectDetails,
-    createProjectFunctionDeclaration,
     runGenesisVerificationFunctionDeclaration,
-    runFoundrySimulationFunctionDeclaration
+    runFoundrySimulationFunctionDeclaration,
+    triggerFullAnalysisFunctionDeclaration,
+    performSystemMapping
 } from './services/geminiService';
-import * as googleApiService from './services/googleApiService';
-import { projectApi } from './services/productionApiService';
 import { useInspirationalImageGenerator } from './hooks/useInspirationalImageGenerator';
 import { useSetupAssistant } from './hooks/useSetupAssistant';
-import { useGoogleExporter } from './hooks/useGoogleExporter';
 import { useTts } from './hooks/useTts';
 import { useSimulation } from './hooks/useSimulation';
 import { useFabricationPlanner } from './hooks/useFabricationPlanner';
-import { useImageIdentifier } from './hooks/useImageIdentifier';
-import { useVersionComparer } from './hooks/useVersionComparer';
 import { useGCodeVisualizer } from './hooks/useGCodeVisualizer';
 import { useSuggestionExplorer } from './hooks/useSuggestionExplorer';
 import { useBomSourcing } from './hooks/useBomSourcing';
 import { usePromptValidator } from './hooks/usePromptValidator';
 import { useLiveCosting } from './hooks/useLiveCosting';
 import { useNextStepAssistant } from './hooks/useNextStepAssistant';
-import { useVoiceCommander } from './hooks/useVoiceCommander';
-import { useAppVoice } from './hooks/useAppVoice';
-import { createDrawingsZip } from './services/zipService';
-import { persistProjectData } from './services/StorageManager';
 import { useAiChat } from './hooks/useAiChat';
-import { AiChatModal } from './components/AiChatModal';
 import { ToolSuite } from './components/suite/ToolSuite';
 import { VideoImportModal } from './components/VideoImportModal';
 import { usePatentGenerator } from './hooks/usePatentGenerator';
 import { PricingPage } from './components/PricingPage';
-import { OnboardingFlow } from './components/OnboardingFlow';
 import { AccountPage } from './components/AccountPage';
-import { LegalGuard } from './components/LegalGuard';
 import { Footer } from './components/Footer';
-import { PartnerIndemnityModal } from './components/PartnerIndemnityModal';
-import { SystemStatusIndicator, DiagnosticsPanel } from './components/SystemActivationOverlay';
-import { SystemToast } from './components/SystemToast';
-import { ConfigurationGateModal } from './components/ConfigurationGateModal';
-import { useForgeController } from './hooks/useForgeController';
-import { useProjectExport } from './hooks/useProjectExport';
-import { useForgeVoice } from './hooks/useForgeVoice';
-import { MATERIAL_LIBRARY } from './constants/materialLibrary';
-import { CadViewerModal } from './components/cad/CadViewerModal';
+import { useUndoRedo } from './hooks/useUndoRedo';
+import { AuthPage } from './components/AuthPage';
+import { ProjectInitiationModal } from './components/dashboard/ProjectInitiationModal';
+import { AdminDashboard } from './components/admin/AdminDashboard';
+import { TechnicalDocumentModal } from './components/TechnicalDocumentModal';
+import { useAnalysisPersistence } from './hooks/useAnalysisPersistence';
 
 const useRossAnalysis = (addLog: (level: LogEntry['level'], message: string) => void) => {
     const workerRef = useRef<Worker | null>(null);
@@ -257,90 +227,44 @@ json.dumps(results)
     return { isRossReady, isRossRunning, rossStatus, rossResult, rossError: rossResultError, runAnalysis };
 };
 
-
-const fileToDataUrl = (file: File): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-};
-
-const fileToGenerativePart = (file: File) => {
-  return new Promise<{inlineData: {data: string, mimeType: string}}>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => {
-        const data = (reader.result as string).split(',')[1];
-        resolve({
-            inlineData: {
-                data,
-                mimeType: file.type,
-            }
-        });
-    };
-    reader.onerror = (error) => reject(error);
-  });
-};
-
 export function App() {
   const { 
-    projects, 
-    activeProject, 
-    onNewProject,
-    updateProjectDetails,
-    onDeleteProject, 
-    onSelectProject,
-    saveNewVersion,
-    revertToVersion,
-    addIngestedDocument,
-    removeIngestedDocument,
-    loadProject,
-    updateVersion
+    projects, activeProject, onNewProject, onDeleteProject, onSelectProject,
+    saveNewVersion, revertToVersion, addIngestedDocument, removeIngestedDocument, updateVersion, updateProjectTasks, loadProject
   } = useProjects();
   
   const [projectName, setProjectName] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [activeVersionIndex, setActiveVersionIndex] = useState(0);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [rotorModel, setRotorModel] = useState<RotorModel | undefined>();
+  const [selectedCouncil, setSelectedCouncil] = useState<Innovator[]>([]);
+
+  // Admin and State-controlled lists
+  const [usersList, setUsersList] = useState<User[]>(MOCK_USERS.map(u => ({...u, forgeCredits: 500})));
+  const [personasList, setPersonasList] = useState<Persona[]>(HISTORICAL_PERSONAS);
+  const [computeEvents, setComputeEvents] = useState<ComputeEvent[]>([
+      { id: 'ev-1', timestamp: new Date().toISOString(), type: 'FOUNDRY_SYNTHESIS', user: 'Alex', cost: 45.2, status: 'SUCCESS' },
+      { id: 'ev-2', timestamp: new Date().toISOString(), type: 'GENESIS_AUDIT', user: 'Blake', cost: 120.0, status: 'SUCCESS' }
+  ]);
+  const [ipAuditLogs, setIpAuditLogs] = useState<IpAuditEntry[]>([]);
 
   const {
-    state: editorState,
-    setState: setEditorState,
-    undo: undoEditorState,
-    redo: redoEditorState,
-    canUndo: canUndoEditorState,
-    canRedo: canRedoEditorState,
-    resetState: resetEditorState,
-  } = useUndoRedo<EditorState>({ prompt: '', selectedFaction: null, tags: [] });
-  const { prompt, selectedFaction, tags } = editorState;
+    state: editorState, setState: setEditorState, undo: undoEditorState, redo: redoEditorState,
+    canUndo: canUndoEditorState, canRedo: canRedoEditorState, resetState: resetEditorState,
+  } = useUndoRedo<EditorState>({ prompt: '', selectedFaction: null, selectedPersona: null, selectionMode: 'philosophy', tags: [] });
+  const { prompt, selectedFaction, selectedPersona, selectionMode, tags } = editorState;
   
   const [authenticatedUser, setAuthenticatedUser] = useState<User | null>(null);
-  const [isOnboarding, setIsOnboarding] = useState(false);
   const [viewMode, setViewMode] = useState<'app' | 'admin' | 'suite' | 'pricing' | 'account'>('app');
-  const [users, setUsers] = useState<User[]>(MOCK_USERS);
   const [logs, setLogs] = useState<LogEntry[]>([]);
 
-  const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
-  const [isConfigGateOpen, setIsConfigGateOpen] = useState(false);
-  const [projectToEdit, setProjectToEdit] = useState<Project | null>(null);
-  const [initialProjectData, setInitialProjectData] = useState<ExtractedProjectDetails | null>(null);
-  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
-  const [isUserManualOpen, setIsUserManualOpen] = useState(false);
-  const [isTechDocOpen, setIsTechDocOpen] = useState(false);
-  const [isTourOpen, setIsTourOpen] = useState(false);
-  const [tourStep, setTourStep] = useState(0);
-  const [isGoogleDocPreviewOpen, setIsGoogleDocPreviewOpen] = useState(false);
-  const [isAiChatOpen, setIsAiChatOpen] = useState(false);
+  const [isInitiationModalOpen, setIsInitiationModalOpen] = useState(false);
   const [isVideoImportModalOpen, setIsVideoImportModalOpen] = useState(false);
-  const [isPartnerModalOpen, setIsPartnerModalOpen] = useState(false);
-  const [showDiagnostics, setShowDiagnostics] = useState(false);
-  // Added missing modal states to resolve "Cannot find name" errors
-  const [isIdentifierModalOpen, setIsIdentifierModalOpen] = useState(false);
-  const [isCommitModalOpen, setIsCommitModalOpen] = useState(false);
-  const [isCadViewerOpen, setIsCadViewerOpen] = useState(false);
+  const [isDeVinciOpen, setIsDeVinciOpen] = useState(false);
+  const [isNeuralIngesting, setIsNeuralIngesting] = useState(false);
+  const [isTechDocOpen, setIsTechDocOpen] = useState(false);
+
+  // Persistence Hook
+  const { saveInProgressAnalysis, loadInProgressAnalysis, clearInProgressAnalysis } = useAnalysisPersistence();
 
   const addLog = useCallback((level: LogEntry['level'], message: string, overrideContext?: { user?: string, project?: string }) => {
     const user = overrideContext?.user || authenticatedUser?.name || 'System';
@@ -348,32 +272,83 @@ export function App() {
     setLogs(prev => [...prev, { id: Date.now(), timestamp: new Date().toISOString(), level, message, user, context: project }]);
   }, [authenticatedUser, activeProject]);
 
+  // SESSION HYDRATION: Load in-progress work on mount
+  useEffect(() => {
+    const hydrate = async () => {
+        const saved = await loadInProgressAnalysis();
+        if (saved) {
+            setProjectName(saved.projectName);
+            setEditorState({
+                prompt: saved.prompt,
+                tags: saved.tags,
+                selectedFaction: saved.factionId ? (ENGINEERING_PHILOSOPHIES.find(f => f.id === saved.factionId) || null) : null,
+                selectedPersona: null,
+                selectionMode: 'philosophy'
+            });
+            // We don't restore the full AnalysisResult to keep the bundle small, 
+            // but we've restored the context to let them pick up where they left off.
+            addLog('INFO', `Session hydrated for project: ${saved.projectName}`);
+        }
+    };
+    hydrate();
+  }, [loadInProgressAnalysis, setEditorState, addLog]);
+
+  // PRE-EMPTIVE AUTO-SAVE: Track editor changes
+  useEffect(() => {
+      if (projectName && prompt) {
+          saveInProgressAnalysis({
+              projectName,
+              prompt,
+              tags,
+              factionId: selectedFaction?.id || FactionId.PRAGMATIC_PRODUCTION,
+              result: {} as AnalysisResult, // Placeholder for minimal footprint
+              drawings: [],
+              inspirationalImages: []
+          });
+      }
+  }, [projectName, prompt, tags, selectedFaction, saveInProgressAnalysis]);
+
+
+
   const { result, isLoading, error, generateAnalysis: performAnalysis, clearAnalysis, setResult } = useAnalysis(addLog);
-  const { saveInProgressAnalysis, loadInProgressAnalysis, clearInProgressAnalysis } = useAnalysisPersistence();
-  
-  const activeVersion: ProjectVersion | null = useMemo(() => {
-    if (!activeProject) return null;
-    return (activeProject.history || [])[activeVersionIndex] || (activeProject.history || [])[0];
-  }, [activeProject, activeVersionIndex]);
-  
-  const displayedResult = result || activeVersion?.result || null;
+  const { drawings, requestDrawing, removeDrawing, toggleDrawingReportInclusion, addLocalSnapshot } = useDrawingGenerator(addLog);
+  const { inspirationalImages, requestInspirationalImage, removeInspirationalImage, toggleImageReportInclusion } = useInspirationalImageGenerator(addLog);
+  const { videoUrl, isVideoLoading, generateVideo } = useVideoGenerator(addLog);
+  const { cadData, foundryResult, isCadLoading, generateCad } = useCadGenerator(addLog);
 
-  const { isSummaryLoading, generateSummary, clearSummary } = useSummaryGenerator(addLog);
-  const { cadData, foundryResult, isCadLoading, cadError, generateCad, clearCad } = useCadGenerator(addLog);
+  const devinci = useDeVinci();
 
-  const creationDeVinci = useDeVinci();
-  const [deVinciMode, setDeVinciMode] = useState<'creation' | 'brainstorm' | null>(null);
-  const [isParsingPdf, setIsParsingPdf] = useState(false);
-  const [isParsingImage, setIsParsingImage] = useState(false);
-  const [isParsingVideo, setIsParsingVideo] = useState(false);
-  const [isParsingForBrainstorm, setIsParsingForBrainstorm] = useState(false);
+  useEffect(() => {
+      const handleRedline = (e: any) => {
+          const { query, conflictingComponent } = e.detail;
+          addLog('WARN', `Foundry Redline: ${conflictingComponent} - ${query}`);
+          
+          const councilNames = selectedCouncil.map(s => s.name).join(', ');
+          const baseInstruction = `You are the DeVinci Partner. I have hit a technical redline in the **${conflictingComponent}**. 
+          Based on the "Solid Balloon" whitepaper, this flight path requires 15% more lift than the current lattice volume provides. 
+          
+          Query: "${query}"
+          
+          Should I increase the Hydro-Heliogel density, or is there a secondary propulsion source I missed? Ask Richard.`;
+
+          devinci.startConversation({
+              systemInstruction: baseInstruction,
+              voice: 'Zephyr',
+              tools: [],
+              authenticatedUser,
+              activeCad: null
+          });
+          setIsDeVinciOpen(true);
+      };
+
+      window.addEventListener('foundry-redline', handleRedline);
+      return () => window.removeEventListener('foundry-redline', handleRedline);
+  }, [selectedCouncil, authenticatedUser, devinci, addLog]);
   const setupAssistant = useSetupAssistant();
   const rossAnalysis = useRossAnalysis(addLog);
   const tts = useTts(addLog);
   const simulation = useSimulation(addLog);
   const fabricationPlanner = useFabricationPlanner(addLog);
-  const imageIdentifier = useImageIdentifier(addLog);
-  const versionComparer = useVersionComparer(addLog);
   const gcodeVisualizer = useGCodeVisualizer(addLog);
   const suggestionExplorer = useSuggestionExplorer(addLog);
   const bomSourcing = useBomSourcing(addLog);
@@ -383,910 +358,312 @@ export function App() {
   const aiChat = useAiChat(addLog, activeProject?.knowledgeBase || [], activeProject?.id);
   const patentGenerator = usePatentGenerator(addLog);
 
-  const forgeController = useForgeController(authenticatedUser);
-  const projectExport = useProjectExport(addLog, tts);
+  const isViewer = authenticatedUser?.role === Role.Apprentice;
+  const isProcessingGlobal = isLoading || isCadLoading || isVideoLoading || isNeuralIngesting;
 
-  const { drawings, requestDrawing, addLocalSnapshot, requestDrawingFromImage, removeDrawing, setDrawings, clearAllDrawings, toggleDrawingReportInclusion } = useDrawingGenerator(addLog);
-  const { inspirationalImages, requestInspirationalImage, removeInspirationalImage, setInspirationalImages, clearAllInspirationalImages, toggleImageReportInclusion } = useInspirationalImageGenerator(addLog);
-  const { videoUrl, isVideoLoading, videoError, generateVideo, clearVideo } = useVideoGenerator(addLog);
-  
-  const isViewer = authenticatedUser?.role === Role.Viewer;
+  const handleEngage = useCallback(async () => {
+    if (!prompt.trim() || !projectName.trim()) return;
+    const factionContext = selectionMode === 'philosophy' ? selectedFaction : null;
+    const personaContext = selectionMode === 'persona' ? selectedPersona : null;
 
-  // --- Handlers ---
-
-  const handleUpdateProfile = useCallback((updatedUser: User | Partial<User>) => {
-    setAuthenticatedUser(prev => {
-        if (!prev) return null;
-        const next = { ...prev, ...updatedUser } as User;
-        setUsers(usersPrev => usersPrev.map(u => u.id === next.id ? next : u));
-        return next;
-    });
-    addLog('INFO', `User profile updated: ${authenticatedUser?.name}`);
-  }, [addLog, authenticatedUser]);
-
-  const handleDeVinciFunctionCall = async (functionCall: { name: string, args: any, id: string }) => {
-      if (functionCall.name === 'create_project') {
-          const { name, description, tags, factionId } = functionCall.args;
-          if (name && description && factionId) {
-              const newProjectId = onNewProject({ name, description, tags: tags || [] }, { factionId });
-              onSelectProject(newProjectId);
-              creationDeVinci.stopConversation();
-              setDeVinciMode(null);
-              return { success: true, message: `Excellent! I've created the project "${name}" for you.` };
-          }
-      }
-
-      if (functionCall.name === 'run_foundry_simulation' || functionCall.name === 'run_genesis_verification') {
-          const { target_mesh, project_domain, engineering_specs, simulation_type, environment_id } = functionCall.args;
-          addLog('INFO', `REALITY_FILTER: Initiating Genesis 4D solve for ${simulation_type || 'structural verification'}.`);
-          
-          try {
-              // Bridge to simulation hook (which polls backend)
-              // FIX: Changed runPhysicsValidation to runGenesisVerification to match useSimulation hook return
-              await simulation.runGenesisVerification(cadData || target_mesh, environment_id || 'SAA_LEO_ORBIT');
-              
-              // Polling simulated success/failure
-              return {
-                  status: 'VERIFIED',
-                  message: `Foundry simulation ${simulation_type} initiated. Streaming telemetry to Data Console.`,
-                  specs: engineering_specs
-              };
-
-          } catch (e) {
-              return { error: 'Physics Engine Handshake Failed' };
-          }
-      }
-
-      return { success: false, message: 'Unsupported function call.' };
-  };
-
-  const handleLaunchCreationDeVinci = () => {
-      if (!authenticatedUser) return;
-      creationDeVinci.startConversation({
-          systemInstruction: `You are the DeVinci Partner. You have access to the run_foundry_simulation tool.
-          
-          1. VERIFICATION MANDATE: Whenever Richard proposes a design modification for the Aegis Harvester or Nommo-II, you MUST proactively trigger a simulation to verify the change against the laws of physics.
-          2. FLAW ANALYSIS: If the simulation returns a FAILED status or high max_stress telemetry, you must pinpoint the exact coordinate of the flaw.
-          3. GENERATIVE SOLVING: Do not just report failure. Use the physics data to suggest a specific geometric solution (e.g., 'Thicken the HYG honeycomb rib at [x,y,z] by 15%').
-          4. AGNOSTICISM: Ensure all data passed to the tool is strictly numerical; do not include proprietary names in the function parameters.`,
-          voice: 'Zephyr',
-          tools: [{ functionDeclarations: [createProjectFunctionDeclaration, runGenesisVerificationFunctionDeclaration, runFoundrySimulationFunctionDeclaration] }],
-          onFunctionCall: handleDeVinciFunctionCall,
-          authenticatedUser,
-      });
-      setDeVinciMode('creation');
-  };
-
-  const handleAddLocalSnapshot = useCallback((dataUrl: string, prompt: string) => {
-    if (!activeProject || !activeVersion) {
-        addLog('ERROR', 'No active project or version selected to attach viewport capture.');
-        return;
-    }
-
-    const newDrawing: GeneratedDrawing = {
-        id: crypto.randomUUID(),
-        url: dataUrl,
-        prompt: `Viewport Capture: ${prompt}`,
-        isLoading: false,
-        error: null,
-        includeInReport: true
-    };
-
-    setDrawings(prev => [...prev, newDrawing]);
-    updateVersion(activeVersion.versionId, {
-        drawings: [...(activeVersion.drawings || []), newDrawing]
-    });
-
-    addLog('INFO', `Local Viewport captured: ${prompt}`);
-  }, [activeProject, activeVersion, addLog, setDrawings, updateVersion]);
-
-  const handleSetCover = useCallback((id: string, type: 'drawing' | 'image') => {
-    setDrawings(prev => prev.map(d => ({
-        ...d,
-        isCoverImage: type === 'drawing' && d.id === id
-    })));
-    setInspirationalImages(prev => prev.map(img => ({
-        ...img,
-        isCoverImage: type === 'image' && img.id === id
-    })));
-    addLog('INFO', `Set new report cover image (${type}: ${id}).`);
-  }, [setDrawings, setInspirationalImages, addLog]);
-
-  const handleDownloadDrawings = useCallback((): string => {
-    const projectNameForZip = activeProject?.name || 'SynapseForge_Analysis';
-    const imagesToZip = [...drawings, ...inspirationalImages];
-    if (imagesToZip.length > 0) {
-        createDrawingsZip(imagesToZip, projectNameForZip);
-        addLog('INFO', `Voice command triggered download of ${imagesToZip.length} visual assets.`);
-        return `Download started for ${imagesToZip.length} files.`;
-    } else {
-        addLog('WARN', 'Voice command for download triggered, but no drawings were available.');
-        return "No drawings found to download.";
-    }
-  }, [activeProject, drawings, inspirationalImages, addLog]);
-
-  const handleGenerateVideoCommand = useCallback((prompt: string, useUploadedImage: boolean): string => {
-    if (isViewer) {
-        addLog('WARN', 'Voice command for video blocked in viewer mode.');
-        return "Video generation is blocked in viewer mode.";
-    }
-
-    let imageFile: File | undefined = undefined;
-    if (useUploadedImage) {
-        imageFile = files.find(f => f.type.startsWith('image/'));
-        if (!imageFile) {
-            addLog('WARN', 'Voice command for video from image failed: No image found in file input.');
-            return "No uploaded image found to use as reference.";
-        }
-    }
-    
-    generateVideo(prompt, imageFile);
-    addLog('INFO', `Voice command triggered video generation for: "${prompt}" ${imageFile ? `using image ${imageFile.name}`: ''}.`);
-    return "Video generation started.";
-
-  }, [files, generateVideo, addLog, isViewer]);
-
-  const handleStartFromImage = async (file: File) => {
-    setIsParsingImage(true);
-    addLog('INFO', `Analyzing image "${file.name}" to extract project details...`);
-    try {
-        const imagePart = await fileToGenerativePart(file);
-        const details = await extractProjectDetailsFromImage(imagePart);
-        setInitialProjectData(details);
-        setIsProjectModalOpen(true);
-        addLog('INFO', `Extracted details for "${details.name}" from image.`);
-    } catch (e) {
-        addLog('ERROR', `Image parsing failed: ${parseApiError(e)}`);
-    } finally {
-        setIsParsingImage(false);
-    }
-  };
-
-  const handleStartFromPdf = async (file: File) => {
-    setIsParsingPdf(true);
-    addLog('INFO', `Analyzing PDF "${file.name}" to extract project details...`);
-    try {
-        const pdfPart = await fileToGenerativePart(file);
-        const details = await extractProjectDetailsFromPdf(pdfPart);
-        setInitialProjectData(details);
-        setIsProjectModalOpen(true);
-        addLog('INFO', `Extracted details for "${details.name}" from PDF.`);
-    } catch (e) {
-        addLog('ERROR', `PDF parsing failed: ${parseApiError(e)}`);
-    } finally {
-        setIsParsingPdf(false);
-    }
-  };
-
-  const handleIdentifyFile = async (file: File) => {
-    setIsParsingVideo(true);
-    addLog('INFO', `Analyzing video file "${file.name}" frame-by-frame...`);
-    try {
-        const videoPart = await fileToGenerativePart(file);
-        const details = await extractProjectDetailsFromVideo(videoPart);
-        setInitialProjectData(details);
-        setIsProjectModalOpen(true);
-        setIsVideoImportModalOpen(false);
-        addLog('INFO', `Video file analysis complete for "${details.name}".`);
-    } catch (e) {
-        addLog('ERROR', `Video analysis failed: ${parseApiError(e)}`);
-    } finally {
-        setIsParsingVideo(false);
-    }
-  };
-
-  const handleStartBrainstormFromPdf = async (file: File) => {
-    setIsParsingForBrainstorm(true);
-    addLog('INFO', `Starting AI brainstorming session based on PDF "${file.name}"...`);
-    try {
-        const pdfPart = await fileToGenerativePart(file);
-        const details = await extractProjectDetailsFromPdf(pdfPart);
-        const newId = onNewProject(
-          { name: `Brainstorm: ${details.name}`, description: details.description, tags: [...details.tags, 'brainstorm'] },
-          { prompt: `System Brainstorm request based on technical manual: ${details.initialPrompt}`, factionId: FactionId.ADVANCED_MATERIALS }
-        );
-        onSelectProject(newId);
-        addLog('INFO', `Created brainstorming project for "${details.name}".`);
-    } catch (e) {
-        addLog('ERROR', `Brainstorming failed: ${parseApiError(e)}`);
-    } finally {
-        setIsParsingForBrainstorm(false);
-    }
-  };
-
-  const handleEngage = useCallback(async (isReanalysis = false, factionId?: string, promptOverride?: string) => {
-    const finalFaction = factionId ? (ENGINEERING_PHILOSOPHIES.find(f => f.id === factionId) || selectedFaction) : selectedFaction;
-    const finalPrompt = promptOverride || prompt;
-
-    if (!finalFaction || !finalPrompt.trim() || !projectName.trim()) {
-      addLog('WARN', 'Engagement failed: Missing lens, name, or prompt.');
-      return "Missing parameters. Please clarify the engineering lens or product description.";
-    }
-
-    const newResult = await performAnalysis(projectName, finalPrompt, finalFaction, { 
-        files, 
-        fileUrls: activeProject?.knowledgeBase?.map(d => d.id) ? [] : activeVersion?.fileUrls,
-        knowledgeBase: activeProject?.knowledgeBase || []
+    const newResult = await performAnalysis(projectName, prompt, factionContext as any, { 
+        files, persona: personaContext as any, knowledgeBase: activeProject?.knowledgeBase || []
     });
 
     if (newResult) {
-      const commitMessage = isReanalysis ? `Re-analyzed with ${finalFaction.name}` : 'New analysis from workspace';
-      const fileUrls = files.length > 0 ? await Promise.all(files.map(fileToDataUrl)) : activeVersion?.fileUrls || [];
-
-      const versionData: Omit<ProjectVersion, 'versionId' | 'createdAt' | 'commitMessage'> = {
-          prompt: finalPrompt,
-          factionId: finalFaction.id,
+      saveNewVersion({
+          prompt: prompt,
+          factionId: selectedFaction?.id || FactionId.PRAGMATIC_PRODUCTION,
           result: newResult,
-          fileUrls: fileUrls,
-          drawings: [],
-          inspirationalImages: [],
-      };
-
-      if (!activeProject) {
-         onNewProject({ name: projectName, description: 'New Analysis', tags }, { 
-            prompt: finalPrompt, 
-            factionId: finalFaction.id,
-            result: newResult,
-            fileUrls: fileUrls
-         });
-      } else {
-          saveNewVersion(versionData, commitMessage);
-      }
-
-      setActiveVersionIndex(0);
-      clearAllDrawings();
-      clearAllInspirationalImages();
-      clearVideo();
-      clearCad();
-      clearSummary();
-      liveCosting.initialize(newResult);
-      patentGenerator.clearPatent();
-      setRotorModel(undefined);
-      setHasUnsavedChanges(false);
-      clearInProgressAnalysis();
-      return "Analysis sequence successful. Report is now available in the vault.";
+          fileUrls: [], 
+          drawings: drawings,
+          inspirationalImages: inspirationalImages,
+      }, 'Core Synthesis protocol finalized.');
+      
+      setComputeEvents(prev => [{
+          id: `ev-${Date.now()}`,
+          timestamp: new Date().toISOString(),
+          type: 'MASTERMIND_SESSION',
+          user: authenticatedUser?.name || 'System',
+          cost: 15.0,
+          status: 'SUCCESS'
+      }, ...prev]);
     }
-    return "Analysis failed. Check logs for physical solver errors.";
-  }, [selectedFaction, prompt, projectName, activeProject, files, activeVersion, saveNewVersion, clearAllDrawings, clearAllInspirationalImages, clearVideo, clearCad, clearSummary, liveCosting, clearInProgressAnalysis, onNewProject, tags, patentGenerator, addLog, performAnalysis]);
+  }, [selectionMode, selectedFaction, selectedPersona, prompt, projectName, performAnalysis, files, activeProject, saveNewVersion, drawings, inspirationalImages, authenticatedUser]);
 
-  // Added missing commit handler for manual commits via CommitModal
-  const handleCommitVersion = (message: string) => {
-    if (!activeProject || !displayedResult) return;
+  const handleUpdateUser = (updatedUser: User) => {
+      setAuthenticatedUser(prev => prev?.id === updatedUser.id ? updatedUser : prev);
+      setUsersList(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
+      localStorage.setItem(`sf_profile_${updatedUser.id}`, JSON.stringify(updatedUser));
+  };
+
+  const handleDeleteUser = (userId: string) => {
+      setUsersList(prev => prev.filter(u => u.id !== userId));
+      addLog('WARN', `Admin purged user identity: ${userId}`);
+  };
+
+  const handleUpdatePersona = (updatedPersona: Persona) => {
+      setPersonasList(prev => prev.map(p => p.id === updatedPersona.id ? updatedPersona : p));
+      addLog('INFO', `Admin updated calibration for Creative Prime: ${updatedPersona.name}`);
+  };
+
+  const handleAddPersona = (newPersona: Persona) => {
+      setPersonasList(prev => [newPersona, ...prev]);
+      addLog('INFO', `Admin deployed new Creative Prime: ${newPersona.name}`);
+  };
+
+  const handleDeletePersona = (personaId: string) => {
+      setPersonasList(prev => prev.filter(p => p.id !== personaId));
+      addLog('WARN', `Admin decommissioned Creative Prime: ${personaId}`);
+  };
+
+  const handleVideoUrlImport = async (url: string, roi?: {x: number, y: number, w: number, h: number}) => {
+    setIsNeuralIngesting(true);
+    addLog('INFO', `Synchronizing video context: ${url}`);
+    if (roi) {
+        addLog('INFO', `ROI Technical Crop applied: [x:${roi.x}, y:${roi.y}, w:${roi.w}, h:${roi.h}]`);
+    }
     
-    saveNewVersion({
-      prompt: prompt,
-      factionId: selectedFaction?.id || FactionId.PRAGMATIC_PRODUCTION,
-      result: displayedResult,
-      fileUrls: activeVersion?.fileUrls || [],
-      drawings: drawings,
-      inspirationalImages: inspirationalImages,
-      rotorModel: rotorModel
-    }, message);
-
-    setIsCommitModalOpen(false);
-    setHasUnsavedChanges(false);
-    addLog('INFO', `Manual commit: "${message}"`);
-  };
-
-  const voiceCommander = useVoiceCommander({
-    onNavigate: (sectionId: string) => {
-        document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        addLog('INFO', `Voice navigation to: ${sectionId}`);
-    },
-    onDownloadDrawings: handleDownloadDrawings,
-    onGenerateVideo: handleGenerateVideoCommand,
-    onSwitchView: (view: any) => {
-        setViewMode(view);
-        addLog('INFO', `Voice Trigger: Switched view to ${view}`);
-    },
-    onToggleDoc: (type, open) => {
-        if (type === 'manual') setIsUserManualOpen(open);
-        else if (type === 'technical') setIsTechDocOpen(open);
-        addLog('INFO', `Voice Trigger: ${open ? 'Opened' : 'Closed'} ${type} documentation`);
-    },
-    onEngageAnalysis: (factionId, promptOverride) => {
-        handleEngage(false, factionId, promptOverride);
-        addLog('INFO', 'Voice Trigger: Engaging project analysis');
-        return "Initiating core synthesis. Calibrating physics mesh...";
-    },
-    onCreateProject: (args) => {
-        const { name, description, tags, factionId } = args;
-        forgeController.agnosticWipe();
-        const newId = onNewProject({ name, description, tags: tags || [] }, { factionId });
-        onSelectProject(newId);
-        setProjectName(name);
-        addLog('INFO', `Voice Trigger: Forged new project '${name}' [${factionId}]`);
-        return `Excellent. I have purged the vault buffers and initialized the '${name}' project for you.`;
-    },
-    onAnalyzeFile: (fileName, workflow) => {
-        const file = files.find(f => f.name === fileName);
-        if (!file) return `I cannot find a file named "${fileName}" in your current upload set.`;
-
-        switch(workflow) {
-            case 'IMAGE_SYNTHESIS': handleStartFromImage(file); break;
-            case 'TECHNICAL_INTAKE': handleStartFromPdf(file); break;
-            case 'VISUAL_INTAKE': handleIdentifyFile(file); break;
-            case 'RECURSIVE_LOGIC': handleStartBrainstormFromPdf(file); break;
-            case 'SYSTEM_MAPPING': imageIdentifier.identifyImage(file); setIsIdentifierModalOpen(true); break;
-            default: return `Workflow "${workflow}" is not supported.`;
-        }
-        return `Triggering ${workflow.replace('_', ' ')} for ${fileName}. Extraction sequence starting.`;
-    },
-    getAppState: () => ({
-        projectName,
-        prompt,
-        selectedFactionId: selectedFaction?.id || null,
-        files: files.map(f => ({ name: f.name, type: f.type }))
-    })
-  });
-
-  const handleVoiceSetMaterial = useCallback((materialName: string) => {
-      const preset = MATERIAL_LIBRARY.find(m => m.name.toLowerCase().includes(materialName.toLowerCase()));
-      if (preset) {
-          window.dispatchEvent(new CustomEvent('forge-voice-material', { detail: preset.id }));
-          addLog('INFO', `Voice Trigger: Set material to ${preset.name}`);
-      }
-  }, [addLog]);
-
-  const forgeVoice = useForgeVoice(forgeController.voiceMode, tts, {
-      onSwitchLens: (factionId) => {
-          const faction = ENGINEERING_PHILOSOPHIES.find(f => f.id === factionId) || null;
-          setEditorState({ ...editorState, selectedFaction: faction });
-          addLog('INFO', `Voice Trigger: Switched lens to ${faction?.name}`);
-      },
-      onSetMaterial: handleVoiceSetMaterial,
-      onUpdateParam: (param, delta) => {
-          window.dispatchEvent(new CustomEvent('forge-voice-param', { detail: { param, delta } }));
-          addLog('INFO', `Voice Trigger: Adjusted ${param} by ${delta}`);
-      },
-      onGenerateCertificate: () => {
-          window.dispatchEvent(new CustomEvent('forge-voice-secure-ip'));
-          addLog('INFO', 'Voice Trigger: IP Synthesis initialized.');
-      },
-      onSetCover: (id, type) => {
-          handleSetCover(id, type);
-          addLog('INFO', `Voice Trigger: Set report cover to ${type} ${id}`);
-      },
-      onSealBundle: () => {
-          if (activeProject) projectExport.exportSovereignBundle(activeProject, drawings, inspirationalImages);
-          addLog('INFO', 'Voice Trigger: Sovereign Bundle sealed.');
-      },
-      onStartAnalysis: () => handleEngage(),
-      onOpenManual: () => setIsUserManualOpen(true),
-      onOpenTechDoc: () => setIsTechDocOpen(true),
-      onSwitchView: (view) => setViewMode(view),
-      onNavigateSection: (sectionId) => {
-          document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          addLog('INFO', `Voice navigation to: ${sectionId}`);
-      },
-      onLaunchNewProjectWizard: handleLaunchCreationDeVinci,
-      onAddLog: addLog,
-      authenticatedUser
-  });
-  
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-        if (authenticatedUser?.role === Role.Admin && e.ctrlKey && (e.key === '~' || e.key === '`')) {
-            e.preventDefault();
-            setShowDiagnostics(prev => !prev);
-        }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [authenticatedUser]);
-
-  const { isActivating } = useAppVoice(tts, authenticatedUser, viewMode, (u) => handleUpdateProfile(u), activeProject?.name, activeProject?.domainCategory);
-
-  const googleExporter = useGoogleExporter(addLog);
-
-  useEffect(() => {
-    const restoreSession = async () => {
-        const savedState = await loadInProgressAnalysis();
-        if (savedState) {
-            setProjectName(savedState.projectName);
-            setEditorState({
-                prompt: savedState.prompt,
-                selectedFaction: ENGINEERING_PHILOSOPHIES.find(f => f.id === savedState.factionId) || null,
-                tags: savedState.tags || []
-            });
-            setResult(savedState.result);
-            setDrawings(savedState.drawings || []);
-            setInspirationalImages(savedState.inspirationalImages || []);
-            addLog('INFO', 'Recovery Layer: Restored previous work state from IndexedDB.');
-        }
-    };
-    restoreSession();
-  }, [loadInProgressAnalysis, setEditorState, setResult, setDrawings, setInspirationalImages, addLog]);
-
-  const handleGoogleAuth = async () => {
     try {
-        const googleData = await googleApiService.signInWithGoogle();
-        let user = users.find(u => u.email === googleData.email);
+        // 1. Temporal Identification
+        const details = await extractProjectDetailsFromVideoUrl(url);
+        
+        // 2. System Mapping (Reverse Engineering)
+        // We simulate passing the video content by passing the URL in the prompt
+        const roiContext = roi ? `Focus analysis on region: x${roi.x} y${roi.y} w${roi.w} h${roi.h}.` : '';
+        const systemMap = await performSystemMapping(
+            [{ text: `Analyze video at ${url}. ${roiContext}` }], 
+            details.name
+        );
 
-        if (user) {
-            user = { ...user, lastActive: new Date().toISOString(), picture: googleData.picture };
-            setUsers(prev => prev.map(u => u.id === user!.id ? user! : u));
-            setAuthenticatedUser(user);
-        } else {
-            const newUser: User = {
-                id: `user-${Date.now()}`,
-                name: googleData.name,
-                email: googleData.email,
-                picture: googleData.picture,
-                role: Role.Editor,
-                analysesRun: 0,
-                lastActive: new Date().toISOString(),
-                subscriptionStatus: SubscriptionStatus.FREE,
-                hasAcceptedLegal: false,
-                hasSignedPartnerProtocol: false,
-                is_first_login: true,
-                isSilenced: false,
-            };
-            setUsers(prev => [...prev, newUser]);
-            setAuthenticatedUser(newUser);
-            setIsOnboarding(true);
+        // 3. Confidence Check & DeVinci Interrupt
+        const lowConfidenceItems = (systemMap.hierarchy || []).filter(item => item.confidence < 0.7);
+        
+        if (lowConfidenceItems.length > 0) {
+            const ambiguousItem = lowConfidenceItems[0];
+            addLog('WARN', `Low confidence detected in material inference for: ${ambiguousItem.name} (${(ambiguousItem.confidence * 100).toFixed(0)}%)`);
+            
+            // Trigger DeVinci
+            const councilNames = selectedCouncil.map(s => s.name).join(', ');
+            const baseInstruction = `You are the DeVinci Partner. I have detected ambiguity in the material inference for ${ambiguousItem.name}. Confidence is ${(ambiguousItem.confidence * 100).toFixed(0)}%. Should I assume standard ${ambiguousItem.material_inference} or is this a novel alloy?`;
+            
+            devinci.startConversation({
+                systemInstruction: baseInstruction,
+                voice: 'Zephyr',
+                tools: [], 
+                authenticatedUser,
+                activeCad: null
+            });
+            setIsDeVinciOpen(true);
         }
-        addLog('INFO', `User logged in: ${googleData.name}`, { user: googleData.name });
-    } catch (error) {
-        console.error("Google Authentication failed:", error);
-        addLog('ERROR', 'Google Sign-In failed.');
+
+        const id = onNewProject({ name: details.name, description: details.description, tags: details.tags });
+        onSelectProject(id);
+        setProjectName(details.name);
+        setEditorState({ ...editorState, prompt: details.initialPrompt, tags: details.tags });
+        setIsVideoImportModalOpen(false);
+        
+    } catch (e) {
+        addLog('ERROR', `Video intake failed: ${parseApiError(e)}`);
+    } finally {
+        setIsNeuralIngesting(false);
     }
   };
-  
-  const handleLogout = () => {
-    addLog('INFO', `User logged out: ${authenticatedUser?.name}`);
-    googleApiService.signOutFromGoogle();
-    setAuthenticatedUser(null);
-     if (viewMode === 'admin' || viewMode === 'pricing' || viewMode === 'account') {
-      setViewMode('app');
-    }
-  };
+
+  const handleLaunchCreationDeVinci = useCallback(() => {
+    if (!authenticatedUser) return;
+    const councilNames = selectedCouncil.map(s => s.name).join(', ');
+    const baseInstruction = `You are the DeVinci Partner. Goal: move from concept to blueprints using first principles. Seated: ${councilNames}`;
+    devinci.startConversation({
+        systemInstruction: baseInstruction,
+        voice: 'Zephyr',
+        tools: [{ functionDeclarations: [runGenesisVerificationFunctionDeclaration, runFoundrySimulationFunctionDeclaration, triggerFullAnalysisFunctionDeclaration] }],
+        onFunctionCall: async (fc) => {
+            if (fc.name === 'run_genesis_verification' && cadData) {
+                simulation.runGenesisVerification(cadData);
+                return "Genesis 4D Audit initiated.";
+            }
+            if (fc.name === 'trigger_full_analysis') {
+                handleEngage();
+                return "Core Synthesis protocol engaged.";
+            }
+            return "Acknowledge.";
+        },
+        authenticatedUser,
+        activeCad: cadData
+    });
+    setIsDeVinciOpen(true);
+  }, [authenticatedUser, selectedCouncil, cadData, simulation, handleEngage, devinci]);
 
   const handleDemoLogin = (userName: string) => {
-    const user = users.find(u => u.name === userName);
-    if (user) {
-        const updatedUser = { ...user, lastActive: new Date().toISOString() };
-        setAuthenticatedUser(updatedUser);
-        setUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
-        addLog('INFO', `Demo user logged in: ${userName}`, { user: userName });
-    }
+    const mockUser = usersList.find(u => u.name === userName) || usersList[0];
+    setAuthenticatedUser(mockUser);
+    setViewMode('app');
   };
 
-  const handleLoadVersion = useCallback((index: number) => {
-    if (!activeProject) return;
-    const history = activeProject.history || [];
-    const version = history[index];
-    if (!version) return;
-
-    setActiveVersionIndex(index);
-    setResult(version.result);
-    setDrawings(version.drawings || []);
-    setInspirationalImages(version.inspirationalImages || []);
-    setRotorModel(version.rotorModel);
-    setFiles([]); 
-    
-    const faction = ENGINEERING_PHILOSOPHIES.find(f => f.id === version.factionId) || null;
-    resetEditorState({
-        prompt: version.prompt,
-        selectedFaction: faction,
-        tags: activeProject.tags
-    });
-    setProjectName(activeProject.name);
-    
-    liveCosting.initialize(version.result);
-    bomSourcing.clearSourcing();
-    fabricationPlanner.clearPlanner();
-    imageIdentifier.clearIdentification();
-    versionComparer.clearComparison();
-    gcodeVisualizer.closeModal();
-    suggestionExplorer.clearExploration();
-    patentGenerator.clearPatent();
-    clearCad();
-    clearSummary();
-    
-    setHasUnsavedChanges(false);
-    addLog('INFO', `Loaded version: "${version.commitMessage}"`);
-
-  }, [activeProject, resetEditorState, bomSourcing, fabricationPlanner, liveCosting, simulation, clearCad, imageIdentifier, versionComparer, gcodeVisualizer, suggestionExplorer, clearSummary, addLog, setResult, setDrawings, setInspirationalImages, patentGenerator]);
-  
-  const handleProjectSelect = useCallback((projectId: string) => {
-    if (activeProject?.id === projectId) return;
-    onSelectProject(projectId);
-  }, [activeProject, onSelectProject]);
-
-  const handleNewProjectClick = () => {
-    setIsConfigGateOpen(true);
+  const handleLogout = () => {
+    setAuthenticatedUser(null);
+    setViewMode('app');
+    clearInProgressAnalysis();
   };
-
-  const handleConfigGateComplete = async (config: { name: string, category: DomainCategory, branch: EngineeringBranch, description: string }) => {
-      await forgeController.agnosticWipe();
-      
-      const newId = onNewProject({ name: config.name, description: config.description, tags: [config.category] }, { factionId: FactionId.PRAGMATIC_PRODUCTION });
-      updateProjectDetails(newId, { domainCategory: config.category });
-      onSelectProject(newId);
-      setProjectName(config.name);
-      setIsConfigGateOpen(false);
-      addLog('INFO', `Forged agnostic environment for '${config.name}' [${config.category}] with PhD [${config.branch}] Agent active. Context bias neutralized.`);
-  };
-
-  const handleExportAsset = () => {
-      if (activeProject) {
-          projectExport.exportSovereignBundle(activeProject, drawings, inspirationalImages);
-      }
-  };
-
-  const handleImportAsset = async (file: File) => {
-      try {
-          const content = await persistProjectData(file);
-          addLog('INFO', `Imported Sovereign Asset: ${file.name}. Identity established.`);
-      } catch (e) {
-          addLog('ERROR', `Asset import failed: Invalid bundle format.`);
-      }
-  };
-
-  const handlePlanSelect = async (status: SubscriptionStatus) => {
-      if (!authenticatedUser) return;
-      
-      let updatedUser = { ...authenticatedUser, subscriptionStatus: status };
-      
-      if (status === SubscriptionStatus.PRO_TRIAL) {
-          const trialResult = await projectApi.activateTrial(authenticatedUser.id);
-          updatedUser = { ...updatedUser, subscriptionStatus: trialResult.status, trialEndsAt: trialResult.trialEndsAt };
-          addLog('INFO', `Started 1-week free trial for Professional plan.`);
-      } else {
-          addLog('INFO', `Upgraded to ${status} plan.`);
-      }
-      handleUpdateProfile(updatedUser);
-      setViewMode('app');
-  };
-
-  const handleGatedAction = <T,>(action: () => T): T | void => {
-      if (!authenticatedUser) return;
-      if (authenticatedUser.subscriptionStatus === SubscriptionStatus.FREE) {
-          setViewMode('pricing');
-          addLog('WARN', 'Professional tier required for advanced engineering exports.');
-          return;
-      }
-      if (!authenticatedUser.hasSignedPartnerProtocol) {
-          setIsPartnerModalOpen(true);
-          return;
-      }
-      return action();
-  };
-
-  const toggleDiagnostics = useCallback(() => {
-    if (authenticatedUser?.role === Role.Admin) {
-        setShowDiagnostics(prev => !prev);
-    }
-  }, [authenticatedUser]);
-
-  useEffect(() => {
-    if (activeProject) {
-        handleLoadVersion(0);
-    }
-  }, [activeProject, handleLoadVersion]);
 
   if (!authenticatedUser) {
-    return <AuthPage onGoogleAuth={handleGoogleAuth} onDemoLogin={handleDemoLogin} onSignup={(n, e) => {}} />;
-  }
-
-  if (isOnboarding) {
-      return <OnboardingFlow user={authenticatedUser} onComplete={(u) => { handleUpdateProfile(u); setIsOnboarding(false); }} />;
-  }
-
-  if (!authenticatedUser.hasAcceptedLegal) {
-      return <LegalGuard onAccept={() => handleUpdateProfile({ hasAcceptedLegal: true, lastAcceptedLegal: new Date().toISOString() })} />;
-  }
-
-  if (viewMode === 'pricing') {
-      return (
-        <PricingPage 
-            currentPlan={authenticatedUser.subscriptionStatus}
-            onSelectPlan={handlePlanSelect}
-            onBack={() => setViewMode('app')}
-        />
-      );
-  }
-
-  if (viewMode === 'account') {
-      return (
-        <AccountPage 
-            user={authenticatedUser}
-            onUpdate={handleUpdateProfile}
-            onNavigateToPricing={() => setViewMode('pricing')}
-            onBack={() => setViewMode('app')}
-        />
-      )
+    return <AuthPage onGoogleAuth={() => Promise.resolve()} onDemoLogin={handleDemoLogin} onSignup={(n, e) => {}} />;
   }
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50 dark:bg-brand-dark text-gray-900 dark:text-brand-light overflow-hidden transition-colors duration-300">
-      <SystemStatusIndicator isVoiceActive={voiceCommander.state === 'listening'} />
-      <DiagnosticsPanel 
-        isOpen={showDiagnostics} 
-        user={authenticatedUser} 
-        tts={tts} 
-        onUpdateUser={handleUpdateProfile} 
-        systemState={forgeController.systemState}
-        ioStatus={forgeController.ioStatus}
-        exportStatus={forgeController.exportStatus}
-        voiceMode={forgeController.voiceMode}
-        setVoiceMode={forgeController.setVoiceMode}
-        voiceTranscripts={forgeVoice.transcripts}
-        nalPrecision={forgeController.nalPrecision}
-        targetPrecision={forgeController.targetPrecision}
-        setTargetPrecision={forgeController.setTargetPrecision}
-        onForceFlush={forgeController.forceFlush}
-        onForceStable={forgeController.forceStable}
-        onDefrost={forgeController.performDefrost}
-        onAgnosticWipe={forgeController.agnosticWipe}
-      />
-      <SystemToast />
-      
+    <div className="flex flex-col h-screen bg-gray-50 dark:bg-brand-dark text-gray-900 dark:text-gray-100 transition-colors duration-300 font-sans">
       <Header
-        onStartTour={() => setIsTourOpen(true)}
-        onOpenUserManual={() => setIsUserManualOpen(true)}
+        onStartTour={() => {}}
+        onOpenUserManual={() => {}}
         authenticatedUser={authenticatedUser}
         onLogout={handleLogout}
-        onOpenProfile={() => setIsProfileModalOpen(true)}
-        viewMode={viewMode === 'app' || viewMode === 'pricing' || viewMode === 'account' ? 'app' : viewMode}
+        onOpenProfile={() => {}}
+        viewMode={viewMode}
         onSwitchView={(v) => setViewMode(v as any)}
-        onMobileDiagnostics={toggleDiagnostics}
       />
 
       <div className="flex-1 flex flex-col overflow-y-auto">
         {viewMode === 'app' && (
-          <div className="w-full bg-white dark:bg-gray-800 p-6 flex-shrink-0 border-b border-gray-200 dark:border-gray-700 space-y-6 transition-colors duration-300">
-             <div className="max-w-5xl mx-auto space-y-6">
-                 <ProjectManager
-                    projects={projects}
-                    activeProject={activeProject}
-                    activeVersionIndex={activeVersionIndex}
-                    onSelectProject={handleProjectSelect}
-                    onNewProject={handleNewProjectClick}
-                    // Fixed double attribute
-                    onOpenFile={handleImportAsset}
-                    onSaveProject={handleExportAsset}
-                    hasUnsavedChanges={hasUnsavedChanges}
-                    // Fixed: passed setIsCommitModalOpen to ProjectManager
-                    onCommitVersion={() => setIsCommitModalOpen(true)}
-                    onStartWithDeVinci={handleLaunchCreationDeVinci}
-                    onStartFromImage={handleStartFromImage} 
-                    isParsingImage={isParsingImage}
-                    onStartFromPdf={handleStartFromPdf}
-                    isParsingPdf={isParsingPdf}
-                    onStartBrainstormFromPdf={handleStartBrainstormFromPdf}
-                    isParsingForBrainstorm={isParsingForBrainstorm}
-                    // Fixed: passed setIsIdentifierModalOpen to ProjectManager
-                    onIdentifyImage={(file) => { imageIdentifier.identifyImage(file); setIsIdentifierModalOpen(true); }}
-                    isIdentifyingImage={imageIdentifier.isLoading}
-                    onOpenVideoImport={() => setIsVideoImportModalOpen(true)}
-                    isParsingVideo={isParsingVideo}
-                    onEditProject={(p) => { setProjectToEdit(p); setIsProjectModalOpen(true); }}
-                    onDeleteProject={onDeleteProject}
-                    onLoadVersion={handleLoadVersion}
-                    onRevertVersion={revertToVersion}
-                    onCompareVersions={(p, idx) => versionComparer.runComparison(p, idx)}
-                    disabled={isLoading}
-                    authenticatedUser={authenticatedUser}
-                    onAddDocument={addIngestedDocument}
-                    onRemoveDocument={removeIngestedDocument}
-                    addLog={addLog}
-                />
-                <FactionSelector
-                  selectedFaction={selectedFaction}
-                  onSelectFaction={(faction) => { setEditorState({ ...editorState, selectedFaction: faction }); setHasUnsavedChanges(true); }}
-                  disabled={isLoading || isViewer}
-                  authenticatedUser={authenticatedUser}
-                />
-                <PromptInput
-                  projectName={projectName}
-                  onProjectNameChange={(name) => { setProjectName(name); setHasUnsavedChanges(true); }}
-                  prompt={prompt}
-                  onPromptChange={(p) => { setEditorState({ ...editorState, prompt: p }); setHasUnsavedChanges(true); }}
-                  tags={tags}
-                  onTagsChange={(t) => { setEditorState({ ...editorState, tags: t }); setHasUnsavedChanges(true); }}
-                  onUndo={undoEditorState}
-                  onRedo={redoEditorState}
-                  canUndo={canUndoEditorState}
-                  canRedo={canRedoEditorState}
-                  files={files}
-                  onFilesChange={(f) => { setFiles(f); setHasUnsavedChanges(true); }}
-                  onEngage={() => handleEngage()}
-                  isLoading={isLoading}
-                  onClearFiles={() => { setFiles([]); setHasUnsavedChanges(true); }}
-                  isReady={!!selectedFaction && !!prompt && !!projectName}
-                  authenticatedUser={authenticatedUser}
-                  setupAssistant={setupAssistant}
-                  onApplyFactionSuggestion={() => {}}
-                  onReanalyzeWithFaction={() => handleEngage(true)}
-                  selectedFaction={selectedFaction}
-                  activeVersionFactionId={activeVersion?.factionId}
-                  promptValidator={promptValidator}
-                  hasKnowledgeContext={(activeProject?.knowledgeBase?.length || 0) > 0}
-                />
+          <div className="w-full bg-white dark:bg-slate-800 p-6 flex-shrink-0 border-b border-gray-200 dark:border-slate-700 shadow-sm transition-colors duration-300">
+             <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-8">
+                {/* Project Manager Sidebar */}
+                <div className="lg:w-1/4">
+                    <Sidebar
+                        projects={projects} activeProject={activeProject} activeVersionIndex={activeVersionIndex}
+                        onSelectProject={onSelectProject} onNewProject={() => setIsInitiationModalOpen(true)}
+                        onOpenFile={() => {}} onSaveProject={() => {}} hasUnsavedChanges={false}
+                        onCommitVersion={() => {}} onStartWithDeVinci={handleLaunchCreationDeVinci}
+                        onStartFromImage={() => {}} isParsingImage={false}
+                        onStartFromPdf={() => {}} isParsingPdf={false}
+                        onStartBrainstormFromPdf={() => {}} isParsingForBrainstorm={false}
+                        onIdentifyImage={() => {}} isIdentifyingImage={false}
+                        onOpenVideoImport={() => setIsVideoImportModalOpen(true)} isParsingVideo={isNeuralIngesting}
+                        onEditProject={() => {}} onDeleteProject={onDeleteProject}
+                        onLoadVersion={() => {}} onRevertVersion={revertToVersion}
+                        onCompareVersions={() => {}} disabled={isLoading} authenticatedUser={authenticatedUser}
+                        onSaveToDrive={() => {}} onOpenFromDrive={() => {}} isSavingToDrive={false} isDriveAuthenticated={false}
+                        addLog={addLog} onAddDocument={addIngestedDocument} onRemoveDocument={removeIngestedDocument}
+                    />
+                </div>
+
+                {/* Editor Area */}
+                <div className="flex-1 space-y-6">
+                    <div className="bg-gray-100 dark:bg-slate-900 p-6 rounded-xl border border-gray-200 dark:border-slate-700">
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-lg font-bold text-gray-800 dark:text-white uppercase tracking-tight">1. Analytical Lens</h2>
+                            <div className="flex p-1 bg-white dark:bg-slate-800 rounded-lg border border-gray-300 dark:border-slate-700">
+                                <button onClick={() => setEditorState({ ...editorState, selectionMode: 'philosophy' })} className={`px-4 py-1 text-xs font-bold uppercase rounded-md transition-all ${selectionMode === 'philosophy' ? 'bg-brand-cyan text-white shadow-sm' : 'text-gray-500'}`}>Philosophies</button>
+                                <button onClick={() => setEditorState({ ...editorState, selectionMode: 'persona' })} className={`px-4 py-1 text-xs font-bold uppercase rounded-md transition-all ${selectionMode === 'persona' ? 'bg-purple-600 text-white shadow-sm' : 'text-gray-500'}`}>Personas</button>
+                            </div>
+                        </div>
+                        {selectionMode === 'philosophy' ? (
+                            <FactionSelector selectedFaction={selectedFaction} onSelectFaction={(f) => setEditorState({...editorState, selectedFaction: f})} disabled={isLoading || isViewer} authenticatedUser={authenticatedUser} />
+                        ) : (
+                            <PersonaSelector personas={personasList} selectedPersona={selectedPersona} onSelectPersona={(p) => setEditorState({...editorState, selectedPersona: p})} disabled={isLoading || isViewer} authenticatedUser={authenticatedUser} />
+                        )}
+                    </div>
+
+                    <div className="bg-gray-100 dark:bg-slate-900 p-6 rounded-xl border border-gray-200 dark:border-slate-700">
+                        <PromptInput
+                            projectName={projectName} onProjectNameChange={setProjectName}
+                            prompt={prompt} onPromptChange={(p) => setEditorState({...editorState, prompt: p})}
+                            tags={tags} onTagsChange={(t) => setEditorState({...editorState, tags: t})}
+                            onUndo={undoEditorState} onRedo={redoEditorState} canUndo={canUndoEditorState} canRedo={canRedoEditorState}
+                            files={files} onFilesChange={setFiles} onEngage={handleEngage} isLoading={isLoading}
+                            onClearFiles={() => setFiles([])} isReady={!!projectName && !!prompt} authenticatedUser={authenticatedUser}
+                            setupAssistant={setupAssistant} onApplyFactionSuggestion={() => {}} onReanalyzeWithFaction={() => {}}
+                            selectedFaction={selectedFaction} activeVersionFactionId={undefined} promptValidator={promptValidator}
+                        />
+                    </div>
+                </div>
              </div>
           </div>
         )}
 
-        <main className="flex-1 w-full bg-gray-50 dark:bg-brand-dark animate-fade-in transition-colors duration-300">
+        <main className="flex-1 w-full transition-colors duration-300">
           {viewMode === 'app' ? (
-            <div className="max-w-5xl mx-auto p-6">
-              <AnalysisDisplay
-                projectName={projectName}
-                result={displayedResult}
-                isLoading={isLoading}
-                error={error}
-                selectedFaction={selectedFaction}
-                onClear={clearAnalysis}
-                onGenerateVideo={generateVideo}
-                isVideoLoading={isVideoLoading}
-                videoUrl={videoUrl}
-                videoError={videoError}
-                drawings={drawings}
-                onRequestDrawing={requestDrawing}
-                onRequestDrawingFromImage={requestDrawingFromImage}
-                onRemoveDrawing={(id) => removeDrawing(id)}
-                onToggleDrawingReportInclusion={(id) => toggleDrawingReportInclusion(id)}
-                onSetCover={handleSetCover}
-                inspirationalImages={inspirationalImages}
-                onRequestInspirationalImage={requestInspirationalImage}
-                onRemoveInspirationalImage={(id) => removeInspirationalImage(id)}
-                onToggleImageReportInclusion={(id) => toggleImageReportInclusion(id)}
-                onIncorporateSuggestions={() => {}}
-                onLaunchDeVinci={() => {}}
-                activeProject={activeProject}
-                activeVersion={activeVersion}
-                authenticatedUser={authenticatedUser}
-                onGenerateSummary={generateSummary}
-                isSummaryLoading={isSummaryLoading}
-                summaryError={null}
-                cadData={cadData}
-                foundryResult={foundryResult}
-                onGenerateCad={(d, r) => handleGatedAction(() => generateCad(d, r)) || Promise.resolve(null)}
-                isCadLoading={isCadLoading}
-                cadError={cadError}
-                // Fixed: passed setIsCadViewerOpen to AnalysisDisplay
-                onOpenCadViewer={() => handleGatedAction(() => setIsCadViewerOpen(true))}
-                onAddLocalSnapshot={handleAddLocalSnapshot}
-                isGoogleExporterAuthenticated={googleExporter.isAuthenticated}
-                googleExporterUser={googleExporter.authenticatedUser}
-                isGoogleAuthLoading={googleExporter.isAuthLoading}
-                onGoogleExporterSignIn={googleExporter.signIn}
-                onGoogleExporterSignOut={googleExporter.signOut}
-                isGoogleExporting={googleExporter.isExporting}
-                googleExportStatus={googleExporter.exportStatus}
-                googleExportError={googleExporter.exportError}
-                googleDocContent={googleExporter.exportedDocContent}
-                onOpenGoogleDocPreview={() => setIsGoogleDocPreviewOpen(true)}
-                onExportToGoogle={() => { if(activeProject) googleExporter.exportToGoogle(activeProject, drawings, authenticatedUser!)}}
-                rotorModel={rotorModel}
-                onRotorModelChange={setRotorModel}
-                rossAnalysis={rossAnalysis}
-                tts={tts}
-                inspirationalImageHistory={activeProject?.inspirationalImageHistory || []}
-                onReinsertInspirationalImage={() => {}}
-                onDeleteInspirationalImageFromHistory={() => {}}
-                simulation={simulation}
-                fabricationPlanner={fabricationPlanner}
-                gcodeVisualizer={gcodeVisualizer}
-                suggestionExplorer={suggestionExplorer}
-                bomSourcing={bomSourcing}
-                liveCosting={liveCosting}
-                nextStepAssistant={nextStepAssistant}
-                patentGenerator={patentGenerator}
-              />
+            <div className="max-w-7xl mx-auto p-6">
+              {activeProject ? (
+                <AnalysisDisplay
+                  projectName={projectName} result={result} isLoading={isLoading} error={error}
+                  selectedFaction={selectedFaction} onClear={clearAnalysis} onGenerateVideo={generateVideo}
+                  isVideoLoading={isVideoLoading} videoUrl={videoUrl} videoError={null}
+                  drawings={drawings} onRequestDrawing={requestDrawing} onRequestDrawingFromImage={() => {}}
+                  onRemoveDrawing={removeDrawing} onToggleDrawingReportInclusion={toggleDrawingReportInclusion}
+                  onSetCover={() => {}} inspirationalImages={inspirationalImages} onRequestInspirationalImage={requestInspirationalImage}
+                  onRemoveInspirationalImage={removeInspirationalImage} onToggleImageReportInclusion={toggleImageReportInclusion}
+                  onIncorporateSuggestions={() => {}} onLaunchDeVinci={handleLaunchCreationDeVinci}
+                  activeProject={activeProject} activeVersion={null} authenticatedUser={authenticatedUser}
+                  onGenerateSummary={() => Promise.resolve(null)} isSummaryLoading={false} summaryError={null}
+                  cadData={cadData} foundryResult={foundryResult} onGenerateCad={generateCad}
+                  isCadLoading={isCadLoading} cadError={null} isCadViewerOpen={false} onOpenCadViewer={() => {}}
+                  isGoogleExporterAuthenticated={false} googleExporterUser={null} isGoogleAuthLoading={false}
+                  onGoogleExporterSignIn={() => {}} onGoogleExporterSignOut={() => {}}
+                  isGoogleExporting={false} googleExportStatus="" googleExportError={null} googleDocContent={null}
+                  onOpenGoogleDocPreview={() => {}} onExportToGoogle={() => {}}
+                  onRotorModelChange={() => {}} rossAnalysis={rossAnalysis} tts={tts}
+                  inspirationalImageHistory={[]} onReinsertInspirationalImage={() => {}} onDeleteInspirationalImageFromHistory={() => {}}
+                  simulation={simulation} fabricationPlanner={fabricationPlanner} gcodeVisualizer={gcodeVisualizer}
+                  suggestionExplorer={suggestionExplorer} bomSourcing={bomSourcing} liveCosting={liveCosting}
+                  nextStepAssistant={nextStepAssistant} patentGenerator={patentGenerator} onUpdateTasks={updateProjectTasks}
+                />
+              ) : (
+                <InitialView onStartDialogue={() => setIsInitiationModalOpen(true)} />
+              )}
             </div>
           ) : viewMode === 'admin' ? (
-            <div className="max-w-7xl mx-auto p-6">
-              <AdminDashboard 
-                authenticatedUser={authenticatedUser}
-                users={users}
-                projects={projects}
-                logs={logs}
-                onUpdateUser={handleUpdateProfile}
-                onDeleteUser={(userId) => setUsers(prev => prev.filter(u => u.id !== userId))}
-                onOpenTechDoc={() => setIsTechDocOpen(true)}
-              />
+            <div className="w-full h-full bg-slate-50 animate-fade-in text-slate-900">
+                <AdminDashboard 
+                    authenticatedUser={authenticatedUser} 
+                    users={usersList} 
+                    projects={projects} 
+                    logs={logs} 
+                    personas={personasList} 
+                    computeEvents={computeEvents}
+                    ipAuditLogs={ipAuditLogs}
+                    onUpdateUser={handleUpdateUser} 
+                    onDeleteUser={handleDeleteUser} 
+                    onUpdatePersona={handleUpdatePersona} 
+                    onAddPersona={handleAddPersona} 
+                    onDeletePersona={handleDeletePersona} 
+                    onOpenTechDoc={() => setIsTechDocOpen(true)} 
+                />
             </div>
           ) : viewMode === 'suite' ? (
-            <ToolSuite />
+            <ToolSuite user={authenticatedUser} onUpdateUser={handleUpdateUser} />
+          ) : viewMode === 'account' ? (
+            <AccountPage user={authenticatedUser} onUpdate={handleUpdateUser} onNavigateToPricing={() => setViewMode('pricing')} onBack={() => setViewMode('app')} />
+          ) : viewMode === 'pricing' ? (
+            <PricingPage currentPlan={authenticatedUser.subscriptionStatus} onSelectPlan={(p) => handleUpdateUser({...authenticatedUser, subscriptionStatus: p})} onBack={() => setViewMode('app')} />
           ) : null}
         </main>
-        
         <Footer />
       </div>
 
-      <Tour isOpen={isTourOpen} stepIndex={tourStep} steps={TOUR_STEPS} onClose={() => setIsTourOpen(false)} onNext={() => setTourStep(s => s + 1)} onPrev={() => setTourStep(s => s - 1)} tts={tts} />
-      <UserManualModal isOpen={isUserManualOpen} onClose={() => setIsUserManualOpen(false)} />
-      <TechnicalDocumentModal isOpen={isTechDocOpen} onClose={() => setIsTechDocOpen(false)} />
-      <ConfigurationGateModal 
-          isOpen={isConfigGateOpen}
-          onClose={() => setIsConfigGateOpen(false)}
-          onForge={handleConfigGateComplete}
+      <ProjectInitiationModal 
+        isOpen={isInitiationModalOpen} onClose={() => setIsInitiationModalOpen(false)}
+        onStart={(c) => { onNewProject({ name: c.name, description: c.description, tags: [] }); setIsInitiationModalOpen(false); }}
+        onStartFromPdf={() => {}} onStartFromImage={() => {}} onStartFromVideo={() => setIsVideoImportModalOpen(true)}
+        onStartBrainstorm={() => {}} onStartWithDeVinci={handleLaunchCreationDeVinci}
       />
-       <ProfileModal
-        isOpen={isProfileModalOpen}
-        onClose={() => setIsProfileModalOpen(false)}
-        user={authenticatedUser!}
-        onSave={handleUpdateProfile}
-        onNavigateToPricing={() => { setIsProfileModalOpen(false); setViewMode('pricing'); }}
-        onNavigateToAccount={() => { setIsProfileModalOpen(false); setViewMode('account'); }}
-      />
-      <AiChatModal
-        isOpen={isAiChatOpen}
-        onClose={() => setIsAiChatOpen(false)}
-        state={aiChat.state}
-        history={aiChat.history}
-        sendMessage={aiChat.sendMessage}
-        error={aiChat.error}
-      />
-      {/* Added missing ImageIdentifierModal state wiring */}
-      <ImageIdentifierModal 
-        isOpen={isIdentifierModalOpen}
-        onClose={() => setIsIdentifierModalOpen(false)}
-        isLoading={imageIdentifier.isLoading}
-        error={imageIdentifier.error}
-        result={imageIdentifier.result}
-      />
+
       <VideoImportModal 
-        isOpen={isVideoImportModalOpen}
-        onClose={() => setIsVideoImportModalOpen(false)}
-        onImportFile={handleIdentifyFile}
-        onImportUrl={(u) => {}}
-        isLoading={isParsingVideo}
+        isOpen={isVideoImportModalOpen} onClose={() => setIsVideoImportModalOpen(false)}
+        onImportFile={() => {}} onImportUrl={handleVideoUrlImport} isLoading={isNeuralIngesting}
       />
-      {isPartnerModalOpen && (
-          <PartnerIndemnityModal 
-              onSign={(s) => {}} 
-              onCancel={() => setIsPartnerModalOpen(false)} 
-          />
-      )}
-      <VoiceCommanderWidget 
-        state={voiceCommander.state} 
-        startListening={voiceCommander.startListening} 
-        stopListening={voiceCommander.stopListening} 
-      />
+
       <DeVinciModal 
-        isOpen={deVinciMode === 'creation'}
-        onClose={() => { creationDeVinci.stopConversation(); setDeVinciMode(null); }}
-        startConversation={() => {}} 
-        stopConversation={creationDeVinci.stopConversation}
-        pauseConversation={creationDeVinci.pauseConversation}
-        resumeConversation={creationDeVinci.resumeConversation}
-        state={creationDeVinci.state}
-        transcript={creationDeVinci.transcript}
-        isCreating={true}
-        onFileUpload={creationDeVinci.sendFile}
-        analyzableFile={creationDeVinci.analyzableFile}
-        sendImageRegion={creationDeVinci.sendImageRegion}
-        simulateNewSpeaker={creationDeVinci.simulateNewSpeaker}
-        manualRetry={creationDeVinci.manualRetry}
-        retryCount={creationDeVinci.retryCount}
+        isOpen={isDeVinciOpen} onClose={() => setIsDeVinciOpen(false)}
+        startConversation={handleLaunchCreationDeVinci} stopConversation={devinci.stopConversation}
+        pauseConversation={devinci.pauseConversation} resumeConversation={devinci.resumeConversation}
+        state={devinci.state} transcript={devinci.transcript} onFileUpload={devinci.sendFile}
+        analyzableFile={devinci.analyzableFile} sendImageRegion={devinci.sendImageRegion}
+        simulateNewSpeaker={devinci.simulateNewSpeaker} manualRetry={devinci.manualRetry}
+        retryCount={devinci.retryCount} selectedCouncil={selectedCouncil}
       />
 
-      {/* Added missing CommitModal component */}
-      <CommitModal
-        isOpen={isCommitModalOpen}
-        onClose={() => setIsCommitModalOpen(false)}
-        onConfirm={handleCommitVersion}
-      />
-
-      {/* Fixed: wire isCadViewerOpen and setIsCadViewerOpen correctly */}
-      {isCadViewerOpen && cadData && (
-        <CadViewerModal
-          isOpen={isCadViewerOpen}
-          onClose={() => setIsCadViewerOpen(false)}
-          cadData={cadData}
-          isViewer={isViewer}
-          foundryResult={foundryResult}
-          onAddSnapshot={handleAddLocalSnapshot}
-          // FIX: Changed physicsTelemetry to physicsResult and wired missing simulation props
-          physicsResult={simulation.physicsResult}
-          runPhysicsValidation={simulation.runGenesisVerification}
-          isPhysicsActive={simulation.isPhysicsActive}
-        />
-      )}
+      <TechnicalDocumentModal isOpen={isTechDocOpen} onClose={() => setIsTechDocOpen(false)} />
     </div>
   );
 }

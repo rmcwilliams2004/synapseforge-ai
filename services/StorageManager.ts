@@ -96,12 +96,17 @@ export const clearVaultBuffer = async () => {
 
 /**
  * AGNOSTIC WIPE: Purges session specific context and scrubs proprietary strings.
- * Ensures the platform is a "Blank Slate" for new innovation.
+ * PROTECTS: Any keys prefixed with 'sf_project_' or 'sf_projects_index' to prevent accidental data loss.
+ * SCRUBS: sessionStorage and specific 'bias' keys in localStorage.
  */
 export const performAgnosticWipe = async () => {
     console.log("[SYSTEM]: Initiating Hard Reset of Inference Buffers...");
     
-    // 1. Deep scrub of session bias
+    // 1. Target non-persistent leakage points
+    sessionStorage.clear();
+    
+    // 2. Identify and purge ONLY session-related bias, protecting the project ledger
+    const protectedPrefixes = ['sf_project_', 'sf_projects_index', 'sf_profile_'];
     const biasKeywords = [
         'nommo', 'alpha', 'aegis', 'intelligent shielding', 
         'hydrographene', 'hyg', 'z-pinch', 'propulsion', 
@@ -114,9 +119,12 @@ export const performAgnosticWipe = async () => {
     for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
         if (key) {
-            const val = localStorage.getItem(key)?.toLowerCase() || "";
-            if (biasKeywords.some(word => val.includes(word))) {
-                keysToRemove.push(key);
+            const isProtected = protectedPrefixes.some(pref => key.startsWith(pref));
+            if (!isProtected) {
+                const val = localStorage.getItem(key)?.toLowerCase() || "";
+                if (biasKeywords.some(word => val.includes(word))) {
+                    keysToRemove.push(key);
+                }
             }
         }
     }
@@ -126,16 +134,14 @@ export const performAgnosticWipe = async () => {
         purgedCount++;
     });
     
-    sessionStorage.clear();
-    
-    // 2. Reset Multi-Tenant isolation layers
+    // 3. Reset I/O Buffers
     await clearVaultBuffer();
     
     window.dispatchEvent(new CustomEvent('forge-log', { 
-        detail: `[AUDIT]: Agnostic Wipe complete. Purged ${purgedCount} biased records. System state: NEUTRAL.` 
+        detail: `[AUDIT]: Agnostic Wipe complete. Purged ${purgedCount} session records. Primary ledger preserved. System state: NEUTRAL.` 
     }));
     
-    // 3. Clear WebGL scene and GPU buffers
+    // 4. Clear UI Visual Buffers
     window.dispatchEvent(new CustomEvent('forge-webgl-reset'));
 };
 
