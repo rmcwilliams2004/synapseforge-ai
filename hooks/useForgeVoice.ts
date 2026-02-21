@@ -193,7 +193,10 @@ export const useForgeVoice = (
 
     useEffect(() => {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SpeechRecognition) return;
+        if (!SpeechRecognition) {
+            console.warn("Speech Engine: Not supported in this browser.");
+            return;
+        }
 
         const recognition = new SpeechRecognition();
         recognition.continuous = true;
@@ -206,7 +209,9 @@ export const useForgeVoice = (
             if (mode === 'ALWAYS_ON') {
                 try {
                     recognition.start();
-                } catch(e) {}
+                } catch(e) {
+                    console.error("Voice Handshake Failed. Please click 'Activate Voice' manually.");
+                }
             }
         };
 
@@ -218,7 +223,11 @@ export const useForgeVoice = (
         recognitionRef.current = recognition;
 
         if (mode === 'ALWAYS_ON') {
-            recognition.start();
+            try {
+                recognition.start();
+            } catch(e) {
+                console.error("Voice Handshake Failed. Please click 'Activate Voice' manually.");
+            }
         }
 
         return () => {

@@ -86,6 +86,33 @@ const TagInput = ({ tags, onTagsChange, disabled }: { tags: string[]; onTagsChan
     );
 };
 
+const REPORT_TEMPLATES = [
+    {
+        id: 'competitive_analysis',
+        name: 'Competitive Analysis',
+        prompt: 'Perform a comprehensive competitive analysis of this product. Identify key market competitors, compare feature sets, analyze pricing strategies, and highlight potential areas for differentiation and market disruption.',
+        tags: ['Market Research', 'Competitive Benchmarking']
+    },
+    {
+        id: 'material_assessment',
+        name: 'Material Assessment',
+        prompt: 'Conduct a deep-dive material assessment for this design. Evaluate current material choices against advanced alternatives, focusing on weight reduction, thermal performance, cost-efficiency, and environmental sustainability.',
+        tags: ['Materials Science', 'Sustainability']
+    },
+    {
+        id: 'performance_benchmarking',
+        name: 'Performance Benchmarking',
+        prompt: 'Establish a performance benchmarking protocol for this system. Define critical KPIs, suggest simulation methodologies (FEA, CFD), and predict potential failure modes under extreme operational conditions.',
+        tags: ['Performance', 'Simulation', 'Reliability']
+    },
+    {
+        id: 'dfm_optimization',
+        name: 'DFM Optimization',
+        prompt: 'Analyze this concept strictly through the lens of Design for Manufacturability (DFM). Identify complex geometries that increase tooling costs, suggest part consolidation opportunities, and recommend optimal high-volume manufacturing processes.',
+        tags: ['DFM', 'Manufacturing', 'Cost Reduction']
+    }
+];
+
 export const PromptInput = ({ 
   projectName, 
   onProjectNameChange, 
@@ -117,7 +144,6 @@ export const PromptInput = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [roiEditorState, setRoiEditorState] = useState<{ isOpen: boolean; file: File | null; fileIndex: number | null }>({ isOpen: false, file: null, fileIndex: null });
-  // Fix: Use Role.Viewer from enum instead of string literal to resolve "unintentional comparison" type error.
   const isViewer = authenticatedUser.role === Role.Viewer;
   const { validationResult, isChecking, checkPrompt, clearValidation, error: validationError } = promptValidator;
   
@@ -141,6 +167,13 @@ export const PromptInput = ({
     debounceTimeoutRef.current = window.setTimeout(() => {
         onPromptChange(newValue);
     }, 500);
+  };
+
+  const applyTemplate = (template: typeof REPORT_TEMPLATES[0]) => {
+      onPromptChange(template.prompt);
+      setLocalPrompt(template.prompt);
+      const newTags = Array.from(new Set([...tags, ...template.tags]));
+      onTagsChange(newTags);
   };
 
   const canReanalyze = selectedFaction && activeVersionFactionId && selectedFaction.id !== activeVersionFactionId;
@@ -262,6 +295,28 @@ export const PromptInput = ({
           className="w-full p-3 mb-3 bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-gray-300 focus:ring-2 focus:ring-brand-cyan focus:border-brand-cyan transition disabled:opacity-50 disabled:cursor-not-allowed"
           disabled={isLoading || isViewer}
         />
+        
+        <div className="mb-3">
+            <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Quick Templates</label>
+            </div>
+            <div className="flex flex-wrap gap-2">
+                {REPORT_TEMPLATES.map(t => (
+                    <button
+                        key={t.id}
+                        onClick={() => {
+                            setLocalPrompt(t.text);
+                            onPromptChange(t.text);
+                        }}
+                        disabled={isLoading || isViewer}
+                        className="px-3 py-1.5 text-xs font-medium bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:border-brand-cyan hover:text-brand-cyan transition-colors disabled:opacity-50"
+                    >
+                        {t.label}
+                    </button>
+                ))}
+            </div>
+        </div>
+
         <textarea
           id="tour-step-2"
           value={localPrompt}
