@@ -85,7 +85,13 @@ export const ConceptSynthesisSection: React.FC<ConceptSynthesisSectionProps> = (
                                 </div>
                             ) : (
                                 <>
-                                    <img src={img.url || ''} alt={img.prompt} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                                {img.url ? (
+                                    <img src={img.url} alt={img.prompt} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                                ) : (
+                                    <div className="w-full h-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                                        <span className="text-gray-400 dark:text-gray-500 text-xs">Image not available</span>
+                                    </div>
+                                )}
                                     {/* Hover Actions Overlay */}
                                     <div className="absolute inset-0 bg-slate-900/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4">
                                         <button 

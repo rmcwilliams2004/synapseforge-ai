@@ -127,7 +127,13 @@ export const PersonaManager: React.FC<PersonaManagerProps> = ({ personas, onUpda
                     <div key={persona.id} className="bg-white border border-slate-200 rounded-[2rem] overflow-hidden shadow-sm group hover:border-brand-cyan transition-all duration-500">
                         <div className="p-8 space-y-6">
                             <div className="flex items-center gap-6">
-                                <img src={persona.avatar} alt={persona.name} className="w-20 h-20 rounded-3xl border border-slate-100 bg-slate-50 object-cover shadow-xl grayscale group-hover:grayscale-0 transition-all" />
+                                {persona.avatar ? (
+                                    <img src={persona.avatar} alt={persona.name} className="w-20 h-20 rounded-3xl border border-slate-100 bg-slate-50 object-cover shadow-xl grayscale group-hover:grayscale-0 transition-all" />
+                                ) : (
+                                    <div className="w-20 h-20 rounded-3xl border border-slate-100 bg-slate-50 shadow-xl flex items-center justify-center text-gray-400 font-bold text-2xl">
+                                        {persona.name.charAt(0)}
+                                    </div>
+                                )}
                                 <div className="min-w-0">
                                     <h3 className="text-xl font-black text-slate-900 truncate italic uppercase tracking-tighter">{persona.name}</h3>
                                     <p className="text-[10px] text-brand-cyan font-black uppercase tracking-widest truncate mt-1">{persona.title}</p>

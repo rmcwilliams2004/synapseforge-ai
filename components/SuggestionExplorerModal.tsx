@@ -48,10 +48,12 @@ export const SuggestionExplorerModal: React.FC<SuggestionExplorerModalProps> = (
                             <h3 className="text-lg font-semibold text-brand-cyan mb-2">Explanation</h3>
                             <p className="text-gray-300">{result.explanation}</p>
                         </div>
-                        <div>
-                            <h3 className="text-lg font-semibold text-brand-cyan mb-2">Visual Concept</h3>
-                            <img src={result.imageUrl} alt={`Visual concept for ${result.suggestionText}`} className="w-full h-auto object-cover rounded-lg bg-gray-900/50 border border-gray-600" />
-                        </div>
+                        {result.imageUrl && (
+                            <div>
+                                <h3 className="text-lg font-semibold text-brand-cyan mb-2">Visual Concept</h3>
+                                <img src={result.imageUrl} alt={`Visual concept for ${result.suggestionText}`} className="w-full h-auto object-cover rounded-lg bg-gray-900/50 border border-gray-600" />
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

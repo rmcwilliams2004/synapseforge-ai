@@ -95,7 +95,13 @@ export const AccountPage: React.FC<AccountPageProps> = ({ user, onUpdate, onNavi
                         </span>
                     </div>
                     
-                    <img src={user.picture} alt={user.name} className="w-28 h-28 rounded-full mx-auto border-4 border-brand-cyan shadow-xl shadow-cyan-900/20 mb-6" />
+                    {user.picture ? (
+                        <img src={user.picture} alt={user.name} className="w-28 h-28 rounded-full mx-auto border-4 border-brand-cyan shadow-xl shadow-cyan-900/20 mb-6" />
+                    ) : (
+                        <div className="w-28 h-28 rounded-full mx-auto border-4 border-brand-cyan shadow-xl shadow-cyan-900/20 mb-6 bg-gray-800 flex items-center justify-center text-gray-400 font-bold text-4xl">
+                            {user.name.charAt(0)}
+                        </div>
+                    )}
                     <h2 className="text-2xl font-black text-white tracking-tight">{user.name}</h2>
                     <p className="text-sm text-gray-500 font-medium mb-6">{user.email}</p>
                     

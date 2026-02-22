@@ -76,7 +76,13 @@ export const AdminDashboard = (props: AdminDashboardProps) => {
 
                 <div className="p-6 border-t border-slate-100">
                     <div className="bg-slate-50 p-4 rounded-2xl flex items-center gap-4">
-                        <img src={props.authenticatedUser.picture} className="w-10 h-10 rounded-full border-2 border-brand-cyan" alt="Admin" />
+                        {props.authenticatedUser.picture ? (
+                            <img src={props.authenticatedUser.picture} className="w-10 h-10 rounded-full border-2 border-brand-cyan" alt="Admin" />
+                        ) : (
+                            <div className="w-10 h-10 rounded-full border-2 border-brand-cyan bg-gray-200 flex items-center justify-center text-gray-500 font-bold text-sm">
+                                {props.authenticatedUser.name.charAt(0)}
+                            </div>
+                        )}
                         <div className="min-w-0">
                             <p className="text-xs font-black text-slate-900 truncate uppercase">{props.authenticatedUser.name}</p>
                             <p className="text-[9px] text-brand-cyan font-black uppercase tracking-widest">{props.authenticatedUser.role}</p>

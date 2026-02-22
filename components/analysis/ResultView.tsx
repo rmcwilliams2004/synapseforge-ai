@@ -166,9 +166,22 @@ export const ResultView: React.FC<ResultViewProps> = (props) => {
                     <h2 className="text-xl font-bold text-gray-800 dark:text-white uppercase tracking-tight">{projectName}</h2>
                 </div>
                 <div className="flex items-center gap-2">
+                    <button 
+                        onClick={() => props.onGenerateSummary(result)} 
+                        disabled={props.isSummaryLoading}
+                        className="py-2 px-4 bg-brand-cyan text-white font-semibold rounded-lg hover:bg-cyan-600 transition text-sm flex items-center gap-2 shadow-sm disabled:opacity-50"
+                    >
+                        {props.isSummaryLoading ? 'Generating...' : 'Generate Summary'}
+                    </button>
                     <ExportDropdown onExportPDF={handleExportPDF} />
                 </div>
             </header>
+
+            {props.summaryError && (
+                <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-4 rounded-xl border border-red-200 dark:border-red-800/30">
+                    {props.summaryError}
+                </div>
+            )}
 
             <ProjectDashboard result={result} />
 

@@ -762,19 +762,25 @@ export const generateFoundryCad = async (productName: string, prompt: string, ma
 
 export const generateInspirationalImage = async (prompt: string, aspectRatio: string = "16:9"): Promise<string> => {
     const ai = getAiClient();
-    const response = await ai.models.generateContent({
-        model: 'gemini-3-pro-image-preview',
-        contents: prompt,
-        config: {
-            imageConfig: { aspectRatio: aspectRatio as any }
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash-image',
+            contents: prompt,
+            config: {
+                imageConfig: { aspectRatio: aspectRatio as any }
+            }
+        });
+        for (const part of response.candidates?.[0]?.content?.parts || []) {
+            if (part.inlineData) {
+                return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+            }
         }
-    });
-    for (const part of response.candidates?.[0]?.content?.parts || []) {
-        if (part.inlineData) {
-            return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-        }
+        console.error("Image generation response missing inlineData:", JSON.stringify(response));
+        throw new Error("High-fidelity concept synthesis failed.");
+    } catch (error) {
+        console.error("Error in generateInspirationalImage:", error);
+        throw new Error("High-fidelity concept synthesis failed.");
     }
-    throw new Error("High-fidelity concept synthesis failed.");
 };
 
 export const getSetupSuggestions = async (prompt: string): Promise<SetupSuggestions> => {

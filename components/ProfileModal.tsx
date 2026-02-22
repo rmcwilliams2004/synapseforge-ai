@@ -69,7 +69,13 @@ export const ProfileModal = ({ isOpen, onClose, user, onSave, onNavigateToPricin
                 </div>
                 
                 <div className="flex items-center gap-6 mb-8 p-4 bg-gray-900/40 rounded-xl border border-gray-700">
-                    <img src={user.picture} alt={user.name} className="w-20 h-20 rounded-full border-4 border-gray-600 shadow-xl" />
+                    {user.picture ? (
+                        <img src={user.picture} alt={user.name} className="w-20 h-20 rounded-full border-4 border-gray-600 shadow-xl" />
+                    ) : (
+                        <div className="w-20 h-20 rounded-full border-4 border-gray-600 shadow-xl bg-gray-800 flex items-center justify-center text-gray-400 font-bold text-2xl">
+                            {user.name.charAt(0)}
+                        </div>
+                    )}
                     <div className="flex-1">
                         <div className="flex justify-between items-start mb-2">
                              <h3 className="text-xl font-bold text-white leading-none">{formData.name}</h3>

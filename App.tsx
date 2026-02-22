@@ -310,7 +310,7 @@ export function App() {
 
 
 
-  const { result, isLoading, error, generateAnalysis: performAnalysis, clearAnalysis, setResult } = useAnalysis(addLog);
+  const { result, isLoading, error, generateAnalysis: performAnalysis, clearAnalysis, setResult, runVideoToFoundry } = useAnalysis(addLog);
   const { drawings, requestDrawing, removeDrawing, toggleDrawingReportInclusion, addLocalSnapshot } = useDrawingGenerator(addLog);
   const { inspirationalImages, requestInspirationalImage, removeInspirationalImage, toggleImageReportInclusion } = useInspirationalImageGenerator(addLog);
   const { videoUrl, isVideoLoading, generateVideo } = useVideoGenerator(addLog);
@@ -360,6 +360,25 @@ export function App() {
 
   const isViewer = authenticatedUser?.role === Role.Apprentice;
   const isProcessingGlobal = isLoading || isCadLoading || isVideoLoading || isNeuralIngesting;
+
+  useEffect(() => {
+      const handleRunFoundrySimulation = (e: any) => {
+          const { process, material } = e.detail;
+          simulation.runFoundrySimulation(process, material);
+      };
+
+      const handleRunVideoToFoundry = (e: any) => {
+          const { file } = e.detail;
+          runVideoToFoundry(file, (msg) => tts.speak(msg, 'Zephyr'), setResult);
+      };
+
+      window.addEventListener('run-foundry-simulation', handleRunFoundrySimulation);
+      window.addEventListener('run-video-to-foundry', handleRunVideoToFoundry);
+      return () => {
+          window.removeEventListener('run-foundry-simulation', handleRunFoundrySimulation);
+          window.removeEventListener('run-video-to-foundry', handleRunVideoToFoundry);
+      };
+  }, [simulation, runVideoToFoundry, tts, setResult]);
 
   const handleEngage = useCallback(async () => {
     if (!prompt.trim() || !projectName.trim()) return;
@@ -483,6 +502,12 @@ export function App() {
                 simulation.runGenesisVerification(cadData);
                 return "Genesis 4D Audit initiated.";
             }
+            if (fc.name === 'run_foundry_simulation' && cadData) {
+                const process = fc.args?.type || 'CNC Machining';
+                const material = fc.args?.components?.[0] || 'Aluminum 6061';
+                simulation.runFoundrySimulation(process, material);
+                return `Foundry simulation initiated for process: ${process}, material: ${material}`;
+            }
             if (fc.name === 'trigger_full_analysis') {
                 handleEngage();
                 return "Core Synthesis protocol engaged.";
@@ -493,7 +518,7 @@ export function App() {
         activeCad: cadData
     });
     setIsDeVinciOpen(true);
-  }, [authenticatedUser, selectedCouncil, cadData, simulation, handleEngage, devinci]);
+  }, [authenticatedUser, selectedCouncil, cadData, simulation, handleEngage, devinci, addLog]);
 
   const handleDemoLogin = (userName: string) => {
     const mockUser = usersList.find(u => u.name === userName) || usersList[0];

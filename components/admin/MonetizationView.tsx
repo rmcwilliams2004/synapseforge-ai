@@ -72,7 +72,13 @@ export const MonetizationView: React.FC<MonetizationViewProps> = ({ users, event
                             {users.map(user => (
                                 <div key={user.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 group">
                                     <div className="flex items-center gap-4">
-                                        <img src={user.picture} className="w-10 h-10 rounded-full" alt={user.name} />
+                                        {user.picture ? (
+                                            <img src={user.picture} className="w-10 h-10 rounded-full" alt={user.name} />
+                                        ) : (
+                                            <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 font-bold text-sm">
+                                                {user.name.charAt(0)}
+                                            </div>
+                                        )}
                                         <div>
                                             <p className="text-xs font-black text-slate-900 uppercase truncate max-w-[100px]">{user.name}</p>
                                             <p className="text-[10px] font-black text-brand-cyan uppercase tracking-widest">{user.forgeCredits || 0} CR</p>

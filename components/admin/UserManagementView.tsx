@@ -77,7 +77,13 @@ export const UserManagementView = ({ authenticatedUser, users, onUpdateUser, onD
                             <tr key={user.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors group">
                                 <td className="px-8 py-5">
                                     <div className="flex items-center gap-4">
-                                        <img src={user.picture} className="w-10 h-10 rounded-full shadow-sm" alt={user.name} />
+                                        {user.picture ? (
+                                            <img src={user.picture} className="w-10 h-10 rounded-full shadow-sm" alt={user.name} />
+                                        ) : (
+                                            <div className="w-10 h-10 rounded-full shadow-sm bg-gray-200 flex items-center justify-center text-gray-500 font-bold text-sm">
+                                                {user.name.charAt(0)}
+                                            </div>
+                                        )}
                                         <div className="min-w-0">
                                             <p className="text-slate-900 truncate uppercase tracking-tight">{user.name}</p>
                                             <p className="text-[9px] text-slate-400 font-medium truncate">{user.email}</p>

@@ -185,7 +185,13 @@ export const Header = ({ onStartTour, onOpenUserManual, authenticatedUser, onLog
                     onTouchEnd={handleTouchEnd}
                     className="flex items-center gap-2.5 p-1 pr-2.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-all border border-transparent hover:border-gray-200 dark:hover:border-gray-700"
                 >
-                    <img src={authenticatedUser.picture} alt={authenticatedUser.name} className="w-8 h-8 rounded-full border-2 border-brand-cyan shadow-[0_0_10px_rgba(6,182,212,0.3)]" />
+                    {authenticatedUser.picture ? (
+                        <img src={authenticatedUser.picture} alt={authenticatedUser.name} className="w-8 h-8 rounded-full border-2 border-brand-cyan shadow-[0_0_10px_rgba(6,182,212,0.3)]" />
+                    ) : (
+                        <div className="w-8 h-8 rounded-full border-2 border-brand-cyan shadow-[0_0_10px_rgba(6,182,212,0.3)] bg-gray-800 flex items-center justify-center text-gray-400 font-bold text-xs">
+                            {authenticatedUser.name.charAt(0)}
+                        </div>
+                    )}
                     <span className="hidden sm:inline font-bold text-gray-700 dark:text-brand-light text-sm">{authenticatedUser.name.split(' ')[0]}</span>
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className={`w-3.5 h-3.5 text-gray-400 transition-transform ${isProfileOpen ? 'rotate-180' : ''}`}><path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
                 </button>

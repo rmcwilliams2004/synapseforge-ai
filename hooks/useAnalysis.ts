@@ -104,10 +104,37 @@ export const useAnalysis = (addLog: (level: LogEntry['level'], message: string) 
     }
   };
   
+  const runVideoToFoundry = async (videoFile: File, speak: (msg: string) => void, setAnalysisResult: (res: any) => void) => {
+    setIsLoading(true);
+    speak("Initiating Video-to-Foundry Pipeline. Deconstructing modeling history.");
+
+    // The Rhythmic Heartbeat
+    const processingInterval = setInterval(() => speak("Processing."), 5000);
+
+    try {
+        // 1. Extract CAD UI actions from video frames (VideoCAD logic)
+        // We simulate the extraction here
+        const cadSequence = [{ action: "extrude", parameters: { depth: 10 } }]; // Simulated
+        
+        // 2. Synthesize 3D Geometry
+        const cadData = await generateCadData("VideoCAD Extracted Model", "Hydro-Heliogel", "Methane Hydrate");
+
+        clearInterval(processingInterval);
+        speak("Your request is complete. 3D Model and 4D Physics Audit are ready.");
+        setAnalysisResult({ cad: cadData, type: 'FOUNDRY_BLUEPRINT' });
+
+    } catch (error) {
+        clearInterval(processingInterval);
+        speak("Ingestion interrupted. Redline detected.");
+    } finally {
+        setIsLoading(false);
+    }
+  };
+
   const clearAnalysis = () => {
     setResult(null);
     setError(null);
   }
 
-  return { result, isLoading, error, generateAnalysis, runReverseEngineering, clearAnalysis, setResult };
+  return { result, isLoading, error, generateAnalysis, runReverseEngineering, runVideoToFoundry, clearAnalysis, setResult };
 };

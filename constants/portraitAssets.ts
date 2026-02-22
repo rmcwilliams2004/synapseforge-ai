@@ -1,6 +1,6 @@
 export const PORTRAITS = {
-  TESLA: "https://api.dicebear.com/7.x/avataaars/svg?seed=Nikola",
-  EINSTEIN: "https://api.dicebear.com/7.x/avataaars/svg?seed=Albert",
+  TESLA: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMIAAACbCAIAAAC/AtNZ...",
+  EINSTEIN: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAKAAAACgCAYAAACLz2...",
   DA_VINCI: "https://api.dicebear.com/7.x/avataaars/svg?seed=Leonardo",
   MUSK: "https://api.dicebear.com/7.x/avataaars/svg?seed=Elon",
   BRUNEL: "https://api.dicebear.com/7.x/avataaars/svg?seed=Brunel",

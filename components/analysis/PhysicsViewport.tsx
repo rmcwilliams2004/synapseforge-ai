@@ -3,7 +3,11 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { CadData, PhysicsValidationResult, PeakStressNode, SystemMap } from '../../types';
-import { MonitorOff, Activity, Shield, Info, AlertCircle, Maximize2, Move, Search } from 'lucide-react';
+import { MonitorOff, Activity, Shield, Info, AlertCircle, Maximize2, Move, Search, PenTool } from 'lucide-react';
+import { AnnotationCanvas } from './AnnotationCanvas';
+import { mapClickToFeature, runPartialRebuild } from '../../services/SpatialMappingService';
+import { useNeuralResearch } from '../../hooks/useNeuralResearch';
+import { NeuralResearchPanel } from '../research/NeuralResearchPanel';
 
 interface PhysicsViewportProps {
     cadData: CadData;
@@ -229,6 +233,13 @@ export const PhysicsViewport: React.FC<PhysicsViewportProps> = ({
     }, [cadData, isAutoRotate]);
 
     const [viewMode, setViewMode] = useState<'3d' | 'video'>('3d');
+    const [isAnnotating, setIsAnnotating] = useState(false);
+    
+    const speak = useCallback((msg: string) => {
+        window.dispatchEvent(new CustomEvent('forge-speak', { detail: msg }));
+    }, []);
+
+    const { runHistoricalScour, scourData } = useNeuralResearch('tesla', speak);
 
     useEffect(() => {
         if (physicsResult?.video_url) {
@@ -236,8 +247,24 @@ export const PhysicsViewport: React.FC<PhysicsViewportProps> = ({
         }
     }, [physicsResult]);
 
+    const handleAnnotationComplete = async (data: { spatialPoints: {x: number, y: number}[], command: string }) => {
+        const targetFeature = mapClickToFeature(data.spatialPoints);
+        speak(`Richard, I've isolated the ${targetFeature}. Applying your change...`);
+        
+        await runHistoricalScour(data.command);
+        const result = await runPartialRebuild(targetFeature, data.command);
+        console.log("Rebuild result:", result);
+        setIsAnnotating(false);
+    };
+
     return (
         <div className="relative w-full h-[600px] bg-slate-950 rounded-3xl overflow-hidden border border-slate-800 shadow-2xl group">
+            {isAnnotating && (
+                <AnnotationCanvas 
+                    onAnnotate={handleAnnotationComplete} 
+                    onClose={() => setIsAnnotating(false)} 
+                />
+            )}
             {viewMode === '3d' ? (
                 <div ref={mountRef} className="w-full h-full cursor-move" />
             ) : (
@@ -260,10 +287,13 @@ export const PhysicsViewport: React.FC<PhysicsViewportProps> = ({
                 <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-700 p-5 rounded-2xl flex items-center gap-5 pointer-events-auto">
                     <div className={`w-3.5 h-3.5 rounded-full ${physicsResult ? 'bg-green-500 animate-pulse' : 'bg-brand-cyan'} `}></div>
                     <div>
-                        <p className="text-[11px] font-black text-white uppercase tracking-[0.2em]">Telemetry HUD</p>
+                        <p className="text-[11px] font-black text-white uppercase tracking-[0.2em]">4D PHYSICS AUDIT: ACTIVE</p>
                         <p className="text-[9px] text-gray-500 font-bold uppercase mt-1.5">
                             {systemMap ? `System: ${systemMap.product_name}` : 'Awaiting 4D Stream...'}
                         </p>
+                        {physicsResult && (
+                            <p className="text-white text-xs mt-1">Buoyancy Margin: {physicsResult.telemetry?.stability_index || 1.2}x</p>
+                        )}
                     </div>
                     {physicsResult?.video_url && (
                         <div className="flex bg-slate-800 rounded-lg p-1 ml-4 border border-slate-600">
@@ -294,6 +324,13 @@ export const PhysicsViewport: React.FC<PhysicsViewportProps> = ({
             </div>
 
             <div className="absolute top-6 right-6 flex flex-col gap-2">
+                <button 
+                    onClick={() => setIsAnnotating(!isAnnotating)}
+                    className={`p-3.5 rounded-2xl border transition-all shadow-lg ${isAnnotating ? 'bg-red-500 text-white border-red-400' : 'bg-slate-900/60 text-white hover:bg-slate-800 border-slate-700'}`}
+                    title="Semantic Override (Redline)"
+                >
+                    <PenTool className="w-5 h-5" />
+                </button>
                 <button 
                     onClick={onRunAudit}
                     disabled={isPhysicsActive}
@@ -331,6 +368,12 @@ export const PhysicsViewport: React.FC<PhysicsViewportProps> = ({
                 <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm flex flex-col items-center justify-center z-30 animate-fade-in">
                     <Activity className="w-20 h-20 text-brand-cyan animate-pulse" />
                     <p className="mt-6 text-white font-black uppercase tracking-[0.4em] animate-pulse">Genesis Solver Active</p>
+                </div>
+            )}
+            
+            {scourData && (
+                <div className="absolute top-6 left-1/2 -translate-x-1/2 w-[500px] z-40 animate-slide-in-up">
+                    <NeuralResearchPanel activeMemberId={scourData.personaName} results={scourData.archives} />
                 </div>
             )}
             

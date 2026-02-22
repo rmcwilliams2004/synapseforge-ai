@@ -51,10 +51,12 @@ export const ImageIdentifierModal: React.FC<ImageIdentifierModalProps> = ({ isOp
                 )}
                 {result && !isLoading && (
                     <div className="animate-fade-in space-y-4">
-                        <div className="relative group">
-                            <img src={result.imageUrl} alt="Uploaded for identification" className="w-full h-auto max-h-64 object-contain rounded-xl bg-gray-900/50 p-1 border border-gray-600 shadow-2xl transition-all duration-500 group-hover:border-brand-cyan/50" />
-                            <div className="absolute inset-0 bg-brand-cyan/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl pointer-events-none"></div>
-                        </div>
+                        {result.imageUrl && (
+                            <div className="relative group">
+                                <img src={result.imageUrl} alt="Uploaded for identification" className="w-full h-auto max-h-64 object-contain rounded-xl bg-gray-900/50 p-1 border border-gray-600 shadow-2xl transition-all duration-500 group-hover:border-brand-cyan/50" />
+                                <div className="absolute inset-0 bg-brand-cyan/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl pointer-events-none"></div>
+                            </div>
+                        )}
                         <div>
                             <h3 className="text-sm font-black text-brand-cyan uppercase tracking-widest mb-3 flex items-center gap-2">
                                 <div className="w-1.5 h-1.5 rounded-full bg-brand-cyan animate-pulse"></div>

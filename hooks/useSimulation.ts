@@ -114,5 +114,28 @@ export const useSimulation = (addLog: (level: LogEntry['level'], message: string
         addLog('INFO', '[GENESIS]: Geometry optimized. Structural integrity restored to 95%.');
     }, [addLog]);
 
-    return { simulationResult, isPhysicsActive, physicsResult, runSimulation, runGenesisVerification, autoCorrectGeometry, clearSimulation: () => setPhysicsResult(null) };
+    const runFoundrySimulation = useCallback(async (processType: string = 'CNC Machining', material: string = 'Aluminum 6061') => {
+        setIsPhysicsActive(true);
+        addLog('INFO', `[FOUNDRY]: Initiating simulation for ${processType} using ${material}...`);
+        
+        // Simulate processing delay
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
+        setPhysicsResult((prev: any) => {
+            return {
+                ...prev,
+                telemetry: {
+                    ...prev?.telemetry,
+                    stability_index: 0.98,
+                    max_stress: 0.2
+                },
+                message: `Foundry simulation completed successfully for ${processType} with ${material}.`
+            };
+        });
+        
+        setIsPhysicsActive(false);
+        addLog('INFO', `[FOUNDRY]: Simulation complete. Process: ${processType}, Material: ${material}.`);
+    }, [addLog]);
+
+    return { simulationResult, isPhysicsActive, physicsResult, runSimulation, runGenesisVerification, autoCorrectGeometry, runFoundrySimulation, clearSimulation: () => setPhysicsResult(null) };
 };

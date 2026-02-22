@@ -191,7 +191,30 @@ export const useForgeVoice = (
         setTimeout(() => { isProcessingRef.current = false; }, 2000);
     }, [callbacks, tts]);
 
+    const initializeVoiceEngine = async () => {
+        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+        if (!AudioContextClass) return;
+
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const context = new AudioContextClass();
+            
+            // FIX: Only proceed if browser isn't blocking audio
+            if (context.state === 'suspended') {
+                console.log("Awaiting user interaction to resume audio.");
+                return; 
+            }
+
+            const source = context.createMediaStreamSource(stream);
+            // setIsVoiceActive(true);
+        } catch (e) {
+            console.error("Audio block: Click 'Engage' to start Forge Voice.");
+        }
+    };
+
     useEffect(() => {
+        initializeVoiceEngine();
+        
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (!SpeechRecognition) {
             console.warn("Speech Engine: Not supported in this browser.");
@@ -242,5 +265,10 @@ export const useForgeVoice = (
         }
     };
 
-    return { isListening, transcripts, toggleManual };
+    const emergencyStop = () => {
+        window.speechSynthesis.cancel();
+        window.location.reload(); // Wipes memory and stops API flood
+    };
+
+    return { isListening, transcripts, toggleManual, emergencyStop };
 };

@@ -98,7 +98,13 @@ export const PersonaManagementView: React.FC<PersonaManagementViewProps> = ({ pe
                         <div className="h-2 bg-brand-cyan/20 group-hover:bg-brand-cyan transition-colors" />
                         <div className="p-6 space-y-4">
                             <div className="flex items-center gap-4">
-                                <img src={persona.avatar} alt={persona.name} className="w-16 h-16 rounded-xl border border-gray-700 bg-gray-900 object-cover shadow-lg" />
+                                {persona.avatar ? (
+                                    <img src={persona.avatar} alt={persona.name} className="w-16 h-16 rounded-xl border border-gray-700 bg-gray-900 object-cover shadow-lg" />
+                                ) : (
+                                    <div className="w-16 h-16 rounded-xl border border-gray-700 bg-gray-900 shadow-lg flex items-center justify-center text-gray-500 font-bold text-xl">
+                                        {persona.name.charAt(0)}
+                                    </div>
+                                )}
                                 <div className="min-w-0">
                                     <h3 className="text-lg font-black text-white truncate italic uppercase tracking-tight">{persona.name}</h3>
                                     <p className="text-[10px] text-brand-cyan font-black uppercase tracking-widest truncate">{persona.title}</p>
@@ -130,7 +136,13 @@ export const PersonaManagementView: React.FC<PersonaManagementViewProps> = ({ pe
                 <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar py-2">
                     <div className="flex items-center gap-6">
                         <div className="relative group shrink-0">
-                            <img src={editingPersona?.avatar} alt="Avatar" className="w-24 h-24 rounded-2xl border-2 border-gray-700 object-cover bg-gray-950 shadow-2xl" />
+                            {editingPersona?.avatar ? (
+                                <img src={editingPersona?.avatar} alt="Avatar" className="w-24 h-24 rounded-2xl border-2 border-gray-700 object-cover bg-gray-950 shadow-2xl" />
+                            ) : (
+                                <div className="w-24 h-24 rounded-2xl border-2 border-gray-700 bg-gray-950 shadow-2xl flex items-center justify-center text-gray-500 font-bold text-3xl">
+                                    {editingPersona?.name?.charAt(0) || '?'}
+                                </div>
+                            )}
                             <button 
                                 onClick={() => fileInputRef.current?.click()}
                                 className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-2xl"

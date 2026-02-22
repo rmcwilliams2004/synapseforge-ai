@@ -326,13 +326,20 @@ export const FoundryParamPanel: React.FC<FoundryParamPanelProps> = ({ state, onU
       </div>
       
       {!state.isLocked && (
-          <div className="p-6 bg-gray-950 border-t border-gray-800">
+          <div className="p-6 bg-gray-950 border-t border-gray-800 space-y-3">
             <button 
                 onClick={() => window.dispatchEvent(new CustomEvent('re-forge'))}
                 disabled={isViewer}
                 className="w-full py-4 bg-brand-cyan text-gray-900 font-black uppercase tracking-[0.2em] rounded-xl hover:bg-cyan-400 transition-all active:scale-95 shadow-lg shadow-cyan-900/40"
             >
                 Re-Forge Geometry
+            </button>
+            <button 
+                onClick={() => window.dispatchEvent(new CustomEvent('run-foundry-simulation', { detail: { process: 'CNC Machining', material: 'Aluminum 6061' } }))}
+                disabled={isViewer}
+                className="w-full py-4 bg-indigo-600 text-white font-black uppercase tracking-[0.2em] rounded-xl hover:bg-indigo-500 transition-all active:scale-95 shadow-lg shadow-indigo-900/40"
+            >
+                Run Foundry Simulation
             </button>
           </div>
       )}
