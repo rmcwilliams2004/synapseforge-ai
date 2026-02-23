@@ -1,4 +1,6 @@
 import React from 'react';
+import { CreditGate } from '../monetization/CreditGate';
+import { Zap, Shield } from 'lucide-react';
 
 export const ReadAloudButton = ({ text, tts, voice }: { text: string, tts: any, voice: string }) => (
     <button onClick={() => tts.speak(text, voice)} className="p-2 text-gray-400 hover:text-brand-cyan transition" title="Read Aloud">
@@ -12,3 +14,35 @@ export const CommentButton = ({ sectionId, sectionTitle, onToggle, count, isOpen
         {count > 0 && <span className="text-xs font-bold">{count}</span>}
     </button>
 );
+
+export const AnalysisButtons = ({ onEngage }: { onEngage: (type: string) => void }) => {
+  return (
+    <div className="flex gap-4">
+      {/* Gated 360° Ingestion Action */}
+      <CreditGate 
+        cost={10} 
+        actionName="360° Kinematic Intake"
+      >
+        <button 
+          onClick={() => onEngage('INGESTION')}
+          className="px-6 py-3 bg-cyan-600 hover:bg-cyan-500 rounded-full font-black text-[10px] tracking-widest uppercase flex items-center gap-2"
+        >
+          <Zap className="w-3 h-3" /> Engage Holistic Intake
+        </button>
+      </CreditGate>
+
+      {/* Gated Physics Audit Action */}
+      <CreditGate 
+        cost={25} 
+        actionName="Genesis 4D Audit"
+      >
+        <button 
+          onClick={() => onEngage('AUDIT')}
+          className="px-6 py-3 bg-amber-600 hover:bg-amber-500 rounded-full font-black text-[10px] tracking-widest uppercase flex items-center gap-2"
+        >
+          <Shield className="w-3 h-3" /> Run 4D Stability Audit
+        </button>
+      </CreditGate>
+    </div>
+  );
+};

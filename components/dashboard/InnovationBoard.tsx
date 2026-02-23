@@ -230,12 +230,12 @@ export const InnovationBoard: React.FC<InnovationBoardProps> = ({ projects, onSe
         </div>
       ) : (
         <div className={viewMode === 'grid' ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in" : "space-y-4 animate-fade-in"}>
-          {filteredProjects.map(project => (
+          {filteredProjects.map((project, index) => (
             viewMode === 'grid' ? (
-                <ProjectCard key={project.id} project={project} onSelect={onSelectProject} />
+                <ProjectCard key={`grid-${project.id}-${index}-${project.updatedAt}`} project={project} onSelect={onSelectProject} />
             ) : (
                 <div 
-                    key={project.id}
+                    key={`list-${project.id}-${index}-${project.updatedAt}`}
                     onClick={() => onSelectProject(project.id)}
                     className="flex items-center gap-6 p-5 bg-slate-900/40 border border-slate-800 rounded-2xl hover:border-brand-cyan/50 hover:bg-slate-900 transition-all cursor-pointer group"
                 >

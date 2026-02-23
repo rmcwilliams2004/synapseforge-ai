@@ -188,7 +188,7 @@ export interface User {
 export interface ComputeEvent {
   id: string;
   timestamp: string;
-  type: 'FOUNDRY_SYNTHESIS' | 'GENESIS_AUDIT' | 'MASTERMIND_SESSION';
+  type: 'FOUNDRY_SYNTHESIS' | 'GENESIS_AUDIT' | 'MASTERMIND_SESSION' | 'SOVEREIGN_EXPORT';
   user: string;
   cost: number;
   status: 'SUCCESS' | 'FAILURE' | 'PENDING';

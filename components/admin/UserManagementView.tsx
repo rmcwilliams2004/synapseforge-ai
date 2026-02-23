@@ -67,7 +67,7 @@ export const UserManagementView = ({ authenticatedUser, users, onUpdateUser, onD
                         <tr>
                             <th className="px-8 py-5 w-[30%]">Auth Node (User)</th>
                             <th className="px-8 py-5 w-[20%]">Permission Tier</th>
-                            <th className="px-8 py-5 w-[15%]">Synapses</th>
+                            <th className="px-8 py-5 w-[15%]">Credits</th>
                             <th className="px-8 py-5 w-[20%]">Last Active</th>
                             <th className="px-8 py-5 w-[15%] text-center">Protocol</th>
                         </tr>
@@ -80,7 +80,7 @@ export const UserManagementView = ({ authenticatedUser, users, onUpdateUser, onD
                                         {user.picture ? (
                                             <img src={user.picture} className="w-10 h-10 rounded-full shadow-sm" alt={user.name} />
                                         ) : (
-                                            <div className="w-10 h-10 rounded-full shadow-sm bg-gray-200 flex items-center justify-center text-gray-500 font-bold text-sm">
+                                            <div className="w-10 h-10 rounded-full shadow-sm bg-slate-800 flex items-center justify-center text-brand-cyan font-bold text-sm border border-slate-700">
                                                 {user.name.charAt(0)}
                                             </div>
                                         )}
@@ -91,17 +91,34 @@ export const UserManagementView = ({ authenticatedUser, users, onUpdateUser, onD
                                     </div>
                                 </td>
                                 <td className="px-8 py-5">
-                                    <select
-                                        value={user.role}
-                                        onChange={(e) => handleRoleChange(user.id, e.target.value as Role)}
-                                        className="bg-transparent border-none p-0 text-[11px] font-black text-slate-900 uppercase focus:ring-0 cursor-pointer hover:text-brand-cyan transition-colors"
-                                        disabled={authenticatedUser.id === user.id}
-                                    >
-                                        {Object.values(Role).map(role => <option key={role} value={role}>{role}</option>)}
-                                    </select>
-                                    <div className="mt-1"><RoleBadge role={user.role} /></div>
+                                    <div className="flex flex-col gap-2 items-start">
+                                        <select
+                                            value={user.role}
+                                            onChange={(e) => handleRoleChange(user.id, e.target.value as Role)}
+                                            className="bg-transparent border-none p-0 text-[11px] font-black text-slate-900 uppercase focus:ring-0 cursor-pointer hover:text-brand-cyan transition-colors"
+                                            disabled={authenticatedUser.id === user.id}
+                                        >
+                                            {Object.values(Role).map(role => <option key={role} value={role}>{role}</option>)}
+                                        </select>
+                                        <span className={`px-2 py-1 rounded-md text-[9px] font-black uppercase tracking-wider border ${
+                                            user.role === Role.Admin ? 'bg-purple-100 text-purple-600 border-purple-200' : 
+                                            user.role === Role.Editor ? 'bg-cyan-100 text-cyan-600 border-cyan-200' : 
+                                            'bg-slate-100 text-slate-500 border-slate-200'
+                                        }`}>
+                                            {user.role === Role.Admin ? 'Sovereign' : user.role === Role.Editor ? 'Foundry Pro' : 'Standard'}
+                                        </span>
+                                    </div>
                                 </td>
-                                <td className="px-8 py-5 text-slate-500 font-mono">{user.analysesRun}</td>
+                                <td className="px-8 py-5">
+                                    <div className="flex items-center gap-2">
+                                        <div className="text-xs font-mono text-amber-500 font-black">
+                                            {user.forgeCredits || 0} CR
+                                        </div>
+                                        <button className="opacity-0 group-hover:opacity-100 p-1 hover:text-brand-cyan transition-all">
+                                            <Zap className="w-3 h-3" />
+                                        </button>
+                                    </div>
+                                </td>
                                 <td className="px-8 py-5 text-slate-400">{new Date(user.lastActive).toLocaleDateString()}</td>
                                 <td className="px-8 py-5 text-center">
                                     <div className="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">

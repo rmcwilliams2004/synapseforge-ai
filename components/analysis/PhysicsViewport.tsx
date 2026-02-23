@@ -3,11 +3,12 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { CadData, PhysicsValidationResult, PeakStressNode, SystemMap } from '../../types';
-import { MonitorOff, Activity, Shield, Info, AlertCircle, Maximize2, Move, Search, PenTool } from 'lucide-react';
+import { MonitorOff, Activity, Shield, Info, AlertCircle, Maximize2, Move, Search, PenTool, Box } from 'lucide-react';
 import { AnnotationCanvas } from './AnnotationCanvas';
 import { mapClickToFeature, runPartialRebuild } from '../../services/SpatialMappingService';
 import { useNeuralResearch } from '../../hooks/useNeuralResearch';
 import { NeuralResearchPanel } from '../research/NeuralResearchPanel';
+import { CadViewerModal } from './CadViewerModal';
 
 interface PhysicsViewportProps {
     cadData: CadData;
@@ -66,6 +67,7 @@ export const PhysicsViewport: React.FC<PhysicsViewportProps> = ({
     const [isAutoRotate, setIsAutoRotate] = useState(false);
     const [showNodalGrid, setShowNodalGrid] = useState(true);
     const [showXRay, setShowXRay] = useState(!!systemMap);
+    const [isCadModalOpen, setIsCadModalOpen] = useState(false);
     
     const threeRef = useRef<{
         scene?: THREE.Scene,
@@ -325,6 +327,13 @@ export const PhysicsViewport: React.FC<PhysicsViewportProps> = ({
 
             <div className="absolute top-6 right-6 flex flex-col gap-2">
                 <button 
+                    onClick={() => setIsCadModalOpen(true)}
+                    className="p-3.5 rounded-2xl border transition-all shadow-lg bg-slate-900/60 text-brand-cyan hover:bg-slate-800 border-brand-cyan/50"
+                    title="Open CAD Viewer"
+                >
+                    <Box className="w-5 h-5" />
+                </button>
+                <button 
                     onClick={() => setIsAnnotating(!isAnnotating)}
                     className={`p-3.5 rounded-2xl border transition-all shadow-lg ${isAnnotating ? 'bg-red-500 text-white border-red-400' : 'bg-slate-900/60 text-white hover:bg-slate-800 border-slate-700'}`}
                     title="Semantic Override (Redline)"
@@ -346,6 +355,12 @@ export const PhysicsViewport: React.FC<PhysicsViewportProps> = ({
                     <Maximize2 className="w-5 h-5" />
                 </button>
             </div>
+
+            <CadViewerModal 
+                isOpen={isCadModalOpen} 
+                onClose={() => setIsCadModalOpen(false)} 
+                cadData={cadData} 
+            />
 
             {physicsResult && (physicsResult.telemetry?.stability_index || 1) < 0.7 && (
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-red-900/90 backdrop-blur-md border border-red-500 p-8 rounded-3xl text-center animate-pulse z-40 pointer-events-auto shadow-[0_0_50px_rgba(239,68,68,0.5)]">

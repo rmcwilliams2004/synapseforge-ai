@@ -9,9 +9,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@codemirror/lang-python": "^6.2.1",
     "@google/genai": "^1.22.0",
     "@pdfme/common": "5.1.0",
     "@pdfme/generator": "5.1.0",
+    "@uiw/codemirror-theme-vscode": "^4.25.4",
+    "@uiw/react-codemirror": "^4.25.4",
     "express": "^5.2.1",
     "form-data": "^4.0.5",
     "idb": "8",

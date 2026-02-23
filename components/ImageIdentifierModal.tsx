@@ -52,9 +52,25 @@ export const ImageIdentifierModal: React.FC<ImageIdentifierModalProps> = ({ isOp
                 {result && !isLoading && (
                     <div className="animate-fade-in space-y-4">
                         {result.imageUrl && (
-                            <div className="relative group">
-                                <img src={result.imageUrl} alt="Uploaded for identification" className="w-full h-auto max-h-64 object-contain rounded-xl bg-gray-900/50 p-1 border border-gray-600 shadow-2xl transition-all duration-500 group-hover:border-brand-cyan/50" />
-                                <div className="absolute inset-0 bg-brand-cyan/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl pointer-events-none"></div>
+                            <div className="relative group overflow-hidden rounded-xl border border-gray-600 bg-gray-900/50 p-1 shadow-2xl transition-all duration-500 hover:border-brand-cyan/50">
+                                <div className="aspect-video relative w-full overflow-hidden rounded-lg bg-gray-800 flex items-center justify-center">
+                                    {/* Placeholder state */}
+                                    <div className="absolute inset-0 flex items-center justify-center animate-pulse">
+                                        <Loader2 className="w-8 h-8 text-gray-600 animate-spin" />
+                                    </div>
+                                    <img 
+                                        src={result.imageUrl} 
+                                        alt="Uploaded for identification" 
+                                        loading="lazy"
+                                        className="relative z-10 w-full h-full object-contain transition-transform duration-700 ease-out group-hover:scale-105 opacity-0" 
+                                        onLoad={(e) => {
+                                            const target = e.target as HTMLImageElement;
+                                            target.classList.remove('opacity-0');
+                                            target.previousElementSibling?.classList.add('hidden');
+                                        }}
+                                    />
+                                </div>
+                                <div className="absolute inset-0 bg-brand-cyan/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl pointer-events-none z-20"></div>
                             </div>
                         )}
                         <div>
