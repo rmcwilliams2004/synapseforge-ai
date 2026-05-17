@@ -72,7 +72,7 @@ export const SystemDiagnosticsModal: React.FC<SystemDiagnosticsModalProps> = ({ 
             <h5 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.25em] ml-1">Grid Health Telemetry</h5>
             <div className="grid grid-cols-1 gap-2">
                 {metrics.map((m, i) => (
-                    <div key={i} className="flex items-center justify-between p-4 bg-slate-900/40 border border-slate-800 rounded-xl group hover:border-slate-700 transition-colors">
+                    <button key={i} className="w-full flex items-center justify-between p-4 bg-slate-900/40 border border-slate-800 rounded-xl group hover:border-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-gray-900 active:scale-95">
                         <div className="flex items-center gap-4">
                             <div className={`p-2 rounded-lg bg-slate-800 group-hover:bg-slate-700 transition-colors ${m.color}`}>
                                 <m.icon className="w-4 h-4" />
@@ -80,7 +80,7 @@ export const SystemDiagnosticsModal: React.FC<SystemDiagnosticsModalProps> = ({ 
                             <span className="text-xs font-black uppercase text-slate-400 tracking-tight">{m.label}</span>
                         </div>
                         <span className={`text-[10px] font-mono font-black ${m.color}`}>{m.status}</span>
-                    </div>
+                    </button>
                 ))}
             </div>
         </div>

@@ -16,7 +16,7 @@ export const Section: React.FC<SectionProps> = ({ id, title, children, actions, 
         <div id={id} className="mb-8 border border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-900 rounded-xl overflow-hidden shadow-sm">
             <div className="flex justify-between items-center px-6 py-4 bg-gray-50 dark:bg-slate-800 border-b border-gray-200 dark:border-gray-700">
                 <div className="flex items-center gap-3">
-                    <button onClick={() => setIsOpen(!isOpen)} className="text-gray-500 hover:text-brand-cyan transition-colors">
+                    <button onClick={() => setIsOpen(!isOpen)} className="text-gray-500 hover:text-brand-cyan transition-colors focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-gray-800 rounded-md active:scale-95 p-1">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : '-rotate-90'}`}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
                         </svg>

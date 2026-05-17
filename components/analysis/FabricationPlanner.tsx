@@ -125,7 +125,7 @@ export const FabricationPlanner: React.FC<FabricationPlannerProps> = ({ fabricat
                                     onClick={() => !isViewer && handleCheckToggle(check)}
                                     disabled={isLoading || isViewer}
                                     className={`
-                                        px-3 py-2 rounded-md text-xs font-medium border transition-all text-left flex items-center justify-between
+                                        px-3 py-2 rounded-md text-xs font-medium border transition-all text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 dark:focus:ring-offset-slate-800 active:scale-95
                                         ${isSelected 
                                             ? 'bg-purple-100 dark:bg-purple-900/30 border-purple-500 text-purple-700 dark:text-purple-300' 
                                             : 'bg-gray-50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-500'}
@@ -146,7 +146,7 @@ export const FabricationPlanner: React.FC<FabricationPlannerProps> = ({ fabricat
                     <button
                         onClick={handleRunPlanner}
                         disabled={isLoading}
-                        className={`w-full py-3 px-5 bg-purple-600 text-white font-black uppercase tracking-widest rounded-xl border border-purple-500 hover:bg-purple-500 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 relative overflow-hidden ${isLoading ? 'shadow-inner' : 'shadow-lg shadow-purple-900/30'}`}
+                        className={`w-full py-3 px-5 bg-purple-600 text-white font-black uppercase tracking-widest rounded-xl border border-purple-500 hover:bg-purple-500 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 relative overflow-hidden focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 dark:focus:ring-offset-slate-800 ${isLoading ? 'shadow-inner' : 'shadow-lg shadow-purple-900/30'}`}
                     >
                         {isLoading ? (
                             <>
@@ -245,7 +245,7 @@ export const FabricationPlanner: React.FC<FabricationPlannerProps> = ({ fabricat
                             {selectedProcess === 'CNC Machining' && plan.processSpecificOutput.data && (
                                 <button
                                     onClick={() => gcodeVisualizer.openModal(plan.processSpecificOutput.data)}
-                                    className="mt-3 w-full py-2 px-4 bg-cyan-600 text-white font-semibold rounded-lg border border-cyan-500 hover:bg-cyan-500 transition active:scale-95 text-sm flex items-center justify-center gap-2 shadow-sm"
+                                    className="mt-3 w-full py-2 px-4 bg-cyan-600 text-white font-semibold rounded-lg border border-cyan-500 hover:bg-cyan-500 transition active:scale-95 text-sm flex items-center justify-center gap-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 dark:focus:ring-offset-slate-800"
                                 >
                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0 1 3.75 9.375v-4.5ZM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 0 1-1.125-1.125v-4.5ZM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0 1 13.5 9.375v-4.5Z" /><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 6.75h.75v.75h-.75v-.75ZM6.75 16.5h.75v.75h-.75v-.75ZM16.5 6.75h.75v.75h-.75v-.75ZM13.5 13.5v4.5m0-.75h4.5" /></svg>
                                     Visualize Toolpath & Summary

@@ -61,7 +61,7 @@ export const AccountPage: React.FC<AccountPageProps> = ({ user, onUpdate, onNavi
           <div>
             <button 
                 onClick={onBack}
-                className="mb-4 flex items-center gap-2 text-gray-500 hover:text-brand-cyan transition-colors text-xs font-black uppercase tracking-widest"
+                className="mb-4 flex items-center gap-2 text-gray-500 hover:text-brand-cyan transition-colors text-xs font-black uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-gray-900 rounded"
             >
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" /></svg>
                 Back to Forge
@@ -72,13 +72,13 @@ export const AccountPage: React.FC<AccountPageProps> = ({ user, onUpdate, onNavi
           <div className="flex gap-4">
              <button 
                 onClick={onBack}
-                className="px-6 py-2.5 text-gray-400 hover:text-white transition-colors text-sm font-bold"
+                className="px-6 py-2.5 text-gray-400 hover:text-white transition-colors text-sm font-bold focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 rounded"
             >
                 Discard
             </button>
             <button 
                 onClick={handleSave}
-                className="px-10 py-2.5 bg-brand-cyan text-gray-900 font-black uppercase tracking-widest rounded-xl hover:bg-cyan-400 transition-all shadow-lg shadow-cyan-900/20 active:scale-95"
+                className="px-10 py-2.5 bg-brand-cyan text-gray-900 font-black uppercase tracking-widest rounded-xl hover:bg-cyan-400 transition-all shadow-lg shadow-cyan-900/20 active:scale-95 focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-gray-900"
             >
                 Save Protocol
             </button>
@@ -118,7 +118,7 @@ export const AccountPage: React.FC<AccountPageProps> = ({ user, onUpdate, onNavi
 
                     <button 
                         onClick={onNavigateToPricing}
-                        className="w-full py-4 bg-gray-700/50 text-white font-black uppercase tracking-widest text-xs rounded-2xl hover:bg-gray-700 transition-all border border-gray-600/50"
+                        className="w-full py-4 bg-gray-700/50 text-white font-black uppercase tracking-widest text-xs rounded-2xl hover:bg-gray-700 transition-all border border-gray-600/50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
                     >
                         Manage Subscription
                     </button>

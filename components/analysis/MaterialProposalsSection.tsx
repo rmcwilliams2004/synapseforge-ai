@@ -27,7 +27,7 @@ export const MaterialProposalsSection: React.FC<MaterialProposalsSectionProps> =
                             <h4 className="font-bold text-gray-900 dark:text-white">{mat.name}</h4>
                             <button 
                                 onClick={() => suggestionExplorer.explore(mat.name, result.executive_summary)}
-                                className="text-xs text-brand-cyan hover:underline opacity-0 group-hover:opacity-100 transition-opacity"
+                                className="text-xs text-brand-cyan hover:underline opacity-0 group-hover:opacity-100 transition-opacity focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-slate-800 rounded px-1"
                             >
                                 Explore
                             </button>

@@ -25,7 +25,7 @@ export const ErrorView = ({ error, onClear }: ErrorViewProps) => (
     </p>
     <button
       onClick={onClear}
-      className="mt-6 py-2 px-4 bg-red-600/50 text-white font-semibold rounded-lg border border-red-500 hover:bg-red-500/50 transition flex items-center gap-2"
+      className="mt-6 py-2 px-4 bg-red-600/50 text-white font-semibold rounded-lg border border-red-500 hover:bg-red-500/50 transition flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 active:scale-95"
     >
       <ClearIcon className="w-5 h-5" />
       Clear Error

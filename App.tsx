@@ -48,6 +48,9 @@ import { ProjectInitiationModal } from './components/dashboard/ProjectInitiation
 import { AdminDashboard } from './components/admin/AdminDashboard';
 import { TechnicalDocumentModal } from './components/TechnicalDocumentModal';
 import { useAnalysisPersistence } from './hooks/useAnalysisPersistence';
+import { useGoogleDriveStorage } from './hooks/useGoogleDriveStorage';
+import { useGoogleExporter } from './hooks/useGoogleExporter';
+import { GoogleDrivePickerModal } from './components/GoogleDrivePickerModal';
 
 const useRossAnalysis = (addLog: (level: LogEntry['level'], message: string) => void) => {
     const workerRef = useRef<Worker | null>(null);
@@ -262,10 +265,11 @@ export function App() {
   const [isDeVinciOpen, setIsDeVinciOpen] = useState(false);
   const [isNeuralIngesting, setIsNeuralIngesting] = useState(false);
   const [isTechDocOpen, setIsTechDocOpen] = useState(false);
+  const [isDrivePickerOpen, setIsDrivePickerOpen] = useState(false);
 
   // Persistence Hook
   const { saveInProgressAnalysis, loadInProgressAnalysis, clearInProgressAnalysis } = useAnalysisPersistence();
-
+  
   const addLog = useCallback((level: LogEntry['level'], message: string, overrideContext?: { user?: string, project?: string }) => {
     const user = overrideContext?.user || authenticatedUser?.name || 'System';
     const project = overrideContext?.project || activeProject?.name || '';
@@ -357,6 +361,8 @@ export function App() {
   const nextStepAssistant = useNextStepAssistant(addLog);
   const aiChat = useAiChat(addLog, activeProject?.knowledgeBase || [], activeProject?.id);
   const patentGenerator = usePatentGenerator(addLog);
+  const googleDriveStorage = useGoogleDriveStorage(addLog);
+  const googleExporter = useGoogleExporter(addLog);
 
   const isViewer = authenticatedUser?.role === Role.Apprentice;
   const isProcessingGlobal = isLoading || isCadLoading || isVideoLoading || isNeuralIngesting;
@@ -567,7 +573,14 @@ export function App() {
                         onEditProject={() => {}} onDeleteProject={onDeleteProject}
                         onLoadVersion={() => {}} onRevertVersion={revertToVersion}
                         onCompareVersions={() => {}} disabled={isLoading} authenticatedUser={authenticatedUser}
-                        onSaveToDrive={() => {}} onOpenFromDrive={() => {}} isSavingToDrive={false} isDriveAuthenticated={false}
+                        onSaveToDrive={() => {
+                            if (activeProject) {
+                                googleDriveStorage.saveProject(activeProject);
+                            }
+                        }} 
+                        onOpenFromDrive={() => setIsDrivePickerOpen(true)} 
+                        isSavingToDrive={googleDriveStorage.isSaving} 
+                        isDriveAuthenticated={googleDriveStorage.isAuthenticated}
                         addLog={addLog} onAddDocument={addIngestedDocument} onRemoveDocument={removeIngestedDocument}
                     />
                 </div>
@@ -623,10 +636,21 @@ export function App() {
                   onGenerateSummary={() => Promise.resolve(null)} isSummaryLoading={false} summaryError={null}
                   cadData={cadData} foundryResult={foundryResult} onGenerateCad={generateCad}
                   isCadLoading={isCadLoading} cadError={null} isCadViewerOpen={false} onOpenCadViewer={() => {}}
-                  isGoogleExporterAuthenticated={false} googleExporterUser={null} isGoogleAuthLoading={false}
-                  onGoogleExporterSignIn={() => {}} onGoogleExporterSignOut={() => {}}
-                  isGoogleExporting={false} googleExportStatus="" googleExportError={null} googleDocContent={null}
-                  onOpenGoogleDocPreview={() => {}} onExportToGoogle={() => {}}
+                  isGoogleExporterAuthenticated={googleExporter.isAuthenticated} 
+                  googleExporterUser={googleExporter.authenticatedUser} 
+                  isGoogleAuthLoading={googleExporter.isAuthLoading}
+                  onGoogleExporterSignIn={googleExporter.signIn} 
+                  onGoogleExporterSignOut={googleExporter.signOut}
+                  isGoogleExporting={googleExporter.isExporting} 
+                  googleExportStatus={googleExporter.exportStatus} 
+                  googleExportError={googleExporter.exportError} 
+                  googleDocContent={googleExporter.exportedDocContent}
+                  onOpenGoogleDocPreview={() => {}} 
+                  onExportToGoogle={() => {
+                      if (activeProject && result) {
+                          googleExporter.exportToGoogle(activeProject, drawings, authenticatedUser);
+                      }
+                  }}
                   onRotorModelChange={() => {}} rossAnalysis={rossAnalysis} tts={tts}
                   inspirationalImageHistory={[]} onReinsertInspirationalImage={() => {}} onDeleteInspirationalImageFromHistory={() => {}}
                   simulation={simulation} fabricationPlanner={fabricationPlanner} gcodeVisualizer={gcodeVisualizer}
@@ -689,6 +713,24 @@ export function App() {
       />
 
       <TechnicalDocumentModal isOpen={isTechDocOpen} onClose={() => setIsTechDocOpen(false)} />
+
+      <GoogleDrivePickerModal
+          isOpen={isDrivePickerOpen}
+          onClose={() => setIsDrivePickerOpen(false)}
+          isLoading={googleDriveStorage.isLoadingList || googleDriveStorage.isLoadingFile}
+          files={googleDriveStorage.fileList}
+          onSelect={async (fileId) => {
+              const loadedProject = await googleDriveStorage.loadProject(fileId);
+              if (loadedProject) {
+                  loadProject(loadedProject);
+                  setIsDrivePickerOpen(false);
+              }
+          }}
+          onRefresh={googleDriveStorage.refreshFileList}
+          error={googleDriveStorage.error}
+          isAuthenticated={googleDriveStorage.isAuthenticated}
+          onSignIn={googleDriveStorage.checkAuthStatus}
+      />
     </div>
   );
 }

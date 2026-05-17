@@ -2,6 +2,7 @@ import React from 'react';
 import { Modal } from './Modal';
 import { ImageIdentificationResult } from '../types';
 import { Loader2, Search } from 'lucide-react';
+import { usePlaceholderImage } from '../hooks/usePlaceholderImage';
 
 interface ImageIdentifierModalProps {
     isOpen: boolean;
@@ -12,6 +13,8 @@ interface ImageIdentifierModalProps {
 }
 
 export const ImageIdentifierModal: React.FC<ImageIdentifierModalProps> = ({ isOpen, onClose, isLoading, error, result }) => {
+    const placeholderUrl = usePlaceholderImage();
+
     return (
         <Modal
             isOpen={isOpen}
@@ -55,8 +58,13 @@ export const ImageIdentifierModal: React.FC<ImageIdentifierModalProps> = ({ isOp
                             <div className="relative group overflow-hidden rounded-xl border border-gray-600 bg-gray-900/50 p-1 shadow-2xl transition-all duration-500 hover:border-brand-cyan/50">
                                 <div className="aspect-video relative w-full overflow-hidden rounded-lg bg-gray-800 flex items-center justify-center">
                                     {/* Placeholder state */}
-                                    <div className="absolute inset-0 flex items-center justify-center animate-pulse">
-                                        <Loader2 className="w-8 h-8 text-gray-600 animate-spin" />
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                        {placeholderUrl ? (
+                                            <img src={placeholderUrl} alt="Loading..." className="w-full h-full object-cover opacity-30 animate-pulse" />
+                                        ) : (
+                                            <Loader2 className="w-8 h-8 text-gray-600 animate-spin" />
+                                        )}
+                                        <Loader2 className="absolute w-8 h-8 text-brand-cyan animate-spin" />
                                     </div>
                                     <img 
                                         src={result.imageUrl} 

@@ -49,7 +49,7 @@ export const InnovationPipeline: React.FC<InnovationPipelineProps> = ({ currentP
                 <button
                   key={step.id}
                   onClick={() => onPhaseClick && !isFuture && onPhaseClick(step.id)}
-                  className={`flex flex-col items-center group focus:outline-none transition-all ${isFuture ? 'cursor-default' : 'cursor-pointer hover:scale-105 active:scale-95'}`}
+                  className={`flex flex-col items-center group focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-gray-900 rounded-xl transition-all ${isFuture ? 'cursor-default' : 'cursor-pointer hover:scale-105 active:scale-95'}`}
                   disabled={isFuture}
                 >
                   <div 

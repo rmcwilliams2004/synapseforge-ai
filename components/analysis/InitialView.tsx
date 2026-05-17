@@ -20,7 +20,7 @@ export const InitialView = ({ onStartDialogue }: { onStartDialogue?: () => void 
     <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md">
         <button 
             onClick={onStartDialogue}
-            className="flex-1 px-8 py-5 bg-purple-600 text-white font-black uppercase tracking-widest rounded-2xl hover:bg-purple-500 transition-all shadow-xl shadow-purple-900/30 flex items-center justify-center gap-3 group"
+            className="flex-1 px-8 py-5 bg-purple-600 text-white font-black uppercase tracking-widest rounded-2xl hover:bg-purple-500 transition-all shadow-xl shadow-purple-900/30 flex items-center justify-center gap-3 group focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 active:scale-95"
         >
             <svg className="w-6 h-6 group-hover:scale-110 transition-transform" fill="currentColor" viewBox="0 0 24 24"><path d="M12 18.75a6 6 0 0 0 6-6v-1.5m-6 7.5a6 6 0 0 1-6-6v-1.5m12 0v-1.5a6 6 0 0 0-6-6v1.5m-6 0v-1.5a6 6 0 0 1 6-6v1.5m0 0v1.5m0-1.5a6 6 0 0 0-6 6v1.5m6-7.5a6 6 0 0 1 6 6v1.5" /></svg>
             Talk to DeVinci

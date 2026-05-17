@@ -66,7 +66,7 @@ const TaskItem: React.FC<{
     return (
         <div className={`space-y-2 animate-fade-in`} style={{ marginLeft: depth > 0 ? '24px' : '0' }}>
             <div className={`group flex items-center gap-3 p-3 bg-gray-800/40 rounded-xl border border-gray-700/50 hover:border-brand-cyan/30 transition-all ${task.status === 'DONE' ? 'opacity-60' : ''}`}>
-                <button onClick={toggleStatus} disabled={isViewer} className="flex-shrink-0">
+                <button onClick={toggleStatus} disabled={isViewer} className="flex-shrink-0 focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-gray-900 rounded-full active:scale-95">
                     {getStatusIcon()}
                 </button>
                 
@@ -78,7 +78,7 @@ const TaskItem: React.FC<{
                             onBlur={handleSave}
                             onKeyDown={e => e.key === 'Enter' && handleSave()}
                             autoFocus
-                            className="w-full bg-gray-900 border border-brand-cyan/50 rounded px-2 py-1 text-sm text-white focus:outline-none"
+                            className="w-full bg-gray-900 border border-brand-cyan/50 rounded px-2 py-1 text-sm text-white focus:outline-none focus:ring-2 focus:ring-brand-cyan"
                         />
                     ) : (
                         <>
@@ -95,15 +95,15 @@ const TaskItem: React.FC<{
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     {!isViewer && (
                         <>
-                            <button onClick={() => setIsEditing(true)} className="p-1.5 text-gray-500 hover:text-white transition-colors"><Edit2 className="w-3.5 h-3.5" /></button>
-                            <button onClick={() => onAddSubtask(task)} title="Add Subtask" className="p-1.5 text-brand-cyan/60 hover:text-brand-cyan transition-colors"><Plus className="w-4 h-4" /></button>
-                            <button onClick={onDelete} className="p-1.5 text-red-500/60 hover:text-red-500 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
+                            <button onClick={() => setIsEditing(true)} className="p-1.5 text-gray-500 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 rounded-md active:scale-95"><Edit2 className="w-3.5 h-3.5" /></button>
+                            <button onClick={() => onAddSubtask(task)} title="Add Subtask" className="p-1.5 text-brand-cyan/60 hover:text-brand-cyan transition-colors focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-gray-900 rounded-md active:scale-95"><Plus className="w-4 h-4" /></button>
+                            <button onClick={onDelete} className="p-1.5 text-red-500/60 hover:text-red-500 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 rounded-md active:scale-95"><Trash2 className="w-3.5 h-3.5" /></button>
                         </>
                     )}
                 </div>
 
                 {subtasks.length > 0 && (
-                    <button onClick={() => setIsExpanded(!isExpanded)} className="p-1 text-gray-500 hover:text-white transition-colors">
+                    <button onClick={() => setIsExpanded(!isExpanded)} className="p-1 text-gray-500 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 rounded-md active:scale-95">
                         {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                     </button>
                 )}
@@ -192,7 +192,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ tasks, onUpdateTasks, isVi
                 {!isViewer && (
                     <button 
                         onClick={() => setIsAddingRoot(true)}
-                        className="px-4 py-1.5 bg-brand-cyan text-gray-900 text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-cyan-400 transition-all flex items-center gap-2 shadow-lg shadow-cyan-900/20"
+                        className="px-4 py-1.5 bg-brand-cyan text-gray-900 text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-cyan-400 transition-all flex items-center gap-2 shadow-lg shadow-cyan-900/20 focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-gray-900 active:scale-95"
                     >
                         <Plus className="w-4 h-4" /> New Milestone
                     </button>
@@ -208,12 +208,12 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ tasks, onUpdateTasks, isVi
                             value={rootTitle}
                             onChange={e => setRootTitle(e.target.value)}
                             onKeyDown={e => e.key === 'Enter' && addRootTask()}
-                            className="w-full bg-black/40 border border-gray-700 rounded-xl p-3 text-white text-sm outline-none focus:border-brand-cyan transition-all"
+                            className="w-full bg-black/40 border border-gray-700 rounded-xl p-3 text-white text-sm outline-none focus:border-brand-cyan transition-all focus:ring-2 focus:ring-brand-cyan"
                         />
                         <div className="flex justify-end gap-3 mt-3">
-                            <button onClick={() => setIsAddingRoot(false)} className="text-[10px] font-black uppercase text-gray-500 hover:text-white transition-colors">Cancel</button>
+                            <button onClick={() => setIsAddingRoot(false)} className="text-[10px] font-black uppercase text-gray-500 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 rounded-md active:scale-95 px-2 py-1">Cancel</button>
                             {/* Fix: Replaced malformed attribute with proper onClick handler */}
-                            <button onClick={addRootTask} className="text-[10px] font-black uppercase text-brand-cyan hover:underline">Deploy Milestone</button>
+                            <button onClick={addRootTask} className="text-[10px] font-black uppercase text-brand-cyan hover:underline focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-gray-900 rounded-md active:scale-95 px-2 py-1">Deploy Milestone</button>
                         </div>
                     </div>
                 )}

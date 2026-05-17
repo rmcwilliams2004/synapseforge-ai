@@ -163,17 +163,17 @@ export const ProjectInitiationModal: React.FC<ProjectInitiationProps> = ({
                     <div>
                         <label className="block text-slate-400 text-[10px] uppercase tracking-wider font-black mb-4 ml-1">Maturity Phase</label>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <button onClick={() => setStage('concept')} className={`p-5 rounded-2xl border text-left transition-all relative overflow-hidden group ${stage === 'concept' ? 'border-brand-cyan bg-cyan-900/10' : 'border-slate-700 bg-slate-800/40 hover:bg-slate-800'}`}>
+                        <button onClick={() => setStage('concept')} className={`p-5 rounded-2xl border text-left transition-all relative overflow-hidden group focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-gray-900 active:scale-95 ${stage === 'concept' ? 'border-brand-cyan bg-cyan-900/10' : 'border-slate-700 bg-slate-800/40 hover:bg-slate-800'}`}>
                             <BrainIcon className={`w-8 h-8 mb-4 ${stage === 'concept' ? 'text-brand-cyan' : 'text-slate-600'}`} />
                             <h3 className={`text-xs font-black uppercase tracking-widest ${stage === 'concept' ? 'text-white' : 'text-slate-400'}`}>Raw Concept</h3>
                             <p className="text-[10px] text-slate-500 mt-2 leading-tight">Napkin sketches & vague ideation.</p>
                         </button>
-                        <button onClick={() => setStage('draft')} className={`p-5 rounded-2xl border text-left transition-all relative overflow-hidden group ${stage === 'draft' ? 'border-purple-500 bg-purple-900/10' : 'border-slate-700 bg-slate-800/40 hover:bg-slate-800'}`}>
+                        <button onClick={() => setStage('draft')} className={`p-5 rounded-2xl border text-left transition-all relative overflow-hidden group focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-gray-900 active:scale-95 ${stage === 'draft' ? 'border-purple-500 bg-purple-900/10' : 'border-slate-700 bg-slate-800/40 hover:bg-slate-800'}`}>
                             <FileTextIcon className={`w-8 h-8 mb-4 ${stage === 'draft' ? 'text-purple-400' : 'text-slate-600'}`} />
                             <h3 className={`text-xs font-black uppercase tracking-widest ${stage === 'draft' ? 'text-white' : 'text-slate-400'}`}>Rough Draft</h3>
                             <p className="text-[10px] text-slate-500 mt-2 leading-tight">Structured specs or initial drafts.</p>
                         </button>
-                        <button onClick={() => setStage('prototype')} className={`p-5 rounded-2xl border text-left transition-all relative overflow-hidden group ${stage === 'prototype' ? 'border-emerald-500 bg-emerald-900/10' : 'border-slate-700 bg-slate-800/40 hover:bg-slate-800'}`}>
+                        <button onClick={() => setStage('prototype')} className={`p-5 rounded-2xl border text-left transition-all relative overflow-hidden group focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-gray-900 active:scale-95 ${stage === 'prototype' ? 'border-emerald-500 bg-emerald-900/10' : 'border-slate-700 bg-slate-800/40 hover:bg-slate-800'}`}>
                             <PenToolIcon className={`w-8 h-8 mb-4 ${stage === 'prototype' ? 'text-emerald-400' : 'text-slate-600'}`} />
                             <h3 className={`text-xs font-black uppercase tracking-widest ${stage === 'prototype' ? 'text-white' : 'text-slate-400'}`}>Technical</h3>
                             <p className="text-[10px] text-slate-500 mt-2 leading-tight">CAD data & physical verification.</p>
@@ -196,7 +196,7 @@ export const ProjectInitiationModal: React.FC<ProjectInitiationProps> = ({
                     <input type="file" ref={brainstormInputRef} accept=".pdf" className="hidden" onChange={(e) => handleFileSelect(onStartBrainstorm, e)} />
 
                     {/* Neural Buttons */}
-                    <button onClick={() => { onStartWithDeVinci(); resetAndClose(); }} className="flex flex-col items-center justify-center p-8 bg-slate-800/40 hover:bg-purple-900/20 border border-slate-700 hover:border-purple-500 rounded-3xl transition-all group shadow-xl">
+                    <button onClick={() => { onStartWithDeVinci(); resetAndClose(); }} className="flex flex-col items-center justify-center p-8 bg-slate-800/40 hover:bg-purple-900/20 border border-slate-700 hover:border-purple-500 rounded-3xl transition-all group shadow-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 active:scale-95">
                         <div className="p-4 bg-purple-500/10 rounded-2xl mb-4 group-hover:scale-110 group-hover:shadow-[0_0_20px_rgba(168,85,247,0.2)] transition-all">
                             <SparklesIcon className="w-10 h-10 text-purple-400" />
                         </div>
@@ -204,7 +204,7 @@ export const ProjectInitiationModal: React.FC<ProjectInitiationProps> = ({
                         <p className="text-[10px] text-slate-500 text-center font-bold">Dialogue-driven Forge</p>
                     </button>
 
-                    <button onClick={() => pdfInputRef.current?.click()} className="flex flex-col items-center justify-center p-8 bg-slate-800/40 hover:bg-blue-900/20 border border-slate-700 hover:border-blue-500 rounded-3xl transition-all group shadow-xl">
+                    <button onClick={() => pdfInputRef.current?.click()} className="flex flex-col items-center justify-center p-8 bg-slate-800/40 hover:bg-blue-900/20 border border-slate-700 hover:border-blue-500 rounded-3xl transition-all group shadow-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 active:scale-95">
                         <div className="p-4 bg-blue-500/10 rounded-2xl mb-4 group-hover:scale-110 group-hover:shadow-[0_0_20px_rgba(59,130,246,0.2)] transition-all">
                             <FileSearchIcon className="w-10 h-10 text-blue-400" />
                         </div>
@@ -212,7 +212,7 @@ export const ProjectInitiationModal: React.FC<ProjectInitiationProps> = ({
                         <p className="text-[10px] text-slate-500 text-center font-bold">Parse Manuals & Specs</p>
                     </button>
 
-                    <button onClick={() => imageInputRef.current?.click()} className="flex flex-col items-center justify-center p-8 bg-slate-800/40 hover:bg-pink-900/20 border border-slate-700 hover:border-pink-500 rounded-3xl transition-all group shadow-xl">
+                    <button onClick={() => imageInputRef.current?.click()} className="flex flex-col items-center justify-center p-8 bg-slate-800/40 hover:bg-pink-900/20 border border-slate-700 hover:border-pink-500 rounded-3xl transition-all group shadow-xl focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 active:scale-95">
                         <div className="p-4 bg-pink-500/10 rounded-2xl mb-4 group-hover:scale-110 group-hover:shadow-[0_0_20px_rgba(236,72,153,0.2)] transition-all">
                             <PhotoIcon className="w-10 h-10 text-pink-400" />
                         </div>
@@ -220,7 +220,7 @@ export const ProjectInitiationModal: React.FC<ProjectInitiationProps> = ({
                         <p className="text-[10px] text-slate-500 text-center font-bold">Analyze Schematics</p>
                     </button>
 
-                    <button onClick={() => { onStartFromVideo(); resetAndClose(); }} className="flex flex-col items-center justify-center p-8 bg-slate-800/40 hover:bg-red-900/20 border border-slate-700 hover:border-red-500 rounded-3xl transition-all group shadow-xl">
+                    <button onClick={() => { onStartFromVideo(); resetAndClose(); }} className="flex flex-col items-center justify-center p-8 bg-slate-800/40 hover:bg-red-900/20 border border-slate-700 hover:border-red-500 rounded-3xl transition-all group shadow-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 active:scale-95">
                         <div className="p-4 bg-red-500/10 rounded-2xl mb-4 group-hover:scale-110 group-hover:shadow-[0_0_20px_rgba(239,68,68,0.2)] transition-all">
                             <VideoIcon className="w-10 h-10 text-red-400" />
                         </div>
@@ -228,7 +228,7 @@ export const ProjectInitiationModal: React.FC<ProjectInitiationProps> = ({
                         <p className="text-[10px] text-slate-500 text-center font-bold">Extraction Protocol</p>
                     </button>
 
-                    <button onClick={() => brainstormInputRef.current?.click()} className="flex flex-col items-center justify-center p-8 bg-slate-800/40 hover:bg-yellow-900/20 border border-slate-700 hover:border-yellow-500 rounded-3xl transition-all group shadow-xl">
+                    <button onClick={() => brainstormInputRef.current?.click()} className="flex flex-col items-center justify-center p-8 bg-slate-800/40 hover:bg-yellow-900/20 border border-slate-700 hover:border-yellow-500 rounded-3xl transition-all group shadow-xl focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 active:scale-95">
                         <div className="p-4 bg-yellow-500/10 rounded-2xl mb-4 group-hover:scale-110 group-hover:shadow-[0_0_20px_rgba(234,179,8,0.2)] transition-all">
                             <BrainIcon className="w-10 h-10 text-yellow-400" />
                         </div>

@@ -3,6 +3,7 @@ import { BillOfMaterialsItem, SimulationResult, SimulationType, User, CadData, L
 import { useSimulation } from '../../hooks/useSimulation';
 import { useTts } from '../../hooks/useTts';
 import { useDeVinci } from '../../hooks/useDeVinci';
+import { ImageWithPlaceholder } from '../ui/ImageWithPlaceholder';
 import { 
   Mic, Play, Square, MessageSquare, Wrench, ArrowRight, Save, CheckCircle, 
   Activity, Wind, Thermometer, Radio, Zap, Layers, AlertTriangle, Loader2, Settings
@@ -27,7 +28,7 @@ const SimulationTypeButton = ({ type, currentType, setType, icon: Icon, label, d
     return (
         <button 
             onClick={() => setType(type)} 
-            className={`relative flex flex-col items-start p-4 rounded-xl border transition-all duration-200 w-full text-left group ${
+            className={`relative flex flex-col items-start p-4 rounded-xl border transition-all duration-200 w-full text-left group focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-gray-900 active:scale-95 ${
                 isActive 
                 ? 'bg-cyan-900/30 border-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.3)]' 
                 : 'bg-white dark:bg-slate-800/50 border-gray-200 dark:border-slate-700 hover:border-brand-cyan dark:hover:border-slate-500'
@@ -162,7 +163,7 @@ export const AdvancedSimulation: React.FC<AdvancedSimulationProps> = ({
                 <div className="flex gap-2">
                     <button 
                         onClick={handleStartDeVinciSession}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${devinci.state !== 'idle' ? 'bg-purple-600 text-white shadow-[0_0_15px_rgba(168,85,247,0.4)]' : 'bg-gray-800 text-gray-400 hover:text-white border border-gray-700'}`}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-gray-900 active:scale-95 ${devinci.state !== 'idle' ? 'bg-purple-600 text-white shadow-[0_0_15px_rgba(168,85,247,0.4)]' : 'bg-gray-800 text-gray-400 hover:text-white border border-gray-700'}`}
                     >
                         <Mic className={`w-4 h-4 ${devinci.state !== 'idle' ? 'animate-pulse' : ''}`} /> 
                         {devinci.state !== 'idle' ? 'Consultant Linked' : 'Voice Consultant'}
@@ -171,7 +172,7 @@ export const AdvancedSimulation: React.FC<AdvancedSimulationProps> = ({
                         <button 
                             onClick={handleRunRealWorldTest}
                             disabled={isPhysicsActive}
-                            className="flex items-center gap-2 px-4 py-2 bg-brand-cyan/20 text-brand-cyan border border-brand-cyan/40 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-brand-cyan hover:text-white transition-all shadow-lg animate-pulse"
+                            className="flex items-center gap-2 px-4 py-2 bg-brand-cyan/20 text-brand-cyan border border-brand-cyan/40 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-brand-cyan hover:text-white transition-all shadow-lg animate-pulse focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-gray-900 active:scale-95 disabled:opacity-50"
                         >
                             <Layers className="w-4 h-4" /> Run Genesis 4D Audit
                         </button>
@@ -192,7 +193,7 @@ export const AdvancedSimulation: React.FC<AdvancedSimulationProps> = ({
                                         type="checkbox"
                                         checked={selectedComponents.has(item.name)}
                                         onChange={() => handleToggleComponent(item.name)}
-                                        className="rounded border-gray-300 dark:border-slate-600 text-cyan-500 focus:ring-brand-cyan dark:bg-slate-700"
+                                        className="rounded border-gray-300 dark:border-slate-600 text-cyan-500 focus:ring-2 focus:ring-brand-cyan focus:ring-offset-1 dark:focus:ring-offset-gray-800 dark:bg-slate-700"
                                     />
                                     <span className="text-xs text-gray-700 dark:text-slate-200 font-bold truncate">{item.name}</span>
                                 </label>
@@ -219,7 +220,7 @@ export const AdvancedSimulation: React.FC<AdvancedSimulationProps> = ({
                              <button
                                 onClick={triggerRun}
                                 disabled={selectedComponents.size === 0 || simulationResult?.isLoading || isPhysicsActive}
-                                className="px-10 py-4 bg-purple-600 text-white font-black uppercase tracking-widest rounded-xl shadow-lg shadow-purple-900/40 hover:bg-purple-500 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-3 relative overflow-hidden"
+                                className="px-10 py-4 bg-purple-600 text-white font-black uppercase tracking-widest rounded-xl shadow-lg shadow-purple-900/40 hover:bg-purple-500 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-3 relative overflow-hidden focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
                             >
                                 {simulationResult?.isLoading || isPhysicsActive ? (
                                     <>
@@ -273,14 +274,14 @@ export const AdvancedSimulation: React.FC<AdvancedSimulationProps> = ({
                                                     };
                                                     onSaveSimulation(res);
                                                 }}
-                                                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition-all text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-900/30"
+                                                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition-all text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-900/30 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 active:scale-95"
                                             >
                                                 <Save className="w-4 h-4" /> Commit to Vault
                                             </button>
                                         )}
                                         <button 
                                             onClick={() => tts.isPlaying ? tts.stop() : tts.speak(consultantAnalysis || '')}
-                                            className={`p-2 rounded-full transition-all ${tts.isPlaying ? 'bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400 animate-pulse' : 'bg-cyan-100 text-cyan-600 dark:bg-cyan-900/40 dark:text-cyan-400'}`}
+                                            className={`p-2 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-900 active:scale-95 ${tts.isPlaying ? 'bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400 focus:ring-red-500 animate-pulse' : 'bg-cyan-100 text-cyan-600 dark:bg-cyan-900/40 dark:text-cyan-400 focus:ring-cyan-500'}`}
                                         >
                                             {tts.isPlaying ? <Square className="w-5 h-5 fill-current" /> : <Mic className="w-5 h-5" />}
                                         </button>
@@ -309,7 +310,12 @@ export const AdvancedSimulation: React.FC<AdvancedSimulationProps> = ({
 
                                 {simulationResult?.imageUrl && !physicsResult?.video_url && (
                                     <div className="mb-10 rounded-2xl overflow-hidden border border-gray-200 dark:border-slate-700 shadow-xl group relative">
-                                        <img src={simulationResult.imageUrl} alt="Simulation Visualization" className="w-full h-64 object-cover transform transition-transform duration-700 group-hover:scale-110" />
+                                        <ImageWithPlaceholder 
+                                            src={simulationResult.imageUrl} 
+                                            alt="Simulation Visualization" 
+                                            placeholderKeyword="engineering"
+                                            className="w-full h-64 object-cover transform transition-transform duration-700 group-hover:scale-110" 
+                                        />
                                     </div>
                                 )}
 
@@ -334,7 +340,7 @@ export const AdvancedSimulation: React.FC<AdvancedSimulationProps> = ({
                                                 <button 
                                                     key={idx} 
                                                     onClick={sugg.action}
-                                                    className="flex items-center gap-3 px-5 py-2.5 bg-brand-cyan/10 border border-brand-cyan/30 hover:bg-brand-cyan hover:text-white text-brand-cyan rounded-xl transition-all text-xs font-black uppercase tracking-widest group"
+                                                    className="flex items-center gap-3 px-5 py-2.5 bg-brand-cyan/10 border border-brand-cyan/30 hover:bg-brand-cyan hover:text-white text-brand-cyan rounded-xl transition-all text-xs font-black uppercase tracking-widest group focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-gray-900 active:scale-95"
                                                 >
                                                     <Wrench className="w-4 h-4" />
                                                     {sugg.label}

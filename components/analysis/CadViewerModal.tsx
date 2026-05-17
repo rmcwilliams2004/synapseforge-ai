@@ -274,7 +274,7 @@ export const CadViewerModal: React.FC<CadViewerModalProps> = ({ isOpen, onClose,
                         <Move className="w-5 h-5 text-brand-cyan" />
                         CAD Model Viewer
                     </h2>
-                    <button onClick={onClose} className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors">
+                    <button onClick={onClose} className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-slate-950 active:scale-95">
                         <X className="w-5 h-5" />
                     </button>
                 </div>
@@ -300,20 +300,20 @@ export const CadViewerModal: React.FC<CadViewerModalProps> = ({ isOpen, onClose,
                     <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-slate-900/80 backdrop-blur-md border border-slate-700 p-2 rounded-2xl shadow-xl">
                         <button 
                             onClick={() => setIsMeasuring(!isMeasuring)} 
-                            className={`p-3 rounded-xl transition-all ${isMeasuring ? 'bg-brand-cyan text-slate-900' : 'text-slate-400 hover:text-brand-cyan hover:bg-slate-800'}`} 
+                            className={`p-3 rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-slate-900 active:scale-95 ${isMeasuring ? 'bg-brand-cyan text-slate-900' : 'text-slate-400 hover:text-brand-cyan hover:bg-slate-800'}`} 
                             title="Measure Distance"
                         >
                             <Ruler className="w-5 h-5" />
                         </button>
                         <div className="w-px h-6 bg-slate-700 mx-1"></div>
-                        <button onClick={handleZoomIn} className="p-3 text-slate-400 hover:text-brand-cyan hover:bg-slate-800 rounded-xl transition-all" title="Zoom In">
+                        <button onClick={handleZoomIn} className="p-3 text-slate-400 hover:text-brand-cyan hover:bg-slate-800 rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-slate-900 active:scale-95" title="Zoom In">
                             <ZoomIn className="w-5 h-5" />
                         </button>
-                        <button onClick={handleZoomOut} className="p-3 text-slate-400 hover:text-brand-cyan hover:bg-slate-800 rounded-xl transition-all" title="Zoom Out">
+                        <button onClick={handleZoomOut} className="p-3 text-slate-400 hover:text-brand-cyan hover:bg-slate-800 rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-slate-900 active:scale-95" title="Zoom Out">
                             <ZoomOut className="w-5 h-5" />
                         </button>
                         <div className="w-px h-6 bg-slate-700 mx-1"></div>
-                        <button onClick={handleReset} className="p-3 text-slate-400 hover:text-brand-cyan hover:bg-slate-800 rounded-xl transition-all" title="Reset View">
+                        <button onClick={handleReset} className="p-3 text-slate-400 hover:text-brand-cyan hover:bg-slate-800 rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-slate-900 active:scale-95" title="Reset View">
                             <RotateCcw className="w-5 h-5" />
                         </button>
                     </div>

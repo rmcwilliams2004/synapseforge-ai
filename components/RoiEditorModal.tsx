@@ -184,18 +184,18 @@ export const RoiEditorModal: React.FC<RoiEditorModalProps> = ({ isOpen, onClose,
                         <div className="flex justify-between items-center mb-3">
                             <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Active Regions</h4>
                             <div className="flex gap-4">
-                                <button onClick={() => setSelectedBoxIds(new Set(boxes.map(b => b.id)))} className="text-[10px] font-bold text-brand-cyan uppercase hover:underline">Select All</button>
-                                <button onClick={() => setBoxes([])} className="text-[10px] font-bold text-red-500 uppercase hover:underline">Clear All</button>
+                                <button onClick={() => setSelectedBoxIds(new Set(boxes.map(b => b.id)))} className="text-[10px] font-bold text-brand-cyan uppercase hover:underline focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-gray-900 rounded">Select All</button>
+                                <button onClick={() => setBoxes([])} className="text-[10px] font-bold text-red-500 uppercase hover:underline focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 rounded">Clear All</button>
                             </div>
                         </div>
                         <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto pr-2 custom-scrollbar">
                             {boxes.map((box, index) => (
                                 <div key={box.id} className={`flex items-center justify-between p-2 rounded-lg border transition-all ${selectedBoxIds.has(box.id) ? 'bg-brand-cyan/10 border-brand-cyan/50' : 'bg-slate-900/40 border-slate-700'}`}>
                                     <label className="flex items-center gap-2 cursor-pointer flex-1">
-                                        <input type="checkbox" checked={selectedBoxIds.has(box.id)} onChange={() => setSelectedBoxIds(prev => { const n = new Set(prev); n.has(box.id) ? n.delete(box.id) : n.add(box.id); return n; })} className="w-3 h-3 rounded bg-slate-700 border-slate-600 text-brand-cyan focus:ring-brand-cyan" />
+                                        <input type="checkbox" checked={selectedBoxIds.has(box.id)} onChange={() => setSelectedBoxIds(prev => { const n = new Set(prev); n.has(box.id) ? n.delete(box.id) : n.add(box.id); return n; })} className="w-3 h-3 rounded bg-slate-700 border-slate-600 text-brand-cyan focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-gray-900" />
                                         <span className="text-[11px] font-bold text-slate-300">ROI {index + 1}</span>
                                     </label>
-                                    <button onClick={() => setBoxes(prev => prev.filter(b => b.id !== box.id))} className="text-slate-500 hover:text-white">&times;</button>
+                                    <button onClick={() => setBoxes(prev => prev.filter(b => b.id !== box.id))} className="text-slate-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 rounded">&times;</button>
                                 </div>
                             ))}
                         </div>

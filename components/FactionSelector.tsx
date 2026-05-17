@@ -42,13 +42,14 @@ const FactionCard: React.FC<FactionCardProps> = ({ faction, isSelected, onSelect
   const colors = factionColors[faction.id];
 
   return (
-    <div
+    <button
       onClick={() => !disabled && onSelect()}
-      className={`p-4 border-2 rounded-lg transition-all duration-300 ${
+      disabled={disabled}
+      className={`w-full text-left p-4 border-2 rounded-lg transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-gray-900 ${
         isSelected
           ? colors.selected
           : `border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 ${colors.hover}`
-      } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:-translate-y-1'}`}
+      } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:-translate-y-1 active:scale-95'}`}
     >
       <div className="flex items-center mb-2">
         <Icon className={`w-8 h-8 mr-3 ${colors.icon}`} />
@@ -58,7 +59,7 @@ const FactionCard: React.FC<FactionCardProps> = ({ faction, isSelected, onSelect
         <strong>Focus:</strong> {faction.focus}
       </p>
       <p className="text-sm text-gray-600 dark:text-gray-300">{faction.philosophy}</p>
-    </div>
+    </button>
   );
 };
 

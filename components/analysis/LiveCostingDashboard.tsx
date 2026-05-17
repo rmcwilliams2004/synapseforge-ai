@@ -50,7 +50,7 @@ export const LiveCostingDashboard: React.FC<LiveCostingDashboardProps> = ({ live
                      <button
                         onClick={recalculate}
                         disabled={isRecalculating}
-                        className="py-2 px-5 bg-purple-600 text-white font-bold rounded-lg border border-purple-500 hover:bg-purple-500 transition active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+                        className="py-2 px-5 bg-purple-600 text-white font-bold rounded-lg border border-purple-500 hover:bg-purple-500 transition active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
                     >
                         {isRecalculating ? 'Recalculating...' : 'Recalculate Cost'}
                     </button>

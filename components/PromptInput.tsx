@@ -279,10 +279,10 @@ export const PromptInput = ({
               )}
           </div>
           <div className="flex items-center gap-1">
-            <button onClick={onUndo} disabled={!canUndo || isLoading || isViewer} className="p-2 text-gray-400 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition" title="Undo (Ctrl+Z)">
+            <button onClick={onUndo} disabled={!canUndo || isLoading || isViewer} className="p-2 text-gray-400 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-gray-900 active:scale-95" title="Undo (Ctrl+Z)">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" /></svg>
             </button>
-            <button onClick={onRedo} disabled={!canRedo || isLoading || isViewer} className="p-2 text-gray-400 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition" title="Redo (Ctrl+Y)">
+            <button onClick={onRedo} disabled={!canRedo || isLoading || isViewer} className="p-2 text-gray-400 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-gray-900 active:scale-95" title="Redo (Ctrl+Y)">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="m15 15 6-6m0 0-6-6m6 6H9a6 6 0 0 0 0 12h3" /></svg>
             </button>
           </div>
@@ -305,13 +305,15 @@ export const PromptInput = ({
                     <button
                         key={t.id}
                         onClick={() => {
-                            setLocalPrompt(t.text);
-                            onPromptChange(t.text);
+                            setLocalPrompt(t.prompt);
+                            onPromptChange(t.prompt);
+                            const newTags = Array.from(new Set([...tags, ...t.tags]));
+                            onTagsChange(newTags);
                         }}
                         disabled={isLoading || isViewer}
-                        className="px-3 py-1.5 text-xs font-medium bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:border-brand-cyan hover:text-brand-cyan transition-colors disabled:opacity-50"
+                        className="px-3 py-1.5 text-xs font-medium bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:border-brand-cyan hover:text-brand-cyan transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-gray-900 active:scale-95"
                     >
-                        {t.label}
+                        {t.name}
                     </button>
                 ))}
             </div>
@@ -366,7 +368,7 @@ export const PromptInput = ({
             <div className="space-y-3">
               <div>
                 <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Recommended Lens:</h4>
-                <button onClick={() => onApplyFactionSuggestion(recommendedFaction.id)} className="text-left w-full p-2 mt-1 bg-cyan-50 dark:bg-cyan-900/40 border border-brand-cyan rounded-lg hover:bg-cyan-100 dark:hover:bg-cyan-900/60 transition">
+                <button onClick={() => onApplyFactionSuggestion(recommendedFaction.id)} className="text-left w-full p-2 mt-1 bg-cyan-50 dark:bg-cyan-900/40 border border-brand-cyan rounded-lg hover:bg-cyan-100 dark:hover:bg-cyan-900/60 transition focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-gray-900 active:scale-95">
                   <p className="font-bold text-brand-cyan">{recommendedFaction.name}</p>
                   <p className="text-xs text-gray-600 dark:text-gray-300">{recommendedFaction.philosophy}</p>
                 </button>
@@ -375,7 +377,7 @@ export const PromptInput = ({
                 <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Suggested Tags:</h4>
                 <div className="flex flex-wrap gap-2 mt-1">
                   {setupAssistant.suggestions.suggested_tags.map(tag => (
-                    <button key={tag} onClick={() => onTagsChange(Array.from(new Set([...tags, tag])))} className="px-2 py-1 text-xs rounded-full bg-purple-100 dark:bg-purple-600/50 text-purple-700 dark:text-purple-200 hover:bg-purple-200 dark:hover:bg-purple-600/80 transition">
+                    <button key={tag} onClick={() => onTagsChange(Array.from(new Set([...tags, tag])))} className="px-2 py-1 text-xs rounded-full bg-purple-100 dark:bg-purple-600/50 text-purple-700 dark:text-purple-200 hover:bg-purple-200 dark:hover:bg-purple-600/80 transition focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 active:scale-95">
                       + {tag}
                     </button>
                   ))}
@@ -442,7 +444,7 @@ export const PromptInput = ({
                             {file.type.startsWith('image/') && !file.name.startsWith('roi_') && !isViewer && (
                                 <button
                                     onClick={(e) => { e.stopPropagation(); handleOpenRoiEditor(file, index); }}
-                                    className="text-[9px] py-1 px-2 bg-gray-200 dark:bg-gray-700 rounded hover:bg-brand-cyan hover:text-white transition-all active:scale-95 text-gray-700 dark:text-gray-200 font-black uppercase tracking-widest"
+                                    className="text-[9px] py-1 px-2 bg-gray-200 dark:bg-gray-700 rounded hover:bg-brand-cyan hover:text-white transition-all active:scale-95 text-gray-700 dark:text-gray-200 font-black uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-gray-900"
                                     disabled={isLoading}
                                 >
                                     Select ROI
@@ -451,7 +453,7 @@ export const PromptInput = ({
                             {file.type === 'application/pdf' && !isViewer && onTechnicalIntake && (
                                 <button
                                     onClick={(e) => { e.stopPropagation(); onTechnicalIntake(file); }}
-                                    className="text-[9px] py-1 px-2 bg-brand-cyan/20 text-brand-cyan border border-brand-cyan/30 rounded hover:bg-brand-cyan hover:text-white transition-all active:scale-95 font-black uppercase tracking-widest"
+                                    className="text-[9px] py-1 px-2 bg-brand-cyan/20 text-brand-cyan border border-brand-cyan/30 rounded hover:bg-brand-cyan hover:text-white transition-all active:scale-95 font-black uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-gray-900"
                                     disabled={isLoading}
                                 >
                                     Technical Intake
@@ -460,7 +462,7 @@ export const PromptInput = ({
                             {file.type === 'application/pdf' && !isViewer && onPhdResearch && (
                                 <button
                                     onClick={(e) => { e.stopPropagation(); onPhdResearch(file); }}
-                                    className="text-[9px] py-1 px-2 bg-purple-600/20 text-purple-400 border border-purple-500/30 rounded hover:bg-purple-600 hover:text-white transition-all active:scale-95 font-black uppercase tracking-widest"
+                                    className="text-[9px] py-1 px-2 bg-purple-600/20 text-purple-400 border border-purple-500/30 rounded hover:bg-purple-600 hover:text-white transition-all active:scale-95 font-black uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
                                     disabled={isLoading}
                                 >
                                     PhD Research
@@ -485,7 +487,7 @@ export const PromptInput = ({
           id="tour-step-4"
           onClick={onEngage}
           disabled={!isReady || isLoading || isViewer}
-          className="flex-grow py-3 px-4 bg-brand-cyan text-white font-bold rounded-lg text-lg hover:bg-cyan-500 transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
+          className="flex-grow py-3 px-4 bg-brand-cyan text-white font-bold rounded-lg text-lg hover:bg-cyan-500 transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-gray-900"
         >
           {isLoading ? (
             <>
@@ -510,7 +512,7 @@ export const PromptInput = ({
         <button
             onClick={onReanalyzeWithFaction}
             disabled={!canReanalyze || isLoading || isViewer}
-            className="py-3 px-4 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-500 transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
+            className="py-3 px-4 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-500 transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
             title={canReanalyze ? `Apply '${selectedFaction?.name}' and re-run analysis` : 'Select a different faction to enable re-analysis'}
         >
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0 0 11.667 0l3.181-3.183m-4.991-2.691V5.25a3.375 3.375 0 0 0-3.375-3.375H8.25a3.375 3.375 0 0 0-3.375 3.375v4.992" /></svg>

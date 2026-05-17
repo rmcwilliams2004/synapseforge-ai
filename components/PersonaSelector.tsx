@@ -17,13 +17,14 @@ const PersonaCard: React.FC<{
   disabled: boolean;
 }> = ({ persona, isSelected, onSelect, disabled }) => {
   return (
-    <div
+    <button
       onClick={() => !disabled && onSelect()}
-      className={`p-4 border-2 rounded-2xl transition-all duration-300 flex items-center gap-4 ${
+      disabled={disabled}
+      className={`w-full text-left p-4 border-2 rounded-2xl transition-all duration-300 flex items-center gap-4 focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-gray-900 ${
         isSelected
           ? 'border-brand-cyan bg-cyan-900/20 shadow-lg shadow-cyan-900/40'
           : 'border-gray-700 bg-gray-800/40 hover:border-gray-500'
-      } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:-translate-y-1'}`}
+      } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:-translate-y-1 active:scale-95'}`}
     >
       <img src={persona.avatar} alt={persona.name} className="w-16 h-16 rounded-xl border border-gray-600 bg-gray-900 object-cover" />
       <div className="flex-1 min-w-0">
@@ -31,7 +32,7 @@ const PersonaCard: React.FC<{
         <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest truncate">{persona.title}</p>
         <p className="text-xs text-gray-400 mt-1 line-clamp-2 leading-snug">{persona.bio}</p>
       </div>
-    </div>
+    </button>
   );
 };
 

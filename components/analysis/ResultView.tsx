@@ -30,7 +30,7 @@ import { CadSynthesisSection } from './CadSynthesisSection';
 import { MaterialProposalsSection } from './MaterialProposalsSection';
 import { BomSection } from './BomSection';
 
-const ExportDropdown = ({ onExportPDF }: any) => {
+const ExportDropdown = ({ onExportPDF, onExportGoogle, isGoogleExporting }: any) => {
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -46,13 +46,16 @@ const ExportDropdown = ({ onExportPDF }: any) => {
 
     return (
         <div className="relative" ref={dropdownRef}>
-            <button onClick={() => setIsOpen(!isOpen)} className="py-2 px-4 bg-white dark:bg-slate-700 text-gray-800 dark:text-white font-semibold rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-50 transition text-sm flex items-center gap-2 shadow-sm">
+            <button onClick={() => setIsOpen(!isOpen)} className="py-2 px-4 bg-white dark:bg-slate-700 text-gray-800 dark:text-white font-semibold rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-50 transition text-sm flex items-center gap-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-gray-900 active:scale-95">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
                 Export Report
             </button>
             {isOpen && (
                 <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-30 p-2">
-                    <button onClick={() => { onExportPDF(); setIsOpen(false); }} className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded text-sm text-gray-700 dark:text-gray-200">Export as PDF</button>
+                    <button onClick={() => { onExportPDF(); setIsOpen(false); }} className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded text-sm text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-gray-900">Export as PDF</button>
+                    <button onClick={() => { onExportGoogle(); setIsOpen(false); }} disabled={isGoogleExporting} className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded text-sm text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-gray-900 disabled:opacity-50">
+                        {isGoogleExporting ? 'Exporting to Google...' : 'Export to Google Docs'}
+                    </button>
                 </div>
             )}
         </div>
@@ -160,7 +163,7 @@ export const ResultView: React.FC<ResultViewProps> = (props) => {
         <div className="space-y-6 animate-fade-in pb-12">
             <header className="flex justify-between items-center bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-700 p-4 rounded-xl shadow-sm transition-colors duration-300">
                 <div className="flex items-center gap-4">
-                    <button onClick={props.onClear} className="p-2 text-gray-500 hover:text-brand-cyan transition-colors" title="Back to Inputs">
+                    <button onClick={props.onClear} className="p-2 text-gray-500 hover:text-brand-cyan transition-colors focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-slate-900 rounded-full active:scale-95" title="Back to Inputs">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" /></svg>
                     </button>
                     <h2 className="text-xl font-bold text-gray-800 dark:text-white uppercase tracking-tight">{projectName}</h2>
@@ -169,17 +172,40 @@ export const ResultView: React.FC<ResultViewProps> = (props) => {
                     <button 
                         onClick={() => props.onGenerateSummary(result)} 
                         disabled={props.isSummaryLoading}
-                        className="py-2 px-4 bg-brand-cyan text-white font-semibold rounded-lg hover:bg-cyan-600 transition text-sm flex items-center gap-2 shadow-sm disabled:opacity-50"
+                        className="py-2 px-4 bg-brand-cyan text-white font-semibold rounded-lg hover:bg-cyan-600 transition text-sm flex items-center gap-2 shadow-sm disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-slate-900 active:scale-95"
                     >
                         {props.isSummaryLoading ? 'Generating...' : 'Generate Summary'}
                     </button>
-                    <ExportDropdown onExportPDF={handleExportPDF} />
+                    <ExportDropdown 
+                        onExportPDF={handleExportPDF} 
+                        onExportGoogle={() => {
+                            if (!props.isGoogleExporterAuthenticated) {
+                                props.onGoogleExporterSignIn();
+                            } else {
+                                props.onExportToGoogle();
+                            }
+                        }} 
+                        isGoogleExporting={props.isGoogleExporting} 
+                    />
                 </div>
             </header>
 
             {props.summaryError && (
                 <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-4 rounded-xl border border-red-200 dark:border-red-800/30">
                     {props.summaryError}
+                </div>
+            )}
+
+            {props.isGoogleExporting && (
+                <div className="bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 p-4 rounded-xl border border-blue-200 dark:border-blue-800/30 flex items-center gap-3">
+                    <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    {props.googleExportStatus || 'Exporting to Google Docs...'}
+                </div>
+            )}
+
+            {props.googleExportError && (
+                <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-4 rounded-xl border border-red-200 dark:border-red-800/30">
+                    {props.googleExportError}
                 </div>
             )}
 

@@ -35,7 +35,7 @@ export const CouncilSelector: React.FC<CouncilSelectorProps> = ({ selected, onTo
               key={innovator.id}
               disabled={isDisabled}
               onClick={() => onToggle(innovator)}
-              className={`relative p-4 rounded-2xl border transition-all text-left group flex flex-col items-center text-center ${
+              className={`relative p-4 rounded-2xl border transition-all text-left group flex flex-col items-center text-center focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-gray-900 active:scale-95 ${
                 isSelected 
                   ? 'border-brand-cyan bg-brand-cyan/10 shadow-[0_0_15px_rgba(6,182,212,0.2)] ring-1 ring-brand-cyan' 
                   : 'border-slate-800 bg-slate-900/50 opacity-60 hover:opacity-100 hover:border-slate-600'

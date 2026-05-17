@@ -45,9 +45,9 @@ const ProjectCard = ({ project, onSelect }: { project: ProjectIndexEntry; onSele
   const progressPercent = ((phaseIndex + 1) / phases.length) * 100;
 
   return (
-    <div 
+    <button 
       onClick={() => onSelect(project.id)}
-      className="group relative bg-slate-900/40 backdrop-blur-md border border-slate-700/50 rounded-3xl p-6 hover:border-brand-cyan/50 transition-all duration-500 cursor-pointer hover:-translate-y-1 shadow-xl hover:shadow-cyan-900/20 overflow-hidden"
+      className="w-full text-left group relative bg-slate-900/40 backdrop-blur-md border border-slate-700/50 rounded-3xl p-6 hover:border-brand-cyan/50 transition-all duration-500 cursor-pointer hover:-translate-y-1 shadow-xl hover:shadow-cyan-900/20 overflow-hidden focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-gray-900 active:scale-95"
     >
       {/* Activity Heartbeat Visual */}
       <div className="absolute top-0 right-0 p-4 opacity-20 group-hover:opacity-100 transition-opacity">
@@ -114,7 +114,7 @@ const ProjectCard = ({ project, onSelect }: { project: ProjectIndexEntry; onSele
           </div>
         </div>
       </div>
-    </div>
+    </button>
   );
 };
 

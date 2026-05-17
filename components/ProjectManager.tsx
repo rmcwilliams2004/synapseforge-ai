@@ -158,7 +158,7 @@ export const ProjectManager = ({
         <button
             onClick={onClick}
             disabled={disabled || loading || isViewer}
-            className={`flex flex-col items-center justify-center gap-2 p-3 rounded-xl border border-gray-300 dark:border-gray-600 ${color} text-gray-800 dark:text-gray-200 hover:scale-[1.02] transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed`}
+            className={`flex flex-col items-center justify-center gap-2 p-3 rounded-xl border border-gray-300 dark:border-gray-600 ${color} text-gray-800 dark:text-gray-200 hover:scale-[1.02] transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-gray-900`}
         >
             {loading ? <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> : <Icon />}
             <span className="text-[10px] font-black uppercase tracking-wider text-center leading-tight">{label}</span>
@@ -191,11 +191,11 @@ export const ProjectManager = ({
                             if (file) onOpenFile(file);
                             if (e.target) e.target.value = '';
                         }} accept=".sfa,.json" className="hidden" disabled={disabled} />
-                        <button onClick={() => openFileInputRef.current?.click()} disabled={disabled} className="py-2.5 px-3 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white font-black uppercase tracking-widest rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-300 dark:hover:bg-gray-600 transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-xs flex items-center justify-center gap-2">
+                        <button onClick={() => openFileInputRef.current?.click()} disabled={disabled} className="py-2.5 px-3 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white font-black uppercase tracking-widest rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-300 dark:hover:bg-gray-600 transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-xs flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-gray-900">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>
                             Import Asset
                         </button>
-                        <button onClick={onNewProject} disabled={disabled} className="py-2.5 px-3 bg-brand-cyan text-white font-black uppercase tracking-widest rounded-lg hover:bg-cyan-500 transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-xs">
+                        <button onClick={onNewProject} disabled={disabled} className="py-2.5 px-3 bg-brand-cyan text-white font-black uppercase tracking-widest rounded-lg hover:bg-cyan-500 transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-xs focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-gray-900">
                             + Forge Environment
                         </button>
                     </div>
@@ -283,7 +283,7 @@ export const ProjectManager = ({
               <div className="bg-gray-100 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-lg p-3 mb-4">
                 <button 
                     onClick={() => setIsKnowledgeLibraryOpen(!isKnowledgeLibraryOpen)}
-                    className="flex items-center justify-between w-full text-sm font-bold text-gray-700 dark:text-gray-300"
+                    className="flex items-center justify-between w-full text-sm font-bold text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-gray-900 rounded-md"
                 >
                     <div className="flex items-center gap-2">
                         <Icons.Brain />
@@ -310,7 +310,7 @@ export const ProjectManager = ({
                             <button 
                                 onClick={() => knowledgeFileInputRef.current?.click()}
                                 disabled={ingestingCount > 0}
-                                className="w-full py-2 bg-brand-cyan/10 hover:bg-brand-cyan/20 text-brand-cyan border border-brand-cyan/30 rounded-md text-xs font-bold transition flex items-center justify-center gap-2"
+                                className="w-full py-2 bg-brand-cyan/10 hover:bg-brand-cyan/20 text-brand-cyan border border-brand-cyan/30 rounded-md text-xs font-bold transition flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-gray-900 active:scale-95"
                             >
                                 {ingestingCount > 0 ? (
                                     <><svg className="animate-spin h-3 w-3" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Calibrating {ingestingCount} Blocks...</>
@@ -387,7 +387,7 @@ export const ProjectManager = ({
                             <button
                                 key={branch}
                                 onClick={() => setSelectedBranch(branch)}
-                                className={`px-4 py-2 text-xs font-bold rounded-lg border transition-all ${selectedBranch === branch ? 'bg-brand-cyan/20 border-brand-cyan text-brand-cyan' : 'bg-gray-700 border-gray-600 text-gray-400 hover:bg-gray-600'}`}
+                                className={`px-4 py-2 text-xs font-bold rounded-lg border transition-all focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-gray-900 active:scale-95 ${selectedBranch === branch ? 'bg-brand-cyan/20 border-brand-cyan text-brand-cyan' : 'bg-gray-700 border-gray-600 text-gray-400 hover:bg-gray-600'}`}
                             >
                                 {branch}
                             </button>

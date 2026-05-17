@@ -206,7 +206,7 @@ export const PatentModule: React.FC<PatentModuleProps> = ({ result, patentGenera
                                                 <button
                                                     key={type}
                                                     onClick={() => setProtectionType(type)}
-                                                    className={`px-4 py-2 text-left text-sm rounded-lg border transition-all ${protectionType === type ? 'bg-indigo-600 border-indigo-400 text-white shadow-lg' : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-indigo-500'}`}
+                                                    className={`px-4 py-2 text-left text-sm rounded-lg border transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 active:scale-95 ${protectionType === type ? 'bg-indigo-600 border-indigo-400 text-white shadow-lg' : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-indigo-500'}`}
                                                 >
                                                     <div className="font-bold">{type.replace('_', ' ')}</div>
                                                 </button>
@@ -231,7 +231,7 @@ export const PatentModule: React.FC<PatentModuleProps> = ({ result, patentGenera
                                     <button
                                         onClick={() => draftPatent(result, authenticatedUser, protectionType, foundryState?.jurisdiction || 'USPTO', foundryState?.designHash || '', knowledgeBase)}
                                         disabled={isViewer}
-                                        className="w-full md:w-auto px-12 py-5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-black uppercase tracking-widest transition-all hover:scale-105 active:scale-95 shadow-2xl shadow-indigo-500/30 disabled:opacity-50 flex items-center justify-center gap-4"
+                                        className="w-full md:w-auto px-12 py-5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-black uppercase tracking-widest transition-all hover:scale-105 active:scale-95 shadow-2xl shadow-indigo-500/30 disabled:opacity-50 flex items-center justify-center gap-4 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
                                     >
                                         Synthesize Formal IP Specification
                                     </button>
@@ -311,13 +311,13 @@ export const PatentModule: React.FC<PatentModuleProps> = ({ result, patentGenera
                                 <button 
                                     onClick={handleSecureInnovation}
                                     disabled={isSecuring}
-                                    className={`px-10 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all active:scale-95 shadow-2xl flex items-center gap-3 bg-brand-cyan text-white hover:bg-cyan-500 shadow-cyan-900/30`}
+                                    className={`px-10 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all active:scale-95 shadow-2xl flex items-center gap-3 bg-brand-cyan text-white hover:bg-cyan-500 shadow-cyan-900/30 focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-gray-900`}
                                 >
                                     {isSecuring ? 'Securing...' : 'Finalize & Secure Certificate'}
                                 </button>
                                 <button 
                                     onClick={() => patentGenerator.clearPatent()}
-                                    className="px-6 py-3 text-xs font-bold text-gray-500 hover:text-white transition bg-gray-800 rounded-xl border border-gray-700 hover:border-gray-600"
+                                    className="px-6 py-3 text-xs font-bold text-gray-500 hover:text-white transition bg-gray-800 rounded-xl border border-gray-700 hover:border-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 active:scale-95"
                                 >
                                     Refine Strategy
                                 </button>

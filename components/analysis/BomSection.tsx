@@ -41,7 +41,7 @@ export const BomSection: React.FC<BomSectionProps> = ({
                                 <td className="px-4 py-3 text-right">
                                     <button 
                                         onClick={() => bomSourcing.sourceItem(item)}
-                                        className="text-xs font-bold text-brand-cyan hover:underline"
+                                        className="text-xs font-bold text-brand-cyan hover:underline focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-slate-800 rounded px-1"
                                     >
                                         Source
                                     </button>

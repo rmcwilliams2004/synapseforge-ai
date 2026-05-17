@@ -74,7 +74,7 @@ export const CadSynthesisSection: React.FC<CadSynthesisSectionProps> = ({
     };
 
     return (
-        <Section id="physics_visualization" title="3D CAD Synthesis" actions={cadData ? <button onClick={onOpenCadViewer} className="text-xs font-bold text-brand-cyan hover:underline">Launch Advanced Viewer</button> : null}>
+        <Section id="physics_visualization" title="3D CAD Synthesis" actions={cadData ? <button onClick={onOpenCadViewer} className="text-xs font-bold text-brand-cyan hover:underline focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-slate-900 rounded">Launch Advanced Viewer</button> : null}>
             {!cadData && !isVideoCadActive ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="bg-gray-50 dark:bg-slate-800 p-10 rounded-xl border border-gray-200 dark:border-gray-700 text-center space-y-4 flex flex-col items-center justify-center">
@@ -82,7 +82,7 @@ export const CadSynthesisSection: React.FC<CadSynthesisSectionProps> = ({
                         <button 
                             onClick={() => onGenerateCad(drawings, result)}
                             disabled={isCadLoading || isVideoLoading}
-                            className="px-6 py-2 bg-brand-cyan text-white font-bold rounded-lg hover:bg-cyan-600 transition-all disabled:opacity-50"
+                            className="px-6 py-2 bg-brand-cyan text-white font-bold rounded-lg hover:bg-cyan-600 transition-all disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-slate-800 active:scale-95"
                         >
                             {isCadLoading ? 'Generating CAD...' : 'Generate 3D Model'}
                         </button>
@@ -94,7 +94,7 @@ export const CadSynthesisSection: React.FC<CadSynthesisSectionProps> = ({
                         <p className="text-sm text-slate-300 font-medium">Video-to-Foundry Pipeline</p>
                         <p className="text-xs text-slate-500">Upload craft footage to extract CAD operations via VideoCADFormer.</p>
                         
-                        <label className={`mt-4 px-6 py-2 bg-slate-800 text-brand-cyan font-bold rounded-lg border border-brand-cyan/30 hover:bg-slate-700 transition-all cursor-pointer flex items-center gap-2 ${isVideoLoading ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <label className={`mt-4 px-6 py-2 bg-slate-800 text-brand-cyan font-bold rounded-lg border border-brand-cyan/30 hover:bg-slate-700 transition-all cursor-pointer flex items-center gap-2 focus-within:ring-2 focus-within:ring-brand-cyan focus-within:ring-offset-2 dark:focus-within:ring-offset-slate-900 active:scale-95 ${isVideoLoading ? 'opacity-50 pointer-events-none' : ''}`}>
                             <Upload className="w-4 h-4" />
                             {isVideoLoading ? 'Processing Video...' : 'Upload .MP4'}
                             <input type="file" accept="video/mp4" className="hidden" onChange={handleVideoUpload} />
@@ -110,7 +110,7 @@ export const CadSynthesisSection: React.FC<CadSynthesisSectionProps> = ({
                         </h3>
                         <button 
                             onClick={() => setIsVideoCadActive(false)}
-                            className="text-xs text-slate-400 hover:text-white transition-colors"
+                            className="text-xs text-slate-400 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-slate-900 rounded"
                         >
                             Return to Standard Synthesis
                         </button>

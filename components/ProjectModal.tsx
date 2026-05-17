@@ -101,10 +101,10 @@ export const ProjectModal = ({ isOpen, onClose, onSave, project, initialData }: 
           </div>
         </div>
         <div className="flex justify-end gap-4 mt-6">
-          <button onClick={onClose} className="py-2 px-4 bg-gray-600 text-white font-semibold rounded-lg hover:bg-gray-500 transition active:scale-95">
+          <button onClick={onClose} className="py-2 px-4 bg-gray-600 text-white font-semibold rounded-lg hover:bg-gray-500 transition active:scale-95 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900">
             Cancel
           </button>
-          <button onClick={handleSave} disabled={!name.trim()} className="py-2 px-4 bg-brand-cyan text-white font-bold rounded-lg hover:bg-cyan-500 transition active:scale-95 disabled:opacity-50">
+          <button onClick={handleSave} disabled={!name.trim()} className="py-2 px-4 bg-brand-cyan text-white font-bold rounded-lg hover:bg-cyan-500 transition active:scale-95 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 dark:focus:ring-offset-gray-900">
             {confirmText}
           </button>
         </div>
